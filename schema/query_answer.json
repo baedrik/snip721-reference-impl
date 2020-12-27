@@ -1,0 +1,272 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryAnswer",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": [
+        "token_info"
+      ],
+      "properties": {
+        "token_info": {
+          "type": "object",
+          "required": [
+            "decimals",
+            "name",
+            "symbol"
+          ],
+          "properties": {
+            "decimals": {
+              "type": "integer",
+              "format": "uint8",
+              "minimum": 0.0
+            },
+            "name": {
+              "type": "string"
+            },
+            "symbol": {
+              "type": "string"
+            },
+            "total_supply": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Uint128"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "token_config"
+      ],
+      "properties": {
+        "token_config": {
+          "type": "object",
+          "required": [
+            "burn_enabled",
+            "deposit_enabled",
+            "mint_enabled",
+            "public_total_supply",
+            "redeem_enabled"
+          ],
+          "properties": {
+            "burn_enabled": {
+              "type": "boolean"
+            },
+            "deposit_enabled": {
+              "type": "boolean"
+            },
+            "mint_enabled": {
+              "type": "boolean"
+            },
+            "public_total_supply": {
+              "type": "boolean"
+            },
+            "redeem_enabled": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "exchange_rate"
+      ],
+      "properties": {
+        "exchange_rate": {
+          "type": "object",
+          "required": [
+            "denom",
+            "rate"
+          ],
+          "properties": {
+            "denom": {
+              "type": "string"
+            },
+            "rate": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "allowance"
+      ],
+      "properties": {
+        "allowance": {
+          "type": "object",
+          "required": [
+            "allowance",
+            "owner",
+            "spender"
+          ],
+          "properties": {
+            "allowance": {
+              "$ref": "#/definitions/Uint128"
+            },
+            "expiration": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0.0
+            },
+            "owner": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "spender": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "balance"
+      ],
+      "properties": {
+        "balance": {
+          "type": "object",
+          "required": [
+            "amount"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/definitions/Uint128"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transfer_history"
+      ],
+      "properties": {
+        "transfer_history": {
+          "type": "object",
+          "required": [
+            "txs"
+          ],
+          "properties": {
+            "txs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Tx"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "viewing_key_error"
+      ],
+      "properties": {
+        "viewing_key_error": {
+          "type": "object",
+          "required": [
+            "msg"
+          ],
+          "properties": {
+            "msg": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "minters"
+      ],
+      "properties": {
+        "minters": {
+          "type": "object",
+          "required": [
+            "minters"
+          ],
+          "properties": {
+            "minters": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/HumanAddr"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      }
+    },
+    "HumanAddr": {
+      "type": "string"
+    },
+    "Tx": {
+      "type": "object",
+      "required": [
+        "coins",
+        "from",
+        "id",
+        "receiver",
+        "sender"
+      ],
+      "properties": {
+        "coins": {
+          "$ref": "#/definitions/Coin"
+        },
+        "from": {
+          "$ref": "#/definitions/HumanAddr"
+        },
+        "id": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "receiver": {
+          "$ref": "#/definitions/HumanAddr"
+        },
+        "sender": {
+          "$ref": "#/definitions/HumanAddr"
+        }
+      }
+    },
+    "Uint128": {
+      "type": "string"
+    }
+  }
+}
