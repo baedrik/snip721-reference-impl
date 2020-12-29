@@ -37,19 +37,19 @@ impl InitMsg {
 pub struct InitConfig {
     /// Indicates whether the total supply is public or should be kept secret.
     /// default: False
-    pub public_total_supply: Option<bool>,
+    public_total_supply: Option<bool>,
     /// Indicates whether deposit functionality should be enabled
     /// default: False
-    pub enable_deposit: Option<bool>,
+    enable_deposit: Option<bool>,
     /// Indicates whether redeem functionality should be enabled
     /// default: False
-    pub enable_redeem: Option<bool>,
+    enable_redeem: Option<bool>,
     /// Indicates whether mint functionality should be enabled
     /// default: False
-    pub enable_mint: Option<bool>,
+    enable_mint: Option<bool>,
     /// Indicates whether burn functionality should be enabled
     /// default: False
-    pub enable_burn: Option<bool>,
+    enable_burn: Option<bool>,
 }
 
 impl InitConfig {
