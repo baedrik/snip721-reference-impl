@@ -14,9 +14,15 @@ I opted for this style of conversion so that there will never be any tokens lost
 ## Differences from the Base SNIP-20 Reference Implementation
 * Token symbol may contain digits
 * Token may have more than 18 decimal places
+* Instead of transaction history being limited to only transfers, all calls to transfer, transfer_from, send, send_from, deposit, redeem, redeem_to, mint, burn, and burn_from will be displayed in a viewing key authenticated TransactionHistory query:
+```sh
+secretcli q compute query <contract-address> '{"transaction_history": {"address": "*your_address*", "key": "*your_viewing_key*", "page": optional_page_number, "page_size": number_of_transactions_to_return}}'
+```
+The TransferHistory query remains unchanged and will display only transfers in the display format specified in the SNIP-20 spec (memo fields will not be displayed in the legacy TransferHistory query because they are not present in the SNIP-20 spec).
+* You may include an optional `memo` String field with calls to transfer, transfer_from, send, send_from, deposit, redeem, redeem_to, mint, burn, and burn_from if you would like those transactions to have a private memo attached to them.
 * You can redeem tokens to an address other than yourself using the RedeemTo function:
 ```sh
-secretcli tx compute execute --label *your_token_label* '{"redeem_to":{"recipient":"*address_to_receive_the_SCRT*","amount":"*amount_to_redeem_in_smallest_token_denomination*"}}' --from *your_alias_or_address* --gas 130000 -y
+secretcli tx compute execute --label *your_token_label* '{"redeem_to":{"recipient":"*address_to_receive_the_SCRT*","amount":"*amount_to_redeem_in_smallest_token_denomination*","memo":"*optional_memo_String*"}}' --from *your_alias_or_address* --gas 130000 -y
 ```
 * To view the configuration of the token contract:
 ```sh
