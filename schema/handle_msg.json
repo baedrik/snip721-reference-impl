@@ -23,6 +23,12 @@
                 "null"
               ]
             },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "padding": {
               "type": [
                 "string",
@@ -55,6 +61,12 @@
                 "null"
               ]
             },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "padding": {
               "type": [
                 "string",
@@ -77,6 +89,12 @@
         "deposit": {
           "type": "object",
           "properties": {
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "padding": {
               "type": [
                 "string",
@@ -102,6 +120,12 @@
           "properties": {
             "amount": {
               "$ref": "#/definitions/Uint128"
+            },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "padding": {
               "type": [
@@ -131,6 +155,12 @@
           "properties": {
             "amount": {
               "$ref": "#/definitions/Uint128"
+            },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "msg": {
               "anyOf": [
@@ -169,6 +199,12 @@
           "properties": {
             "amount": {
               "$ref": "#/definitions/Uint128"
+            },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "padding": {
               "type": [
@@ -346,6 +382,12 @@
             "amount": {
               "$ref": "#/definitions/Uint128"
             },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "owner": {
               "$ref": "#/definitions/HumanAddr"
             },
@@ -378,6 +420,12 @@
           "properties": {
             "amount": {
               "$ref": "#/definitions/Uint128"
+            },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "msg": {
               "anyOf": [
@@ -421,6 +469,12 @@
             "amount": {
               "$ref": "#/definitions/Uint128"
             },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "owner": {
               "$ref": "#/definitions/HumanAddr"
             },
@@ -449,6 +503,12 @@
           "properties": {
             "amount": {
               "$ref": "#/definitions/Uint128"
+            },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "padding": {
               "type": [

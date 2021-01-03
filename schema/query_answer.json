@@ -168,6 +168,28 @@
             "txs": {
               "type": "array",
               "items": {
+                "$ref": "#/definitions/LegacyTx"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_history"
+      ],
+      "properties": {
+        "transaction_history": {
+          "type": "object",
+          "required": [
+            "txs"
+          ],
+          "properties": {
+            "txs": {
+              "type": "array",
+              "items": {
                 "$ref": "#/definitions/Tx"
               }
             }
@@ -236,7 +258,7 @@
     "HumanAddr": {
       "type": "string"
     },
-    "Tx": {
+    "LegacyTx": {
       "type": "object",
       "required": [
         "coins",
@@ -264,6 +286,170 @@
           "$ref": "#/definitions/HumanAddr"
         }
       }
+    },
+    "Tx": {
+      "type": "object",
+      "required": [
+        "action",
+        "coins",
+        "id"
+      ],
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/TxAction"
+        },
+        "coins": {
+          "$ref": "#/definitions/Coin"
+        },
+        "id": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "memo": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "TxAction": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "transfer"
+          ],
+          "properties": {
+            "transfer": {
+              "type": "object",
+              "required": [
+                "from",
+                "recipient"
+              ],
+              "properties": {
+                "from": {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                "recipient": {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                "sender": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/HumanAddr"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "deposit"
+          ],
+          "properties": {
+            "deposit": {
+              "type": "object",
+              "required": [
+                "recipient"
+              ],
+              "properties": {
+                "recipient": {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "redeem"
+          ],
+          "properties": {
+            "redeem": {
+              "type": "object",
+              "required": [
+                "owner"
+              ],
+              "properties": {
+                "owner": {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                "recipient": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/HumanAddr"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "mint"
+          ],
+          "properties": {
+            "mint": {
+              "type": "object",
+              "required": [
+                "minter",
+                "recipient"
+              ],
+              "properties": {
+                "minter": {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                "recipient": {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "burn"
+          ],
+          "properties": {
+            "burn": {
+              "type": "object",
+              "required": [
+                "owner"
+              ],
+              "properties": {
+                "burner": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/HumanAddr"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "owner": {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "Uint128": {
       "type": "string"
