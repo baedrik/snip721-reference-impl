@@ -44,8 +44,10 @@ pub struct InitConfig {
     /// indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the
     /// private metadata is not viewable by anyone, not even the owner, until the owner calls the
     /// Reveal function.  When Reveal is called, the sealed metadata is irreversibly moved to the
-    /// public metadata.  This simulates buying/selling a wrapped card that non one knows which
-    /// card it is until it is unwrapped
+    /// public metadata (as default).  if unwrapped_metadata_is_private is set to true, it will 
+    /// remain as private metadata, but the owner will now be able to see it.  Anyone will be able
+    /// to query the token to know that it has been unwrapped.  This simulates buying/selling a 
+    /// wrapped card that non one knows which card it is until it is unwrapped
     /// default:  False
     pub enable_sealed_metadata: Option<bool>,
     /// indicates if the Reveal function should keep the sealed metadata private after unwrapping
@@ -97,6 +99,7 @@ pub enum HandleMsg {
         padding: Option<String>,
     },
     /// set the public metadata.  This can be called by either the token owner or a valid minter
+    /// if they have been given this power by the appropriate config values
     SetPublicMetadata {
         /// id of the token whose public metadata should be updated
         token_id: String,
@@ -106,6 +109,7 @@ pub enum HandleMsg {
         padding: Option<String>,
     },
     /// set the private metadata.  This can be called by either the token owner or a valid minter
+    /// if they have been given this power by the appropriate config values
     SetPrivateMetadata {
         /// id of the token whose private metadata should be updated
         token_id: String,
@@ -114,7 +118,7 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// Reveal the private metadata of a sealed token
+    /// Reveal the private metadata of a sealed token and mark the token as having been unwrapped
     Reveal {
         /// id of the token to unwrap
         token_id: String,
@@ -212,7 +216,7 @@ pub enum HandleMsg {
     },
     /// send many tokens and call receiving contracts' ReceiveNft
     BatchSendNft {
-        ///list of sends to perform
+        /// list of sends to perform
         sends: Vec<Send>,
         /// optional message length padding
         padding: Option<String>,
@@ -233,7 +237,7 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// register that contract implements ReceiveNft
+    /// register that the contract implements ReceiveNft
     RegisterReceiveNft {
         /// receving contract's code hash
         code_hash: String,
@@ -306,7 +310,7 @@ pub enum Access {
     None,
 }
 
-/// token burn info
+/// token burn info used when doing a BatchBurnNft
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct Burn {
@@ -316,7 +320,7 @@ pub struct Burn {
     pub memo: Option<String>,
 }
 
-/// token transfer info
+/// token transfer info used when doing a BatchTransferNft
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct Transfer {
@@ -328,7 +332,7 @@ pub struct Transfer {
     pub memo: Option<String>,
 }
 
-/// send token info
+/// send token info used when doing a BatchSendNft
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct Send {
