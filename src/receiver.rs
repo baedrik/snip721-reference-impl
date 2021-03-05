@@ -1,58 +1,58 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{to_binary, Binary, CosmosMsg, HumanAddr, StdResult, Uint128, WasmMsg};
+use cosmwasm_std::{Binary, CosmosMsg, HumanAddr, StdResult};
 
-use crate::{contract::RESPONSE_BLOCK_SIZE, msg::space_pad};
+use secret_toolkit::utils::HandleCallback;
 
-/// Snip20ReceiveMsg should be de/serialized under `Receive()` variant in a HandleMsg
+use crate::contract::BLOCK_SIZE;
+
+/// used to create a ReceiveNft callback message
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub struct Snip20ReceiveMsg {
-    pub sender: HumanAddr,
-    pub from: HumanAddr,
-    pub amount: Uint128,
-    pub msg: Option<Binary>,
+pub enum Snip721ReceiveNftMsg {
+    /// ReceiveNft should be a HandleMsg variant of any contract that wants to implement
+    /// SendNft/ReceiveNft functionality
+    ReceiveNft {
+        /// address that sent the token
+        sender: HumanAddr,
+        /// previous owner of sent token
+        from: HumanAddr,
+        /// token that was sent
+        token_id: String,
+        /// optional message to control receiving logic
+        msg: Option<Binary>,
+    },
 }
 
-impl Snip20ReceiveMsg {
-    pub fn new(sender: HumanAddr, from: HumanAddr, amount: Uint128, msg: Option<Binary>) -> Self {
-        Self {
-            sender,
-            from,
-            amount,
-            msg,
-        }
-    }
-
-    /// serializes the message, and pads it to 256 bytes
-    pub fn into_binary(self) -> StdResult<Binary> {
-        let msg = ReceiverHandleMsg::Receive(self);
-        let mut data = to_binary(&msg)?;
-        space_pad(RESPONSE_BLOCK_SIZE, &mut data.0);
-        Ok(data)
-    }
-
-    /// creates a cosmos_msg sending this struct to the named contract
-    pub fn into_cosmos_msg(
-        self,
-        callback_code_hash: String,
-        contract_addr: HumanAddr,
-    ) -> StdResult<CosmosMsg> {
-        let msg = self.into_binary()?;
-        let execute = WasmMsg::Execute {
-            msg,
-            callback_code_hash,
-            contract_addr,
-            send: vec![],
-        };
-        Ok(execute.into())
-    }
+impl HandleCallback for Snip721ReceiveNftMsg {
+    const BLOCK_SIZE: usize = BLOCK_SIZE;
 }
 
-// This is just a helper to properly serialize the above message
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
-enum ReceiverHandleMsg {
-    Receive(Snip20ReceiveMsg),
+/// Returns a StdResult<CosmosMsg> used to call a registered contract's ReceiveNft
+///
+/// # Arguments
+///
+/// * `sender` - the address that is sending the token
+/// * `from` - the address of the former owner of the sent token
+/// * `token_id` - ID String of the token that was sent
+/// * `msg` - optional msg used to control ReceiveNft logic
+/// * `callback_code_hash` - String holding the code hash of the contract that was
+///                          sent the token
+/// * `contract_addr` - address of the contract that was sent the token
+pub fn receive_nft_msg(
+    sender: HumanAddr,
+    from: HumanAddr,
+    token_id: String,
+    msg: Option<Binary>,
+    callback_code_hash: String,
+    contract_addr: HumanAddr,
+) -> StdResult<CosmosMsg> {
+    let msg = Snip721ReceiveNftMsg::ReceiveNft {
+        sender,
+        from,
+        token_id,
+        msg,
+    };
+    Ok(msg.to_cosmos_msg(callback_code_hash, contract_addr, None)?)
 }

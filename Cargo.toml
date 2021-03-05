@@ -1,7 +1,7 @@
 [package]
-name = "configurable-snip20"
+name = "snip721-reference-impl"
 version = "0.1.0"
-authors = ["Itzik <itzik@keytango.io>"]
+authors = ["bill wincer"]
 edition = "2018"
 
 exclude = [

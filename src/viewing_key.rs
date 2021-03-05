@@ -9,7 +9,6 @@ use crate::rand::{sha_256, Prng};
 use crate::utils::{create_hashed_password, ct_slice_compare};
 
 pub const VIEWING_KEY_SIZE: usize = 32;
-pub const VIEWING_KEY_PREFIX: &str = "api_key_";
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct ViewingKey(pub String);
@@ -36,7 +35,7 @@ impl ViewingKey {
 
         let key = sha_256(&rand_slice);
 
-        Self(VIEWING_KEY_PREFIX.to_string() + &base64::encode(key))
+        Self(base64::encode(key))
     }
 
     pub fn to_hashed(&self) -> [u8; VIEWING_KEY_SIZE] {
