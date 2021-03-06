@@ -545,25 +545,26 @@ pub fn reveal<S: Storage, A: Api, Q: Querier>(
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     let tokens: HashMap<String, u32> =
         may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
-    let idx = tokens
-        .get(token_id)
-        .ok_or_else(|| StdError::generic_err(format!("Token ID: {} not found", token_id)))?;
-    let token_key = idx.to_le_bytes();
-    let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
-    let mut token: Token = json_may_load(&info_store, &token_key)?.ok_or_else(|| {
-        StdError::generic_err(format!("Unable to find token info for {}", token_id))
-    })?;
+    let custom_err = format!("You do not own token {}", token_id);
+    // if token supply is private, don't leak that the token id does not exist
+    // instead just say they do not own that token
+    let opt_err = if config.token_supply_is_public {
+        None
+    } else {
+        Some(&*custom_err)
+    };
+    let (mut token, idx) = get_token(&deps.storage, token_id, &tokens, opt_err)?;
     if token.unwrapped {
         return Err(StdError::generic_err(
             "This token has already been unwrapped",
         ));
     }
     if token.owner != sender_raw {
-        return Err(StdError::generic_err(
-            "Only the token owner may unwrap a token",
-        ));
+        return Err(StdError::generic_err(custom_err));
     }
     token.unwrapped = true;
+    let token_key = idx.to_le_bytes();
+    let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
     json_save(&mut info_store, &token_key, &token)?;
     if !config.unwrap_to_private {
         let mut priv_store = PrefixedStorage::new(PREFIX_PRIV_META, &mut deps.storage);
@@ -610,7 +611,15 @@ pub fn approve_revoke<S: Storage, A: Api, Q: Querier>(
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     let tokens: HashMap<String, u32> =
         may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
-    let (token, idx) = get_token(&deps.storage, token_id, &tokens)?;
+    let custom_err = format!("Not authorized to grant/revoke transfer permission for token {}", token_id);
+    // if token supply is private, don't leak that the token id does not exist
+    // instead just say they are not authorized for that token
+    let opt_err = if config.token_supply_is_public {
+        None
+    } else {
+        Some(&*custom_err)
+    };
+    let (token, idx) = get_token(&deps.storage, token_id, &tokens, opt_err)?;
     let mut all_perm: Option<Vec<Permission>> = None;
     let mut from_oper = false;
     // if not called by the owner, check if message sender has operator status
@@ -632,9 +641,7 @@ pub fn approve_revoke<S: Storage, A: Api, Q: Querier>(
             }
         }
         if !from_oper {
-            return Err(StdError::generic_err(
-                "Not authorized to grant/revoke transfer permission for this token",
-            ));
+            return Err(StdError::generic_err(custom_err));
         }
         all_perm = may_list;
     }
@@ -706,11 +713,20 @@ pub fn set_approval<S: Storage, A: Api, Q: Querier>(
     let token_given: bool;
     let address_raw = deps.api.canonical_address(address)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    let tokens: HashMap<String, u32> =
-        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
+    let mut custom_err = String::new();
     let (token, idx) = if let Some(id) = token_id {
         token_given = true;
-        get_token(&deps.storage, &id, &tokens)?
+        let tokens: HashMap<String, u32> =
+            may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
+        custom_err = format!("You do not own token {}", id);
+        // if token supply is private, don't leak that the token id does not exist
+        // instead just say they do not own that token
+        let opt_err = if config.token_supply_is_public {
+            None
+        } else {
+            Some(&*custom_err)
+        };
+        get_token(&deps.storage, &id, &tokens, opt_err)?
     } else {
         token_given = false;
         (
@@ -724,9 +740,7 @@ pub fn set_approval<S: Storage, A: Api, Q: Querier>(
     };
     // if trying to set token permissions when you are not the owner
     if token_given && token.owner != sender_raw {
-        return Err(StdError::generic_err(
-            "Only the owner of a token my use SetApproval to define its permissions",
-        ));
+        return Err(StdError::generic_err(custom_err));
     }
     // if trying to set view private metadata permission when private metadata is disabled
     if view_private_metadata.is_some() && !config.private_metadata_is_enabled {
@@ -1325,6 +1339,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
 /// * `sender` - a reference to the address trying to get access to the token
 /// * `perm_type` - PermissionType we are checking
 /// * `oper_for` - a mutable reference to a list of owners that gave the sender "all" permission
+/// * `supply_is_public` - true if the token supply is public
 fn check_permission<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     block: &BlockInfo,
@@ -1333,8 +1348,20 @@ fn check_permission<S: Storage, A: Api, Q: Querier>(
     sender: &CanonicalAddr,
     perm_type: PermissionType,
     oper_for: &mut Vec<CanonicalAddr>,
+    supply_is_public: bool,
 ) -> StdResult<(Token, u32)> {
-    let (token, idx) = get_token(&deps.storage, token_id, tokens)?;
+    let custom_err = format!(
+        "You are not authorized to perform this action on token {}",
+        token_id
+    );
+    // if token supply is private, don't leak that the token id does not exist
+    // instead just say they are not authorized for that token
+    let opt_err = if supply_is_public {
+        None
+    } else {
+        Some(&*custom_err)
+    };
+    let (token, idx) = get_token(&deps.storage, token_id, tokens, opt_err)?;
     let exp_idx = perm_type.to_u8();
     let owner_slice = token.owner.as_slice();
     // if sender is not the owner and did not already pass with "all" permission for this owner
@@ -1370,10 +1397,7 @@ fn check_permission<S: Storage, A: Api, Q: Querier>(
                 }
             }
         }
-        return Err(StdError::generic_err(format!(
-            "You are not authorized to perform this action on token {}",
-            token_id
-        )));
+        return Err(StdError::generic_err(custom_err));
     }
     Ok((token, idx))
 }
@@ -1387,14 +1411,24 @@ fn check_permission<S: Storage, A: Api, Q: Querier>(
 /// * `storage` - a reference to contract's storage
 /// * `token_id` - token id string slice
 /// * `tokens` - a reference to the HashMap of token id String to the token storage index
+/// * `custom_err` - optional custom error message to use if don't want to reveal that a token
+///                  does not exist
 fn get_token<S: ReadonlyStorage>(
     storage: &S,
     token_id: &str,
     tokens: &HashMap<String, u32>,
+    custom_err: Option<&str>,
 ) -> StdResult<(Token, u32)> {
+    let default_err: String;
+    let not_found = if let Some(err) = custom_err {
+        err
+    } else {
+        default_err = format!("Token ID: {} not found", token_id);
+        &*default_err
+    };
     let idx = tokens
         .get(token_id)
-        .ok_or_else(|| StdError::generic_err(format!("Token ID: {} not found", token_id)))?;
+        .ok_or_else(|| StdError::generic_err(not_found))?;
     let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, storage);
     let token: Token = json_may_load(&info_store, &idx.to_le_bytes())?.ok_or_else(|| {
         StdError::generic_err(format!("Unable to find token info for {}", token_id))
@@ -1440,14 +1474,15 @@ fn set_metadata<S: Storage>(
 ) -> StdResult<()> {
     let tokens: HashMap<String, u32> =
         may_load(storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
-    let idx = tokens
-        .get(token_id)
-        .ok_or_else(|| StdError::generic_err(format!("Token ID: {} not found", token_id)))?;
-    let token_key = idx.to_le_bytes();
-    let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, storage);
-    let token: Token = json_may_load(&info_store, &token_key)?.ok_or_else(|| {
-        StdError::generic_err(format!("Unable to find token info for {}", token_id))
-    })?;
+    let custom_err = format!("Not authorized to update metadata of token {}", token_id);
+    // if token supply is private, don't leak that the token id does not exist
+    // instead just say they are not authorized for that token
+    let opt_err = if config.token_supply_is_public {
+        None
+    } else {
+        Some(&*custom_err)
+    };
+    let (token, idx) = get_token(storage, token_id, &tokens, opt_err)?;
     // do not allow the altering of sealed metadata
     if config.sealed_metadata_is_enabled && prefix == PREFIX_PRIV_META && !token.unwrapped {
         return Err(StdError::generic_err(
@@ -1458,12 +1493,11 @@ fn set_metadata<S: Storage>(
         let minters: Vec<CanonicalAddr> =
             may_load(storage, MINTERS_KEY)?.unwrap_or_else(|| Vec::new());
         if !(minters.contains(sender) && config.minter_may_update_metadata) {
-            return Err(StdError::generic_err("Not authorized to update metadata"));
+            return Err(StdError::generic_err(custom_err));
         }
     }
-
     let mut meta_store = PrefixedStorage::new(prefix, storage);
-    save(&mut meta_store, &token_key, metadata)?;
+    save(&mut meta_store, &idx.to_le_bytes(), metadata)?;
     Ok(())
 }
 
@@ -2078,6 +2112,7 @@ fn transfer_impl<S: Storage, A: Api, Q: Querier>(
         sender,
         PermissionType::Transfer,
         oper_for,
+        config.token_supply_is_public,
     )?;
     let old_owner = token.owner;
     // don't bother processing anything if ownership does not change
@@ -2249,6 +2284,7 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
             sender,
             PermissionType::Transfer,
             &mut oper_for,
+            config.token_supply_is_public,
         )?;
         // log the inventory change
         let mut new_inv = InventoryUpdate {

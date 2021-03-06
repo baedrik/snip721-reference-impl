@@ -411,12 +411,50 @@ mod tests {
     // test updating public metadata
     #[test]
     fn test_set_public_metadata() {
+        let (init_result, mut deps) = init_helper_with_config(
+            true, false, true, false, false, false, false, false
+        );
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test token does not exist when supply is public
+        let handle_msg = HandleMsg::SetPublicMetadata {
+            token_id: "SNIP20".to_string(),
+            metadata: Metadata {
+                name: Some("New Name".to_string()),
+                description: Some("I changed the metadata".to_string()),
+                image: Some("new uri".to_string()),
+            },
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Token ID: SNIP20 not found"));
+
         let (init_result, mut deps) = init_helper_default();
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
             init_result.err().unwrap()
         );
+
+        // test token does not exist when supply is private
+        let handle_msg = HandleMsg::SetPublicMetadata {
+            token_id: "SNIP20".to_string(),
+            metadata: Metadata {
+                name: Some("New Name".to_string()),
+                description: Some("I changed the metadata".to_string()),
+                image: Some("new uri".to_string()),
+            },
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Not authorized to update metadata of token SNIP20"));
+
         // test setting metadata when status prevents it
         let handle_msg = HandleMsg::SetContractStatus {
             level: ContractStatus::StopAll,
@@ -455,20 +493,6 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-
-        // test token does not exist
-        let handle_msg = HandleMsg::SetPublicMetadata {
-            token_id: "SNIP20".to_string(),
-            metadata: Metadata {
-                name: Some("New Name".to_string()),
-                description: Some("I changed the metadata".to_string()),
-                image: Some("new uri".to_string()),
-            },
-            padding: None,
-        };
-        let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let error = extract_error_msg(handle_result);
-        assert!(error.contains("Token ID: SNIP20 not found"));
 
         // test not minter nor owner
         let handle_msg = HandleMsg::SetPublicMetadata {
@@ -577,15 +601,36 @@ mod tests {
 
     #[test]
     fn test_set_private_metadata() {
-        // test trying to set private metadata when private metadata is disabled
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, false, false, false, true, false, false);
+            init_helper_with_config(false, false, true, false, false, true, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
             init_result.err().unwrap()
         );
 
+        // test token does not exist when supply is private
+        let handle_msg = HandleMsg::SetPrivateMetadata {
+            token_id: "SNIP20".to_string(),
+            metadata: Metadata {
+                name: Some("New Name".to_string()),
+                description: Some("I changed the metadata".to_string()),
+                image: Some("new uri".to_string()),
+            },
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Not authorized to update metadata of token SNIP20"));
+
+        let (init_result, mut deps) =
+        init_helper_with_config(false, false, false, false, false, true, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+    
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -599,6 +644,8 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        
+        // test trying to set private metadata when private metadata is disabled
         let handle_msg = HandleMsg::SetPrivateMetadata {
             token_id: "MyNFT".to_string(),
             metadata: Metadata {
@@ -614,26 +661,12 @@ mod tests {
 
         // test trying to change sealed metadata before it has been unwrapped
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, false, true, true, true, false, false);
+            init_helper_with_config(true, false, false, true, true, true, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
             init_result.err().unwrap()
         );
-
-        // test token does not exist
-        let handle_msg = HandleMsg::SetPrivateMetadata {
-            token_id: "SNIP20".to_string(),
-            metadata: Metadata {
-                name: Some("New Name".to_string()),
-                description: Some("I changed the metadata".to_string()),
-                image: Some("new uri".to_string()),
-            },
-            padding: None,
-        };
-        let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let error = extract_error_msg(handle_result);
-        assert!(error.contains("Token ID: SNIP20 not found"));
 
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
@@ -660,6 +693,20 @@ mod tests {
         let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The private metadata of a sealed token can not be modified"));
+
+        // test token does not exist when supply is public
+        let handle_msg = HandleMsg::SetPrivateMetadata {
+            token_id: "SNIP20".to_string(),
+            metadata: Metadata {
+                name: Some("New Name".to_string()),
+                description: Some("I changed the metadata".to_string()),
+                image: Some("new uri".to_string()),
+            },
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Token ID: SNIP20 not found"));
 
         // sanity check, minter changing metadata after owner unwrapped
         let handle_msg = HandleMsg::Reveal {
@@ -732,7 +779,7 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Not authorized to update metadata"));
+        assert!(error.contains("Not authorized to update metadata of token MyNFT"));
 
         // test authorized owner creates new metadata when it didn't exist before
         let (init_result, mut deps) =
@@ -783,6 +830,40 @@ mod tests {
     // test Reveal
     #[test]
     fn test_reveal() {
+        let (init_result, mut deps) =
+            init_helper_with_config(true, false, true, true, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test token does not exist when supply is public
+        let handle_msg = HandleMsg::Reveal {
+            token_id: "MyNFT".to_string(),
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Token ID: MyNFT not found"));
+
+        let (init_result, mut deps) =
+            init_helper_with_config(false, false, true, true, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test token does not exist when supply is private
+        let handle_msg = HandleMsg::Reveal {
+            token_id: "MyNFT".to_string(),
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("You do not own token MyNFT"));
+
         let (init_result, mut deps) =
             init_helper_with_config(false, false, true, false, false, false, false, false);
         assert!(
@@ -843,15 +924,6 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        // test token does not exist
-        let handle_msg = HandleMsg::Reveal {
-            token_id: "MyNFT".to_string(),
-            padding: None,
-        };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let error = extract_error_msg(handle_result);
-        assert!(error.contains("Token ID: MyNFT not found"));
-
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -871,7 +943,7 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Only the token owner may unwrap a token"));
+        assert!(error.contains("You do not own token MyNFT"));
 
         // sanity check, unwrap to public metadata
         let handle_msg = HandleMsg::Reveal {
@@ -945,14 +1017,14 @@ mod tests {
     #[test]
     fn test_set_approval() {
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, false, false, false, false, false, false);
+            init_helper_with_config(true, false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
             init_result.err().unwrap()
         );
 
-        // test token does not exist
+        // test token does not exist when supply is public
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
@@ -965,6 +1037,28 @@ mod tests {
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT1 not found"));
+
+        let (init_result, mut deps) =
+            init_helper_with_config(false, false, false, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test token does not exist when supply is private
+        let handle_msg = HandleMsg::SetApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(Access::All),
+            view_private_metadata: None,
+            transfer: Some(Access::ApproveToken),
+            expires: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("You do not own token NFT1"));
 
         let handle_msg = HandleMsg::Mint {
             token_id: Some("NFT1".to_string()),
@@ -1056,8 +1150,7 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error
-            .contains("Only the owner of a token my use SetApproval to define its permissions"));
+        assert!(error.contains("You do not own token NFT1"));
 
         // try to set view_private_metadata when the contract has disabled priv meta
         let handle_msg = HandleMsg::SetApproval {
@@ -2915,14 +3008,16 @@ mod tests {
     // test approve from the cw721 spec
     #[test]
     fn test_cw721_approve() {
-        let (init_result, mut deps) = init_helper_default();
+        let (init_result, mut deps) = init_helper_with_config(
+            true, false, false, false, false, false, false, false
+        );
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
             init_result.err().unwrap()
         );
 
-        // test token does not exist
+        // test token does not exist when supply is public
         let handle_msg = HandleMsg::Approve {
             spender: HumanAddr("bob".to_string()),
             token_id: "MyNFT".to_string(),
@@ -2932,6 +3027,24 @@ mod tests {
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
+
+        let (init_result, mut deps) = init_helper_default();
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test token does not exist when supply is private
+        let handle_msg = HandleMsg::Approve {
+            spender: HumanAddr("bob".to_string()),
+            token_id: "MyNFT".to_string(),
+            expires: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Not authorized to grant/revoke transfer permission for token MyNFT"));
 
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
@@ -2978,7 +3091,7 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Not authorized to grant/revoke transfer permission for this token"));
+        assert!(error.contains("Not authorized to grant/revoke transfer permission for token MyNFT"));
 
         // test expired operator attempt
         let handle_msg = HandleMsg::SetApproval {
@@ -3386,14 +3499,16 @@ mod tests {
     // test Revoke from cw721 spec
     #[test]
     fn test_cw721_revoke() {
-        let (init_result, mut deps) = init_helper_default();
+        let (init_result, mut deps) = init_helper_with_config(
+            true, false, false, false, false, false, false, false,
+        );
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
             init_result.err().unwrap()
         );
 
-        // test token does not exist
+        // test token does not exist when supply is public
         let handle_msg = HandleMsg::Revoke {
             spender: HumanAddr("bob".to_string()),
             token_id: "MyNFT".to_string(),
@@ -3402,6 +3517,23 @@ mod tests {
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
+
+        let (init_result, mut deps) = init_helper_default();
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test token does not exist when supply is private 
+        let handle_msg = HandleMsg::Revoke {
+            spender: HumanAddr("bob".to_string()),
+            token_id: "MyNFT".to_string(),
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Not authorized to grant/revoke transfer permission for token MyNFT"));
 
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
@@ -3446,7 +3578,7 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Not authorized to grant/revoke transfer permission for this token"));
+        assert!(error.contains("Not authorized to grant/revoke transfer permission for token MyNFT"));
 
         // test expired operator attempt
         let handle_msg = HandleMsg::SetApproval {
@@ -3969,14 +4101,14 @@ mod tests {
         assert!(error.contains("Burn functionality is not enabled for this token"));
 
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, true);
+            init_helper_with_config(true, false, true, false, false, false, false, true);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
             init_result.err().unwrap()
         );
 
-        // test token not found
+        // test token not found when supply is public
         let handle_msg = HandleMsg::BurnNft {
             token_id: "MyNFT".to_string(),
             memo: None,
@@ -3985,6 +4117,24 @@ mod tests {
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
+
+        let (init_result, mut deps) =
+            init_helper_with_config(false, false, true, false, false, false, false, true);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test token not found when supply is private
+        let handle_msg = HandleMsg::BurnNft {
+            token_id: "MyNFT".to_string(),
+            memo: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("You are not authorized to perform this action on token MyNFT"));
 
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
@@ -4616,7 +4766,9 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Token ID: NFT6 not found"));
+        // because the token no longer exists after burning it, it will say you are not
+        // authorized if supply is private, and token not found if public
+        assert!(error.contains("You are not authorized to perform this action on token NFT6"));
 
         // set up for batch burn test
         let (init_result, mut deps) =
@@ -5244,6 +5396,25 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         let (init_result, mut deps) =
+        init_helper_with_config(true, false, true, false, false, false, false, false);
+    assert!(
+        init_result.is_ok(),
+        "Init failed: {}",
+        init_result.err().unwrap()
+    );
+
+    // test token not found when supply is public
+    let handle_msg = HandleMsg::TransferNft {
+        recipient: HumanAddr("bob".to_string()),
+        token_id: "MyNFT".to_string(),
+        memo: None,
+        padding: None,
+    };
+    let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+    let error = extract_error_msg(handle_result);
+    assert!(error.contains("Token ID: MyNFT not found"));
+
+        let (init_result, mut deps) =
             init_helper_with_config(false, false, true, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
@@ -5251,7 +5422,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        // test token not found
+        // test token not found when supply is private
         let handle_msg = HandleMsg::TransferNft {
             recipient: HumanAddr("bob".to_string()),
             token_id: "MyNFT".to_string(),
@@ -5260,7 +5431,7 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Token ID: MyNFT not found"));
+        assert!(error.contains("You are not authorized to perform this action on token MyNFT"));
 
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
@@ -5752,7 +5923,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(true, false, true, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -5764,7 +5935,7 @@ mod tests {
             memo: None,
         }];
 
-        // test token not found
+        // test token not found when supply is public
         let handle_msg = HandleMsg::BatchTransferNft {
             transfers,
             padding: None,
@@ -6419,6 +6590,26 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         let (init_result, mut deps) =
+        init_helper_with_config(true, false, true, false, false, false, false, false);
+    assert!(
+        init_result.is_ok(),
+        "Init failed: {}",
+        init_result.err().unwrap()
+    );
+
+    // test token not found when supply is public
+    let handle_msg = HandleMsg::SendNft {
+        contract: HumanAddr("bob".to_string()),
+        token_id: "MyNFT".to_string(),
+        msg: None,
+        memo: None,
+        padding: None,
+    };
+    let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+    let error = extract_error_msg(handle_result);
+    assert!(error.contains("Token ID: MyNFT not found"));
+
+        let (init_result, mut deps) =
             init_helper_with_config(false, false, true, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
@@ -6426,7 +6617,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        // test token not found
+        // test token not found when supply is private
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("bob".to_string()),
             token_id: "MyNFT".to_string(),
@@ -6436,7 +6627,7 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Token ID: MyNFT not found"));
+        assert!(error.contains("You are not authorized to perform this action on token MyNFT"));
 
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
@@ -7006,7 +7197,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(true, false, true, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -7019,7 +7210,7 @@ mod tests {
             memo: None,
         }];
 
-        // test token not found
+        // test token not found when supply is public
         let handle_msg = HandleMsg::BatchSendNft {
             sends,
             padding: None,
