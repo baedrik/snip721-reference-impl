@@ -48,7 +48,6 @@ mod tests {
     fn init_helper_with_config(
         public_token_supply: bool,
         public_owner: bool,
-        enable_private_metadata: bool,
         enable_sealed_metadata: bool,
         unwrapped_metadata_is_private: bool,
         minter_may_update_metadata: bool,
@@ -65,7 +64,6 @@ mod tests {
             format!(
                 "{{\"public_token_supply\":{},
             \"public_owner\":{},
-            \"enable_private_metadata\":{},
             \"enable_sealed_metadata\":{},
             \"unwrapped_metadata_is_private\":{},
             \"minter_may_update_metadata\":{},
@@ -73,7 +71,6 @@ mod tests {
             \"enable_burn\":{}}}",
                 public_token_supply,
                 public_owner,
-                enable_private_metadata,
                 enable_sealed_metadata,
                 unwrapped_metadata_is_private,
                 minter_may_update_metadata,
@@ -133,16 +130,15 @@ mod tests {
         assert_eq!(config.symbol, "S721".to_string());
         assert_eq!(config.token_supply_is_public, false);
         assert_eq!(config.owner_is_public, false);
-        assert_eq!(config.private_metadata_is_enabled, true);
         assert_eq!(config.sealed_metadata_is_enabled, false);
         assert_eq!(config.unwrap_to_private, false);
         assert_eq!(config.minter_may_update_metadata, true);
         assert_eq!(config.owner_may_update_metadata, false);
         assert_eq!(config.burn_is_enabled, false);
 
-        // test config specification as well as overriding private metadata when sealed is chosen
+        // test config specification
         let (init_result, deps) =
-            init_helper_with_config(true, true, false, true, true, false, true, false);
+            init_helper_with_config(true, true, true, true, false, true, false);
         assert_eq!(init_result.unwrap(), InitResponse::default());
         let config: Config = load(&deps.storage, CONFIG_KEY).unwrap();
         assert_eq!(config.status, ContractStatus::Normal.to_u8());
@@ -158,7 +154,6 @@ mod tests {
         assert_eq!(config.symbol, "S721".to_string());
         assert_eq!(config.token_supply_is_public, true);
         assert_eq!(config.owner_is_public, true);
-        assert_eq!(config.private_metadata_is_enabled, true);
         assert_eq!(config.sealed_metadata_is_enabled, true);
         assert_eq!(config.unwrap_to_private, true);
         assert_eq!(config.minter_may_update_metadata, false);
@@ -222,30 +217,6 @@ mod tests {
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Only designated minters are allowed to mint"));
-
-        // test setting private metadata when not enabled
-        let (init_result, mut deps) =
-            init_helper_with_config(false, false, false, false, false, false, false, false);
-        assert!(
-            init_result.is_ok(),
-            "Init failed: {}",
-            init_result.err().unwrap()
-        );
-        let handle_msg = HandleMsg::Mint {
-            token_id: Some("MyNFT".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
-            private_metadata: Some(Metadata {
-                name: Some("MyNFT".to_string()),
-                description: None,
-                image: Some("uri".to_string()),
-            }),
-            public_metadata: None,
-            memo: None,
-            padding: None,
-        };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let error = extract_error_msg(handle_result);
-        assert!(error.contains("Private metadata functionality is not enabled for this contract"));
 
         // sanity check
         let (init_result, mut deps) = init_helper_default();
@@ -411,7 +382,7 @@ mod tests {
     #[test]
     fn test_set_public_metadata() {
         let (init_result, mut deps) = init_helper_with_config(
-            true, false, true, false, false, false, false, false
+            true, false, false, false, false, false, false
         );
         assert!(
             init_result.is_ok(),
@@ -523,7 +494,7 @@ mod tests {
 
         // test minter tries, but not allowed
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, false, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -601,7 +572,7 @@ mod tests {
     #[test]
     fn test_set_private_metadata() {
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, true, false, false);
+            init_helper_with_config(false, false, false, false, true, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -623,7 +594,7 @@ mod tests {
         assert!(error.contains("Not authorized to update metadata of token SNIP20"));
 
         let (init_result, mut deps) =
-        init_helper_with_config(false, false, false, false, false, true, false, false);
+        init_helper_with_config(false, false, false, false, true, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -644,23 +615,9 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         
-        // test trying to set private metadata when private metadata is disabled
-        let handle_msg = HandleMsg::SetPrivateMetadata {
-            token_id: "MyNFT".to_string(),
-            metadata: Metadata {
-                name: Some("MyNFT".to_string()),
-                description: None,
-                image: Some("uri".to_string()),
-            },
-            padding: None,
-        };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let error = extract_error_msg(handle_result);
-        assert!(error.contains("Private metadata functionality is not enabled for this contract"));
-
         // test trying to change sealed metadata before it has been unwrapped
         let (init_result, mut deps) =
-            init_helper_with_config(true, false, false, true, true, true, false, false);
+            init_helper_with_config(true, false, true, true, true, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -782,7 +739,7 @@ mod tests {
 
         // test authorized owner creates new metadata when it didn't exist before
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, true, false);
+            init_helper_with_config(false, false, false, false, false, true, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -830,7 +787,7 @@ mod tests {
     #[test]
     fn test_reveal() {
         let (init_result, mut deps) =
-            init_helper_with_config(true, false, true, true, false, false, false, false);
+            init_helper_with_config(true, false, true, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -847,7 +804,7 @@ mod tests {
         assert!(error.contains("Token ID: MyNFT not found"));
 
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, true, false, false, false, false);
+            init_helper_with_config(false, false, true, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -864,7 +821,7 @@ mod tests {
         assert!(error.contains("You do not own token MyNFT"));
 
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -916,7 +873,7 @@ mod tests {
 
         // test someone other than owner tries to unwrap
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, false, true, false, false, false, false);
+            init_helper_with_config(false, false, true, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -975,7 +932,7 @@ mod tests {
 
         // sanity check, unwrap but keep private
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, false, true, true, false, false, false);
+            init_helper_with_config(false, false, true, true, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -1016,7 +973,7 @@ mod tests {
     #[test]
     fn test_set_approval() {
         let (init_result, mut deps) =
-            init_helper_with_config(true, false, false, false, false, false, false, false);
+            init_helper_with_config(true, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -1038,7 +995,7 @@ mod tests {
         assert!(error.contains("Token ID: NFT1 not found"));
 
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, false, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -1150,20 +1107,6 @@ mod tests {
         let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You do not own token NFT1"));
-
-        // try to set view_private_metadata when the contract has disabled priv meta
-        let handle_msg = HandleMsg::SetApproval {
-            address: HumanAddr("bob".to_string()),
-            token_id: Some("NFT1".to_string()),
-            view_owner: Some(AccessLevel::All),
-            view_private_metadata: Some(AccessLevel::All),
-            transfer: Some(AccessLevel::ApproveToken),
-            expires: None,
-            padding: None,
-        };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let error = extract_error_msg(handle_result);
-        assert!(error.contains("Private metadata functionality is not enabled for this contract"));
 
         // try approving a token without specifying which token
         let handle_msg = HandleMsg::SetApproval {
@@ -3008,7 +2951,7 @@ mod tests {
     #[test]
     fn test_cw721_approve() {
         let (init_result, mut deps) = init_helper_with_config(
-            true, false, false, false, false, false, false, false
+            true, false, false, false, false, false, false
         );
         assert!(
             init_result.is_ok(),
@@ -3499,7 +3442,7 @@ mod tests {
     #[test]
     fn test_cw721_revoke() {
         let (init_result, mut deps) = init_helper_with_config(
-            true, false, false, false, false, false, false, false,
+            true, false, false, false, false, false, false,
         );
         assert!(
             init_result.is_ok(),
@@ -4047,7 +3990,7 @@ mod tests {
     #[test]
     fn test_burn() {
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -4100,7 +4043,7 @@ mod tests {
         assert!(error.contains("Burn functionality is not enabled for this token"));
 
         let (init_result, mut deps) =
-            init_helper_with_config(true, false, true, false, false, false, false, true);
+            init_helper_with_config(true, false, false, false, false, false, true);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -4118,7 +4061,7 @@ mod tests {
         assert!(error.contains("Token ID: MyNFT not found"));
 
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, true);
+            init_helper_with_config(false, false, false, false, false, false, true);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -4504,7 +4447,7 @@ mod tests {
     #[test]
     fn test_batch_burn() {
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -4553,7 +4496,7 @@ mod tests {
 
         // set up for batch burn test
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, true);
+            init_helper_with_config(false, false, false, false, false, false, true);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -4777,7 +4720,7 @@ mod tests {
 
         // set up for batch burn test
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, true);
+            init_helper_with_config(false, false, false, false, false, false, true);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -4999,7 +4942,7 @@ mod tests {
 
         // set up for batch burn test
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, true);
+            init_helper_with_config(false, false, false, false, false, false, true);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -5367,7 +5310,7 @@ mod tests {
     #[test]
     fn test_transfer() {
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -5411,7 +5354,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         let (init_result, mut deps) =
-        init_helper_with_config(true, false, true, false, false, false, false, false);
+        init_helper_with_config(true, false, false, false, false, false, false);
     assert!(
         init_result.is_ok(),
         "Init failed: {}",
@@ -5430,7 +5373,7 @@ mod tests {
     assert!(error.contains("Token ID: MyNFT not found"));
 
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -5899,7 +5842,7 @@ mod tests {
     #[test]
     fn test_batch_transfer() {
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -5946,7 +5889,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         let (init_result, mut deps) =
-            init_helper_with_config(true, false, true, false, false, false, false, false);
+            init_helper_with_config(true, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -5996,7 +5939,7 @@ mod tests {
 
         // set up for batch transfer test
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -6206,7 +6149,7 @@ mod tests {
 
         // set up for batch transfer test
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -6570,7 +6513,7 @@ mod tests {
     #[test]
     fn test_send() {
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -6615,7 +6558,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         let (init_result, mut deps) =
-        init_helper_with_config(true, false, true, false, false, false, false, false);
+        init_helper_with_config(true, false, false, false, false, false, false);
     assert!(
         init_result.is_ok(),
         "Init failed: {}",
@@ -6635,7 +6578,7 @@ mod tests {
     assert!(error.contains("Token ID: MyNFT not found"));
 
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -7182,7 +7125,7 @@ mod tests {
     #[test]
     fn test_batch_send() {
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -7230,7 +7173,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         let (init_result, mut deps) =
-            init_helper_with_config(true, false, true, false, false, false, false, false);
+            init_helper_with_config(true, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -7281,7 +7224,7 @@ mod tests {
 
         // set up for batch send test
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, true, false, false, false, false, false);
+            init_helper_with_config(false, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",

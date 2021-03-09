@@ -53,9 +53,6 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     let admin_raw = deps.api.canonical_address(&admin)?;
     let prng_seed: Vec<u8> = sha_256(base64::encode(msg.entropy).as_bytes()).to_vec();
     let init_config = msg.config.unwrap_or_default();
-    // if sealed is enabled, private metadata must be enabled, because it uses the private metadata
-    let sealed_enabled = init_config.enable_sealed_metadata.unwrap_or(false);
-    let private_enabled = init_config.enable_private_metadata.unwrap_or(true) || sealed_enabled;
 
     let config = Config {
         name: msg.name,
@@ -66,8 +63,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         status: ContractStatus::Normal.to_u8(),
         token_supply_is_public: init_config.public_token_supply.unwrap_or(false),
         owner_is_public: init_config.public_owner.unwrap_or(false),
-        private_metadata_is_enabled: private_enabled,
-        sealed_metadata_is_enabled: sealed_enabled,
+        sealed_metadata_is_enabled: init_config.enable_sealed_metadata.unwrap_or(false),
         unwrap_to_private: init_config.unwrapped_metadata_is_private.unwrap_or(false),
         minter_may_update_metadata: init_config.minter_may_update_metadata.unwrap_or(true),
         owner_may_update_metadata: init_config.owner_may_update_metadata.unwrap_or(false),
@@ -375,11 +371,6 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
             "Only designated minters are allowed to mint",
         ));
     }
-    if !config.private_metadata_is_enabled && private_metadata.is_some() {
-        return Err(StdError::generic_err(
-            "Private metadata functionality is not enabled for this contract",
-        ));
-    }
     let mut id_map: HashMap<String, u32> =
         may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
     let id = token_id.unwrap_or(format!("{}", config.mint_cnt));
@@ -515,11 +506,6 @@ pub fn set_private_metadata<S: Storage, A: Api, Q: Querier>(
     metadata: &Metadata,
 ) -> HandleResult {
     check_status(config.status, priority)?;
-    if !config.private_metadata_is_enabled {
-        return Err(StdError::generic_err(
-            "Private metadata functionality is not enabled for this contract",
-        ));
-    }
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     set_metadata(
         &mut deps.storage,
@@ -763,12 +749,6 @@ pub fn set_approval<S: Storage, A: Api, Q: Querier>(
     // if trying to set token permissions when you are not the owner
     if token_given && token.owner != sender_raw {
         return Err(StdError::generic_err(custom_err));
-    }
-    // if trying to set view private metadata permission when private metadata is disabled
-    if view_private_metadata.is_some() && !config.private_metadata_is_enabled {
-        return Err(StdError::generic_err(
-            "Private metadata functionality is not enabled for this contract",
-        ));
     }
     let mut accesses: [Option<AccessLevel>; 3] = [None, None, None];
     accesses[PermissionType::ViewOwner.to_u8() as usize] = view_owner;
@@ -1380,7 +1360,6 @@ pub fn query_config<S: ReadonlyStorage>(storage: &S) -> QueryResult {
     to_binary(&QueryAnswer::ContractConfig {
         token_supply_is_public: config.token_supply_is_public,
         owner_is_public: config.owner_is_public,
-        private_metadata_is_enabled: config.private_metadata_is_enabled,
         sealed_metadata_is_enabled: config.sealed_metadata_is_enabled,
         unwrapped_metadata_is_private: config.unwrap_to_private,
         minter_may_update_metadata: config.minter_may_update_metadata,

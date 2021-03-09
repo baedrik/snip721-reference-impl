@@ -65,8 +65,6 @@ pub struct Config {
     pub token_supply_is_public: bool,
     /// is ownership public
     pub owner_is_public: bool,
-    /// is private metadata enabled
-    pub private_metadata_is_enabled: bool,
     /// is sealed metadata enabled
     pub sealed_metadata_is_enabled: bool,
     /// should Reveal unwrap to private metadata

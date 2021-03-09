@@ -39,11 +39,6 @@ pub struct InitConfig {
     /// the token, ownership privacy will return to this setting.
     /// default: False
     pub public_owner: Option<bool>,
-    /// indicates whether private metadata should be enabled.  Private metadata
-    /// is in addition to public metadata to enable the ability to selectively make
-    /// some data public while keeping other data private
-    /// default: True
-    pub enable_private_metadata: Option<bool>,
     /// indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the
     /// private metadata is not viewable by anyone, not even the owner, until the owner calls the
     /// Reveal function.  When Reveal is called, the sealed metadata is irreversibly moved to the
@@ -74,7 +69,6 @@ impl Default for InitConfig {
         InitConfig {
             public_token_supply: Some(false),
             public_owner: Some(false),
-            enable_private_metadata: Some(true),
             enable_sealed_metadata: Some(false),
             unwrapped_metadata_is_private: Some(false),
             minter_may_update_metadata: Some(true),
@@ -521,7 +515,6 @@ pub enum QueryAnswer {
     ContractConfig {
         token_supply_is_public: bool,
         owner_is_public: bool,
-        private_metadata_is_enabled: bool,
         sealed_metadata_is_enabled: bool,
         unwrapped_metadata_is_private: bool,
         minter_may_update_metadata: bool,
