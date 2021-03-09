@@ -30,7 +30,7 @@ pub struct InitMsg {
 #[serde(rename_all = "snake_case")]
 pub struct InitConfig {
     /// indicates whether the token IDs and the number of tokens controlled by the contract are
-    /// public.  If the token supply is private, only minters can view the token IDs and 
+    /// public.  If the token supply is private, only minters can view the token IDs and
     /// number of tokens controlled by the contract
     /// default: False
     pub public_token_supply: Option<bool>,
@@ -42,9 +42,9 @@ pub struct InitConfig {
     /// indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the
     /// private metadata is not viewable by anyone, not even the owner, until the owner calls the
     /// Reveal function.  When Reveal is called, the sealed metadata is irreversibly moved to the
-    /// public metadata (as default).  if unwrapped_metadata_is_private is set to true, it will 
+    /// public metadata (as default).  if unwrapped_metadata_is_private is set to true, it will
     /// remain as private metadata, but the owner will now be able to see it.  Anyone will be able
-    /// to query the token to know that it has been unwrapped.  This simulates buying/selling a 
+    /// to query the token to know that it has been unwrapped.  This simulates buying/selling a
     /// wrapped card that non one knows which card it is until it is unwrapped. If sealed metadata
     /// is not enabled, all tokens are considered unwrapped
     /// default:  False
@@ -431,13 +431,13 @@ pub enum QueryMsg {
     ContractConfig {},
     /// display the list of authorized minters
     Minters {},
-    /// display the number of tokens controlled by the contract.  The token supply must 
+    /// display the number of tokens controlled by the contract.  The token supply must
     /// either be public, or the querier must be an authenticated minter
     NumTokens {
         /// optional address and key requesting to view the number of tokens
         viewer: Option<ViewerInfo>,
     },
-    /// display an optionally paginated list of all the tokens controlled by the contract. 
+    /// display an optionally paginated list of all the tokens controlled by the contract.
     /// The token supply must either be public, or the querier must be an authenticated
     /// minter
     AllTokens {
@@ -459,32 +459,30 @@ pub enum QueryMsg {
         include_expired: Option<bool>,
     },
     /// display if a token has been unwrapped
-    WasTokenUnwrapped {
-        token_id: String,
-    },
-/*    
-    Allowance {
-        owner: HumanAddr,
-        spender: HumanAddr,
-        key: String,
-    },
-    Balance {
-        address: HumanAddr,
-        key: String,
-    },
-    TransferHistory {
-        address: HumanAddr,
-        key: String,
-        page: Option<u32>,
-        page_size: u32,
-    },
-    TransactionHistory {
-        address: HumanAddr,
-        key: String,
-        page: Option<u32>,
-        page_size: u32,
-    },
-*/
+    WasTokenUnwrapped { token_id: String },
+    /*
+        Allowance {
+            owner: HumanAddr,
+            spender: HumanAddr,
+            key: String,
+        },
+        Balance {
+            address: HumanAddr,
+            key: String,
+        },
+        TransferHistory {
+            address: HumanAddr,
+            key: String,
+            page: Option<u32>,
+            page_size: u32,
+        },
+        TransactionHistory {
+            address: HumanAddr,
+            key: String,
+            page: Option<u32>,
+            page_size: u32,
+        },
+    */
 }
 
 /// CW721 Approval
@@ -539,9 +537,7 @@ pub enum QueryAnswer {
     },
 }
 
-/// 
-
-
+///
 
 /*
 impl QueryMsg {

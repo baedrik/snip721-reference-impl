@@ -3,15 +3,15 @@ mod tests {
     use crate::contract::{handle, init};
     use crate::expiration::Expiration;
     use crate::msg::{
-        AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg, QueryAnswer,
-        Send, Transfer,
+        AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg,
+        QueryAnswer, Send, Transfer,
     };
     use crate::receiver::receive_nft_msg;
     use crate::state::{
         get_txs, json_load, json_may_load, load, may_load, AuthList, Config, Permission,
-        PermissionType, TxAction, CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
-        PREFIX_INFOS, PREFIX_OWNED, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS,
-        PREFIX_VIEW_KEY, IDS_KEY, INDEX_KEY,
+        PermissionType, TxAction, CONFIG_KEY, IDS_KEY, INDEX_KEY, MINTERS_KEY,
+        PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_OWNED, PREFIX_PRIV_META,
+        PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY,
     };
     use crate::token::{Metadata, Token};
     use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -100,14 +100,14 @@ mod tests {
             },
         }
     }
-/*
-    fn extract_log(resp: StdResult<HandleResponse>) -> String {
-        match resp {
-            Ok(response) => response.log[0].value.clone(),
-            Err(_err) => "These are not the logs you are looking for".to_string(),
+    /*
+        fn extract_log(resp: StdResult<HandleResponse>) -> String {
+            match resp {
+                Ok(response) => response.log[0].value.clone(),
+                Err(_err) => "These are not the logs you are looking for".to_string(),
+            }
         }
-    }
-*/
+    */
 
     // Init tests
 
@@ -381,9 +381,8 @@ mod tests {
     // test updating public metadata
     #[test]
     fn test_set_public_metadata() {
-        let (init_result, mut deps) = init_helper_with_config(
-            true, false, false, false, false, false, false
-        );
+        let (init_result, mut deps) =
+            init_helper_with_config(true, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -594,13 +593,13 @@ mod tests {
         assert!(error.contains("Not authorized to update metadata of token SNIP20"));
 
         let (init_result, mut deps) =
-        init_helper_with_config(false, false, false, false, true, false, false);
+            init_helper_with_config(false, false, false, false, true, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
             init_result.err().unwrap()
         );
-    
+
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -614,7 +613,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        
+
         // test trying to change sealed metadata before it has been unwrapped
         let (init_result, mut deps) =
             init_helper_with_config(true, false, true, true, true, false, false);
@@ -2950,9 +2949,8 @@ mod tests {
     // test approve from the cw721 spec
     #[test]
     fn test_cw721_approve() {
-        let (init_result, mut deps) = init_helper_with_config(
-            true, false, false, false, false, false, false
-        );
+        let (init_result, mut deps) =
+            init_helper_with_config(true, false, true, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -2986,7 +2984,9 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Not authorized to grant/revoke transfer permission for token MyNFT"));
+        assert!(
+            error.contains("Not authorized to grant/revoke transfer permission for token MyNFT")
+        );
 
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
@@ -3033,7 +3033,9 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Not authorized to grant/revoke transfer permission for token MyNFT"));
+        assert!(
+            error.contains("Not authorized to grant/revoke transfer permission for token MyNFT")
+        );
 
         // test expired operator attempt
         let handle_msg = HandleMsg::SetApproval {
@@ -3441,9 +3443,8 @@ mod tests {
     // test Revoke from cw721 spec
     #[test]
     fn test_cw721_revoke() {
-        let (init_result, mut deps) = init_helper_with_config(
-            true, false, false, false, false, false, false,
-        );
+        let (init_result, mut deps) =
+            init_helper_with_config(true, false, false, false, false, false, false);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -3467,7 +3468,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        // test token does not exist when supply is private 
+        // test token does not exist when supply is private
         let handle_msg = HandleMsg::Revoke {
             spender: HumanAddr("bob".to_string()),
             token_id: "MyNFT".to_string(),
@@ -3475,7 +3476,9 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Not authorized to grant/revoke transfer permission for token MyNFT"));
+        assert!(
+            error.contains("Not authorized to grant/revoke transfer permission for token MyNFT")
+        );
 
         let handle_msg = HandleMsg::Mint {
             token_id: Some("MyNFT".to_string()),
@@ -3520,7 +3523,9 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Not authorized to grant/revoke transfer permission for token MyNFT"));
+        assert!(
+            error.contains("Not authorized to grant/revoke transfer permission for token MyNFT")
+        );
 
         // test expired operator attempt
         let handle_msg = HandleMsg::SetApproval {
@@ -4942,7 +4947,7 @@ mod tests {
 
         // set up for batch burn test
         let (init_result, mut deps) =
-            init_helper_with_config(false, false, false, false, false, false, true);
+            init_helper_with_config(false, false, true, false, false, false, true);
         assert!(
             init_result.is_ok(),
             "Init failed: {}",
@@ -5241,7 +5246,7 @@ mod tests {
         assert_eq!(charlie_tok_perm.expirations[transfer_idx], None);
         assert_eq!(charlie_tok_perm.expirations[view_owner_idx], None);
         assert_eq!(token.owner, alice_raw);
-        assert!(token.unwrapped);
+        assert!(!token.unwrapped);
         // confirm owner lists are correct
         let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
         // alice only owns NFT2
@@ -5354,23 +5359,23 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         let (init_result, mut deps) =
-        init_helper_with_config(true, false, false, false, false, false, false);
-    assert!(
-        init_result.is_ok(),
-        "Init failed: {}",
-        init_result.err().unwrap()
-    );
+            init_helper_with_config(true, false, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
 
-    // test token not found when supply is public
-    let handle_msg = HandleMsg::TransferNft {
-        recipient: HumanAddr("bob".to_string()),
-        token_id: "MyNFT".to_string(),
-        memo: None,
-        padding: None,
-    };
-    let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-    let error = extract_error_msg(handle_result);
-    assert!(error.contains("Token ID: MyNFT not found"));
+        // test token not found when supply is public
+        let handle_msg = HandleMsg::TransferNft {
+            recipient: HumanAddr("bob".to_string()),
+            token_id: "MyNFT".to_string(),
+            memo: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Token ID: MyNFT not found"));
 
         let (init_result, mut deps) =
             init_helper_with_config(false, false, false, false, false, false, false);
@@ -6558,24 +6563,24 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         let (init_result, mut deps) =
-        init_helper_with_config(true, false, false, false, false, false, false);
-    assert!(
-        init_result.is_ok(),
-        "Init failed: {}",
-        init_result.err().unwrap()
-    );
+            init_helper_with_config(true, false, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
 
-    // test token not found when supply is public
-    let handle_msg = HandleMsg::SendNft {
-        contract: HumanAddr("bob".to_string()),
-        token_id: "MyNFT".to_string(),
-        msg: None,
-        memo: None,
-        padding: None,
-    };
-    let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-    let error = extract_error_msg(handle_result);
-    assert!(error.contains("Token ID: MyNFT not found"));
+        // test token not found when supply is public
+        let handle_msg = HandleMsg::SendNft {
+            contract: HumanAddr("bob".to_string()),
+            token_id: "MyNFT".to_string(),
+            msg: None,
+            memo: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Token ID: MyNFT not found"));
 
         let (init_result, mut deps) =
             init_helper_with_config(false, false, false, false, false, false, false);
