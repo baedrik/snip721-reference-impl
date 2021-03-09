@@ -15,12 +15,16 @@ use crate::expiration::Expiration;
 
 /// storage key for config
 pub const CONFIG_KEY: &[u8] = b"config";
+/// storage key for the BlockInfo when the last handle was executed
+pub const BLOCK_KEY: &[u8] = b"blockinfo";
 /// storage key for minters
 pub const MINTERS_KEY: &[u8] = b"minters";
 /// storage key for prng seed
 pub const PRNG_SEED_KEY: &[u8] = b"prngseed";
-/// storage key for token map
-pub const TOKENS_KEY: &[u8] = b"tokens";
+/// storage key for token id map
+pub const IDS_KEY: &[u8] = b"ids";
+/// storage key for token index map
+pub const INDEX_KEY: &[u8] = b"indices";
 /// prefix for storage of token infos
 pub const PREFIX_INFOS: &[u8] = b"infos";
 /// prefix for the storage of public metadata

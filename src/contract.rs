@@ -13,8 +13,8 @@ use secret_toolkit::utils::{pad_handle_result, pad_query_result, HandleCallback}
 
 use crate::expiration::Expiration;
 use crate::msg::{
-    Access, Burn, ContractStatus, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg,
-    ResponseStatus::Success, Send, Transfer,
+    AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitMsg, QueryAnswer, QueryMsg,
+    ResponseStatus::Success, Send, Transfer, Cw721OwnerOfResponse, Cw721Approval, ViewerInfo,
 };
 use crate::rand::sha_256;
 use crate::receiver::receive_nft_msg;
@@ -23,7 +23,7 @@ use crate::state::{
     store_mint, store_transfer, AuthList, Config, Permission, PermissionType, CONFIG_KEY,
     MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_OWNED,
     PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
-    TOKENS_KEY,
+    IDS_KEY, INDEX_KEY, BLOCK_KEY,
 };
 use crate::token::{Metadata, Token};
 use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -47,7 +47,8 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: InitMsg,
 ) -> InitResult {
-    let tokens: HashMap<String, u32> = HashMap::new();
+    let id_map: HashMap<String, u32> = HashMap::new();
+    let index_map: HashMap<u32, String> = HashMap::new();
     let admin = msg.admin.unwrap_or(env.message.sender);
     let admin_raw = deps.api.canonical_address(&admin)?;
     let prng_seed: Vec<u8> = sha_256(base64::encode(msg.entropy).as_bytes()).to_vec();
@@ -75,9 +76,12 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 
     let minters = vec![admin_raw];
     save(&mut deps.storage, CONFIG_KEY, &config)?;
-    save(&mut deps.storage, TOKENS_KEY, &tokens)?;
+    save(&mut deps.storage, IDS_KEY, &id_map)?;
+    save(&mut deps.storage, INDEX_KEY, &index_map)?;
     save(&mut deps.storage, MINTERS_KEY, &minters)?;
     save(&mut deps.storage, PRNG_SEED_KEY, &prng_seed)?;
+    // TODO remove this after BlockInfo becomes available to queries
+    save(&mut deps.storage, BLOCK_KEY, &env.block)?;
 
     Ok(InitResponse::default())
 }
@@ -95,6 +99,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: HandleMsg,
 ) -> HandleResult {
+    // TODO remove this after BlockInfo becomes available to queries
+    save(&mut deps.storage, BLOCK_KEY, &env.block)?;
     let mut config: Config = load(&deps.storage, CONFIG_KEY)?;
 
     let response = match msg {
@@ -202,7 +208,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             None,
             None,
             None,
-            Some(Access::All),
+            Some(AccessLevel::All),
             expires,
             SetAppResp::ApproveAll,
         ),
@@ -215,7 +221,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             None,
             None,
             None,
-            Some(Access::None),
+            Some(AccessLevel::None),
             None,
             SetAppResp::RevokeAll,
         ),
@@ -374,10 +380,10 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
             "Private metadata functionality is not enabled for this contract",
         ));
     }
-    let mut tokens: HashMap<String, u32> =
-        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
+    let mut id_map: HashMap<String, u32> =
+        may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
     let id = token_id.unwrap_or(format!("{}", config.mint_cnt));
-    if tokens.contains_key(&id) {
+    if id_map.contains_key(&id) {
         return Err(StdError::generic_err("Token ID is already in use"));
     }
     let recipient = if let Some(o) = owner {
@@ -385,6 +391,26 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     } else {
         sender_raw.clone()
     };
+
+
+    // if you are modifying the base contract to include other data fields on-chain in
+    // the Token struct (see token.rs), this is where you will populate those additional
+    // fields
+
+    let mut token = Token {
+        owner: recipient.clone(),
+        permissions: Vec::new(),
+        unwrapped: !config.sealed_metadata_is_enabled,
+        global_permissions: [false, false, false],
+    };
+    token.global_permissions[PermissionType::ViewOwner.to_u8() as usize] = config.owner_is_public;
+    //
+    //
+
+    // save new token info
+    let token_key = config.mint_cnt.to_le_bytes();
+    let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
+    json_save(&mut info_store, &token_key, &token)?;
     // add token to owner's list
     let owner_slice = recipient.as_slice();
     let mut owned_store = PrefixedStorage::new(PREFIX_OWNED, &mut deps.storage);
@@ -392,19 +418,13 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
         may_load(&owned_store, owner_slice)?.unwrap_or_else(|| HashSet::new());
     owned.insert(config.mint_cnt);
     save(&mut owned_store, owner_slice, &owned)?;
-
-    let token = Token {
-        owner: recipient.clone(),
-        permissions: Vec::new(),
-        unwrapped: false,
-    };
-    // save new token info
-    let token_key = config.mint_cnt.to_le_bytes();
-    let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
-    json_save(&mut info_store, &token_key, &token)?;
-    // add to token list
-    tokens.insert(id.clone(), config.mint_cnt);
-    save(&mut deps.storage, TOKENS_KEY, &tokens)?;
+    // add to id and index maps
+    id_map.insert(id.clone(), config.mint_cnt);
+    save(&mut deps.storage, IDS_KEY, &id_map)?;
+    let mut index_map: HashMap<u32, String> =
+    may_load(&deps.storage, INDEX_KEY)?.unwrap_or_else(|| HashMap::new());
+    index_map.insert(config.mint_cnt, id.clone());
+    save(&mut deps.storage, INDEX_KEY, &index_map)?;
     // save the metadata
     if let Some(pub_meta) = public_metadata {
         let mut pub_store = PrefixedStorage::new(PREFIX_PUB_META, &mut deps.storage);
@@ -544,7 +564,7 @@ pub fn reveal<S: Storage, A: Api, Q: Querier>(
     }
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     let tokens: HashMap<String, u32> =
-        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
+        may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
     let custom_err = format!("You do not own token {}", token_id);
     // if token supply is private, don't leak that the token id does not exist
     // instead just say they do not own that token
@@ -610,7 +630,7 @@ pub fn approve_revoke<S: Storage, A: Api, Q: Querier>(
     let address_raw = deps.api.canonical_address(spender)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     let tokens: HashMap<String, u32> =
-        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
+        may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
     let custom_err = format!("Not authorized to grant/revoke transfer permission for token {}", token_id);
     // if token supply is private, don't leak that the token id does not exist
     // instead just say they are not authorized for that token
@@ -622,13 +642,14 @@ pub fn approve_revoke<S: Storage, A: Api, Q: Querier>(
     let (token, idx) = get_token(&deps.storage, token_id, &tokens, opt_err)?;
     let mut all_perm: Option<Vec<Permission>> = None;
     let mut from_oper = false;
+    let transfer_idx = PermissionType::Transfer.to_u8() as usize;
     // if not called by the owner, check if message sender has operator status
     if token.owner != sender_raw {
         let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
         let may_list: Option<Vec<Permission>> = json_may_load(&all_store, token.owner.as_slice())?;
         if let Some(list) = may_list.clone() {
             if let Some(perm) = list.iter().find(|&p| p.address == sender_raw) {
-                if let Some(exp) = perm.expirations[PermissionType::Transfer.to_u8() as usize] {
+                if let Some(exp) = perm.expirations[transfer_idx] {
                     if exp.is_expired(&env.block) {
                         return Err(StdError::generic_err(format!(
                             "Transfer authority for all tokens of {} has expired",
@@ -645,13 +666,13 @@ pub fn approve_revoke<S: Storage, A: Api, Q: Querier>(
         }
         all_perm = may_list;
     }
-    let mut accesses: [Option<Access>; 3] = [None, None, None];
+    let mut accesses: [Option<AccessLevel>; 3] = [None, None, None];
     let response: HandleAnswer;
     if is_approve {
-        accesses[PermissionType::Transfer.to_u8() as usize] = Some(Access::ApproveToken);
+        accesses[transfer_idx] = Some(AccessLevel::ApproveToken);
         response = HandleAnswer::Approve { status: Success };
     } else {
-        accesses[PermissionType::Transfer.to_u8() as usize] = Some(Access::RevokeToken);
+        accesses[transfer_idx] = Some(AccessLevel::RevokeToken);
         response = HandleAnswer::Revoke { status: Success };
     }
     let owner = token.owner.clone();
@@ -703,9 +724,9 @@ pub fn set_approval<S: Storage, A: Api, Q: Querier>(
     priority: u8,
     address: &HumanAddr,
     token_id: Option<String>,
-    view_owner: Option<Access>,
-    view_private_metadata: Option<Access>,
-    transfer: Option<Access>,
+    view_owner: Option<AccessLevel>,
+    view_private_metadata: Option<AccessLevel>,
+    transfer: Option<AccessLevel>,
     expires: Option<Expiration>,
     response_type: SetAppResp,
 ) -> HandleResult {
@@ -717,7 +738,7 @@ pub fn set_approval<S: Storage, A: Api, Q: Querier>(
     let (token, idx) = if let Some(id) = token_id {
         token_given = true;
         let tokens: HashMap<String, u32> =
-            may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
+            may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
         custom_err = format!("You do not own token {}", id);
         // if token supply is private, don't leak that the token id does not exist
         // instead just say they do not own that token
@@ -734,6 +755,7 @@ pub fn set_approval<S: Storage, A: Api, Q: Querier>(
                 owner: sender_raw.clone(),
                 permissions: Vec::new(),
                 unwrapped: false,
+                global_permissions: [false, false, false],
             },
             0,
         )
@@ -748,7 +770,7 @@ pub fn set_approval<S: Storage, A: Api, Q: Querier>(
             "Private metadata functionality is not enabled for this contract",
         ));
     }
-    let mut accesses: [Option<Access>; 3] = [None, None, None];
+    let mut accesses: [Option<AccessLevel>; 3] = [None, None, None];
     accesses[PermissionType::ViewOwner.to_u8() as usize] = view_owner;
     accesses[PermissionType::ViewMetadata.to_u8() as usize] = view_private_metadata;
     accesses[PermissionType::Transfer.to_u8() as usize] = transfer;
@@ -1316,14 +1338,379 @@ pub fn set_contract_status<S: Storage, A: Api, Q: Querier>(
 /// * `deps` - reference to Extern containing all the contract's external dependencies
 /// * `msg` - QueryMsg passed in with the query call
 pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryMsg) -> QueryResult {
-    //    match msg {
-    //      QueryMsg::TokenInfo {} => query_token_info(&deps.storage),
+    let response = match msg {
+        QueryMsg::ContractInfo {} => query_contract_info(&deps.storage),
+        QueryMsg::ContractConfig {} => query_config(&deps.storage),
+        QueryMsg::Minters {} => query_minters(deps),
+        QueryMsg::NumTokens { viewer } => query_num_tokens(deps, viewer),
+        QueryMsg::AllTokens { viewer, start_after, limit } => query_all_tokens(deps, viewer, start_after, limit),
+        QueryMsg::OwnerOf { token_id, viewer, include_expired } => query_owner_of(deps, &token_id, viewer, include_expired),
+        QueryMsg::WasTokenUnwrapped { token_id } => query_was_token_unwrapped(&deps.storage, &token_id),
+        //  QueryMsg::TokenInfo {} => query_token_info(&deps.storage),
     //    QueryMsg::TokenConfig {} => query_token_config(&deps.storage),
     //  QueryMsg::ExchangeRate {} => query_exchange_rate(&deps.storage),
     //QueryMsg::Minters { .. } => query_minters(deps),
     //        _ => authenticated_queries(deps, msg),
-    //  }
-    to_binary(&HandleAnswer::SetContractStatus { status: Success })
+    };
+    pad_query_result(response, BLOCK_SIZE)
+}
+
+/// Returns QueryResult displaying the contract's name and symbol
+///
+/// # Arguments
+///
+/// * `storage` - a reference to the contract's storage
+pub fn query_contract_info<S: ReadonlyStorage>(storage: &S) -> QueryResult {
+    let config: Config = load(storage, CONFIG_KEY)?;
+
+    to_binary(&QueryAnswer::ContractInfo {
+        name: config.name,
+        symbol: config.symbol,
+    })
+}
+
+/// Returns QueryResult displaying the contract's configuration
+///
+/// # Arguments
+///
+/// * `storage` - a reference to the contract's storage
+pub fn query_config<S: ReadonlyStorage>(storage: &S) -> QueryResult {
+    let config: Config = load(storage, CONFIG_KEY)?;
+
+    to_binary(&QueryAnswer::ContractConfig {
+        token_supply_is_public: config.token_supply_is_public,
+        owner_is_public: config.owner_is_public,
+        private_metadata_is_enabled: config.private_metadata_is_enabled,
+        sealed_metadata_is_enabled: config.sealed_metadata_is_enabled,
+        unwrapped_metadata_is_private: config.unwrap_to_private,
+        minter_may_update_metadata: config.minter_may_update_metadata,
+        owner_may_update_metadata: config.owner_may_update_metadata,
+        burn_is_enabled: config.burn_is_enabled,
+    })
+}
+
+/// Returns QueryResult displaying the list of authorized minters
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+pub fn query_minters<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> QueryResult {
+    let minters: Vec<CanonicalAddr> = may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(|| Vec::new());
+
+    to_binary(&QueryAnswer::Minters {
+        minters: minters.iter().map(|m| deps.api.human_address(m)).collect::<StdResult<Vec<HumanAddr>>>()?
+    })
+}
+
+/// Returns QueryResult displaying the number of tokens the contract controls
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `viewer` - optional address and key making an authenticated query request
+pub fn query_num_tokens<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    viewer: Option<ViewerInfo>,
+) -> QueryResult {
+    // authenticate permission to view token supply
+    check_view_supply(deps, viewer)?;
+    let tokens: HashMap<String, u32> =
+    may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
+    to_binary(&QueryAnswer::NumTokens {
+        count: tokens.len() as u32,
+    })
+}
+
+/// Returns QueryResult displaying the list of tokens that the contract controls
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `viewer` - optional address and key making an authenticated query request
+/// * `start_after` - optionally only display token ids that come after this String in 
+///                   lexicographical order
+/// * `limit` - optional max number of tokens to display
+pub fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    viewer: Option<ViewerInfo>,
+    start_after: Option<String>,
+    limit: Option<u32>
+) -> QueryResult {
+    // authenticate permission to view token supply
+    check_view_supply(deps, viewer)?;
+    let after = start_after.unwrap_or_else(|| String::new());
+    let size = limit.unwrap_or(300) as usize;
+    let token_map: HashMap<String, u32> =
+    may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
+    let mut tokens = Vec::new();
+    for id in token_map.keys() {
+        if id > &after {
+            tokens.push(id.to_string());
+        }
+    }
+    tokens.sort_unstable();
+    tokens.truncate(size);
+    to_binary(&QueryAnswer::TokenList {
+        tokens,
+    })
+}
+
+/// Returns QueryResult displaying the owner of the input token if the requester is authorized
+/// to view it and the transfer approvals on this token if the owner is querying
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `token_id` - string slice of the token id
+/// * `viewer` - optional address and key making an authenticated query request
+/// * `include_expired` - optionally true if the Approval lists should include expired Approvals
+pub fn query_owner_of<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>, 
+    token_id: &str,
+    viewer: Option<ViewerInfo>,
+    include_expired: Option<bool>,
+) -> QueryResult {
+    let opt_viewer = if let Some(vwr) = viewer {
+        let viewer_raw = deps.api.canonical_address(&vwr.address)?;
+        check_key(&deps.storage, &viewer_raw, vwr.viewing_key)?;
+        Some(viewer_raw)
+    } else {
+        None
+    };
+    let config: Config = load(&deps.storage, CONFIG_KEY)?;
+    // TODO remove this when BlockInfo becomes available to queries
+    let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo{height: 1, time: 1, chain_id: "secret-2".to_string()});
+    let id_map: HashMap<String, u32> =
+        may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
+    let (token, _idx) = get_token_if_permitted(deps, &block, token_id, &id_map, opt_viewer.as_ref(), PermissionType::ViewOwner, &mut Vec::new(), config.token_supply_is_public)?;
+    let (owner, mut approvals, mut operators) = get_owner_of_resp(deps, &block, &token, opt_viewer.as_ref(), include_expired.unwrap_or(false))?;
+    approvals.append(&mut operators);
+    to_binary(&QueryAnswer::OwnerOf {
+        owner,
+        approvals,
+    })
+}
+
+/// Returns StdResult<(HumanAddr, Vec<Cw721Approval>, Vec<Cw721Approval>)> 
+/// which is the owner, token transfer Approval list, and Approval list of everyone 
+/// that can transfer all of the token owner's tokens
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the current BlockInfo
+/// * `token` - a reference to the token whose owner info is being requested
+/// * `viewer` - optional reference to the address requesting to view the owner
+/// * `include_expired` - true if the Approval lists should include expired Approvals
+fn get_owner_of_resp<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>, 
+    block: &BlockInfo,
+    token: &Token,
+    viewer: Option<&CanonicalAddr>,
+    include_expired: bool,
+) -> StdResult<(HumanAddr, Vec<Cw721Approval>, Vec<Cw721Approval>)> {
+    let owner = deps.api.human_address(&token.owner)?;
+    let mut spenders: Vec<Cw721Approval> = Vec::new();
+    let mut operators: Vec<Cw721Approval> = Vec::new();
+    if let Some(vwr) = viewer {
+        if token.owner == *vwr {
+            let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+            gen_cw721_approvals(&deps.api, block, &token.permissions, &mut spenders, transfer_idx, include_expired)?;
+            let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
+            let all_perm: Vec<Permission> = json_may_load(&all_store, token.owner.as_slice())?.unwrap_or_else(|| Vec::new());
+            gen_cw721_approvals(&deps.api, block, &all_perm, &mut operators, transfer_idx, include_expired)?;
+        }
+    }
+    Ok((owner, spenders, operators))
+}
+
+/// Returns QueryResult displaying true if the token has been unwrapped.  If sealed metadata
+/// is not enabled, all tokens are considered unwrapped
+///
+/// # Arguments
+///
+/// * `storage` - a reference to the contract's storage
+pub fn query_was_token_unwrapped<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryResult {
+    let config: Config = load(storage, CONFIG_KEY)?;
+    let tokens: HashMap<String, u32> =
+        may_load(storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
+    let get_token_res = get_token(storage, token_id, &tokens, None);
+    match get_token_res {
+        Err(err) => 
+            match err {
+                // if the token id is not found, but token supply is private, just say
+                // the token's wrapped state is the same as a newly minted token
+                StdError::GenericErr{msg, ..} if !config.token_supply_is_public && msg.contains("Token ID") => 
+                    to_binary(&QueryAnswer::WasTokenUnwrapped { token_was_unwrapped: !config.sealed_metadata_is_enabled }),
+                _ => Err(err),
+            },
+        Ok((token, _idx)) => to_binary(&QueryAnswer::WasTokenUnwrapped {token_was_unwrapped: token.unwrapped}),
+    }
+}
+
+/// Returns StdResult<()> resulting from generating the list of Approvals
+///
+/// # Arguments
+///
+/// * `api` - reference to the Api used to convert canonical and human addresses
+/// * `block` - a reference to the current BlockInfo
+/// * `perm_list` - slice of Permissions to search through looking for transfer approvals
+/// * `approvals` - a mutable reference to the list of approvals that should be appended 
+///                 with any found in the permission list
+/// * `transfer_idx` - index into the Permission expirations that represents transfers
+/// * `include_expired` - true if the Approval list should include expired Approvals
+fn gen_cw721_approvals<A: Api>(
+    api: &A, 
+    block: &BlockInfo,
+    perm_list: &[Permission],
+    approvals: &mut Vec<Cw721Approval>,
+    transfer_idx: usize,
+    include_expired: bool,
+) -> StdResult<()> {
+    for perm in perm_list {
+        if let Some(exp) = perm.expirations[transfer_idx]{
+            if include_expired || !exp.is_expired(block) {
+                approvals.push(Cw721Approval {
+                    spender: api.human_address(&perm.address)?,
+                    expires: exp,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Returns StdResult<()>
+/// 
+/// returns Ok if authorized to view token supply, Err otherwise
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `viewer` - optional address and key making an authenticated query request
+fn check_view_supply<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    viewer: Option<ViewerInfo>,
+) -> StdResult<()> {
+    let config: Config = load(&deps.storage, CONFIG_KEY)?;
+    let mut is_auth = config.token_supply_is_public;
+    if !is_auth {
+        if let Some(vwr) = viewer {
+            let viewer_raw = deps.api.canonical_address(&vwr.address)?;
+            let minters: Vec<CanonicalAddr> =
+                may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(|| Vec::new());
+            if minters.contains(&viewer_raw) {
+                check_key(&deps.storage, &viewer_raw, vwr.viewing_key)?; 
+                is_auth = true;
+            }
+        }
+        if !is_auth {
+            return Err(StdError::generic_err("The token supply of this contract is private"));
+        }
+    }
+    Ok(())
+}
+
+/// Returns StdResult<bool> result of validating an address' viewing key
+///
+/// # Arguments
+///
+/// * `storage` - a reference to the contract's storage
+/// * `address` - a reference to the address whose key should be validated
+/// * `viewing_key` - String key used for authentication
+fn check_key<S: ReadonlyStorage>(
+    storage: &S,
+    address: &CanonicalAddr,
+    viewing_key: String,
+) -> StdResult<()> {
+    // load the address' key
+    let read_key = ReadonlyPrefixedStorage::new(PREFIX_VIEW_KEY, storage);
+    let load_key: Option<[u8; VIEWING_KEY_SIZE]> = may_load(&read_key, address.as_slice())?;
+    let input_key = ViewingKey(viewing_key);
+    // if a key was set
+    if let Some(expected_key) = load_key {
+        // and it matches
+        if input_key.check_viewing_key(&expected_key) {
+            return Ok(());
+        }
+    } else {
+        // Checking the key will take significant time. We don't want to exit immediately if it isn't set
+        // in a way which will allow to time the command and determine if a viewing key doesn't exist
+        input_key.check_viewing_key(&[0u8; VIEWING_KEY_SIZE]);
+    }
+    Err(StdError::generic_err(
+        "Wrong viewing key for this address or viewing key not set",
+    ))
+}
+
+/// Returns StdResult<()>
+///
+/// returns Ok if the address has permission or an error if not
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the current BlockInfo
+/// * `token` - a reference to the token
+/// * `token_id` - token ID String slice
+/// * `opt_sender` - a optional reference to the address trying to get access to the token
+/// * `perm_type` - PermissionType we are checking
+/// * `oper_for` - a mutable reference to a list of owners that gave the sender "all" permission
+/// * `custom_err` - string slice of the error msg to return if not permitted
+fn check_permission<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    block: &BlockInfo,
+    token: &Token,
+    token_id: &str,
+    opt_sender: Option<&CanonicalAddr>,
+    perm_type: PermissionType,
+    oper_for: &mut Vec<CanonicalAddr>,
+    custom_err: &str,
+) -> StdResult<()> {
+    let exp_idx = perm_type.to_u8() as usize;
+    // if global permission has not been granted and did not 
+    // already pass with "all" permission for this owner
+    if !token.global_permissions[exp_idx] && !oper_for.contains(&token.owner) {
+        if let Some(sender) = opt_sender {
+            // if this is the owner, all is good
+            if token.owner == *sender {
+                return Ok(());
+            }
+            // check if sender has token permission
+            if let Some(perm) = token.permissions.iter().find(|&p| p.address == *sender) {
+                if let Some(exp) = perm.expirations[exp_idx] {
+                    if exp.is_expired(block) {
+                        return Err(StdError::generic_err(format!(
+                            "Access to token {} has expired",
+                            token_id
+                        )));
+                    } else {
+                        return Ok(());
+                    }
+                }
+            }
+            // check if sender has operator permission
+            let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
+            let may_list: Option<Vec<Permission>> = json_may_load(&all_store, token.owner.as_slice())?;
+            if let Some(list) = may_list {
+                if let Some(perm) = list.iter().find(|&p| p.address == *sender) {
+                    if let Some(exp) = perm.expirations[exp_idx] {
+                        if exp.is_expired(block) {
+                            return Err(StdError::generic_err(format!(
+                                "Access to all tokens of {} has expired",
+                                &deps.api.human_address(&token.owner)?
+                            )));
+                        } else {
+                            oper_for.push(token.owner.clone());
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+        return Err(StdError::generic_err(custom_err));
+    }
+    Ok(())
 }
 
 /// Returns StdResult<(Token, u32)>
@@ -1333,19 +1720,19 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
-/// * 'block' - a reference to the current BlockInfo
+/// * `block` - a reference to the current BlockInfo
 /// * `token_id` - token ID String slice
 /// * `tokens` - a reference to the HashMap of token id String to the token storage index
-/// * `sender` - a reference to the address trying to get access to the token
+/// * `sender` - a optional reference to the address trying to get access to the token
 /// * `perm_type` - PermissionType we are checking
 /// * `oper_for` - a mutable reference to a list of owners that gave the sender "all" permission
 /// * `supply_is_public` - true if the token supply is public
-fn check_permission<S: Storage, A: Api, Q: Querier>(
+fn get_token_if_permitted<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     block: &BlockInfo,
     token_id: &str,
     tokens: &HashMap<String, u32>,
-    sender: &CanonicalAddr,
+    sender: Option<&CanonicalAddr>,
     perm_type: PermissionType,
     oper_for: &mut Vec<CanonicalAddr>,
     supply_is_public: bool,
@@ -1362,43 +1749,7 @@ fn check_permission<S: Storage, A: Api, Q: Querier>(
         Some(&*custom_err)
     };
     let (token, idx) = get_token(&deps.storage, token_id, tokens, opt_err)?;
-    let exp_idx = perm_type.to_u8();
-    let owner_slice = token.owner.as_slice();
-    // if sender is not the owner and did not already pass with "all" permission for this owner
-    if token.owner != *sender && !oper_for.contains(&token.owner) {
-        // check if sender has token permission
-        if let Some(perm) = token.permissions.iter().find(|&p| p.address == *sender) {
-            if let Some(exp) = perm.expirations[exp_idx as usize] {
-                if exp.is_expired(block) {
-                    return Err(StdError::generic_err(format!(
-                        "Access to token {} has expired",
-                        token_id
-                    )));
-                } else {
-                    return Ok((token, idx));
-                }
-            }
-        }
-        // check if sender has operator permission
-        let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
-        let may_list: Option<Vec<Permission>> = json_may_load(&all_store, owner_slice)?;
-        if let Some(list) = may_list {
-            if let Some(perm) = list.iter().find(|&p| p.address == *sender) {
-                if let Some(exp) = perm.expirations[exp_idx as usize] {
-                    if exp.is_expired(block) {
-                        return Err(StdError::generic_err(format!(
-                            "Access to all tokens of {} has expired",
-                            &deps.api.human_address(&token.owner)?
-                        )));
-                    } else {
-                        oper_for.push(token.owner.clone());
-                        return Ok((token, idx));
-                    }
-                }
-            }
-        }
-        return Err(StdError::generic_err(custom_err));
-    }
+    check_permission(deps, block, &token, token_id, sender, perm_type, oper_for, &custom_err)?;
     Ok((token, idx))
 }
 
@@ -1473,7 +1824,7 @@ fn set_metadata<S: Storage>(
     config: &Config,
 ) -> StdResult<()> {
     let tokens: HashMap<String, u32> =
-        may_load(storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
+        may_load(storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
     let custom_err = format!("Not authorized to update metadata of token {}", token_id);
     // if token supply is private, don't leak that the token id does not exist
     // instead just say they are not authorized for that token
@@ -1484,7 +1835,7 @@ fn set_metadata<S: Storage>(
     };
     let (token, idx) = get_token(storage, token_id, &tokens, opt_err)?;
     // do not allow the altering of sealed metadata
-    if config.sealed_metadata_is_enabled && prefix == PREFIX_PRIV_META && !token.unwrapped {
+    if  !token.unwrapped && prefix == PREFIX_PRIV_META {
         return Err(StdError::generic_err(
             "The private metadata of a sealed token can not be modified",
         ));
@@ -1563,7 +1914,7 @@ pub struct ProcessAccInfo {
     // true if there was an input token
     pub token_given: bool,
     // the accesses being set
-    pub accesses: [Option<Access>; 3],
+    pub accesses: [Option<AccessLevel>; 3],
     // optional expiration
     pub expires: Option<Expiration>,
     // true if this is an operator trying to set permissions
@@ -1617,13 +1968,13 @@ fn process_accesses<S: Storage>(
     for i in 0..=2usize {
         if let Some(acc) = &proc_info.accesses[i] {
             match acc {
-                Access::ApproveToken | Access::RevokeToken => {
+                AccessLevel::ApproveToken | AccessLevel::RevokeToken => {
                     if !proc_info.token_given {
                         return Err(StdError::generic_err(
                             "Attempted to grant/revoke permission for a token, but did not specify a token ID",
                         ));
                     }
-                    let is_approve = if let Access::ApproveToken = acc {
+                    let is_approve = if let AccessLevel::ApproveToken = acc {
                         true
                     } else {
                         false
@@ -1696,8 +2047,8 @@ fn process_accesses<S: Storage>(
                     alt_tok_perm.has_update = true;
                     alt_auth_list.has_update = true;
                 }
-                Access::All | Access::None => {
-                    if let Access::All = acc {
+                AccessLevel::All | AccessLevel::None => {
+                    if let AccessLevel::All = acc {
                         // add "all" permission
                         alt_all_perm.add[i] = true;
                     } else {
@@ -2104,12 +2455,12 @@ fn transfer_impl<S: Storage, A: Api, Q: Querier>(
     inv_updates: &mut Vec<InventoryUpdate>,
     memo: Option<String>,
 ) -> StdResult<CanonicalAddr> {
-    let (mut token, idx) = check_permission(
+    let (mut token, idx) = get_token_if_permitted(
         deps,
         block,
         &token_id,
         tokens,
-        sender,
+        Some(sender),
         PermissionType::Transfer,
         oper_for,
         config.token_supply_is_public,
@@ -2121,6 +2472,12 @@ fn transfer_impl<S: Storage, A: Api, Q: Querier>(
     }
     token.owner = recipient.clone();
     token.permissions.clear();
+    token.global_permissions[PermissionType::ViewOwner.to_u8() as usize] = config.owner_is_public;
+    token.global_permissions[PermissionType::ViewMetadata.to_u8() as usize] = false;
+    // this reference implementation never changes transfer permission to true, but if someone 
+    // modifies it to provide for global transfer permission, i'll include this line in case they forget
+    token.global_permissions[PermissionType::Transfer.to_u8() as usize] = false;
+
     let update_addrs = vec![recipient.clone(), old_owner.clone()];
     // save updated token info
     let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
@@ -2195,7 +2552,7 @@ fn send_list<S: Storage, A: Api, Q: Querier>(
     sends: Option<Vec<Send>>,
 ) -> StdResult<Vec<CosmosMsg>> {
     let tokens: HashMap<String, u32> =
-        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
+        may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
     let mut messages: Vec<CosmosMsg> = Vec::new();
     let mut oper_for: Vec<CanonicalAddr> = Vec::new();
     let mut inv_updates: Vec<InventoryUpdate> = Vec::new();
@@ -2271,17 +2628,19 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
     sender: &CanonicalAddr,
     burns: &mut Vec<Burn>,
 ) -> StdResult<()> {
-    let mut tokens: HashMap<String, u32> =
-        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(|| HashMap::new());
+    let mut id_map: HashMap<String, u32> =
+        may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(|| HashMap::new());
+    let mut index_map: HashMap<u32, String> =
+        may_load(&deps.storage, INDEX_KEY)?.unwrap_or_else(|| HashMap::new());
     let mut oper_for: Vec<CanonicalAddr> = Vec::new();
     let mut inv_updates: Vec<InventoryUpdate> = Vec::new();
     for burn in burns.drain(..) {
-        let (token, idx) = check_permission(
+        let (token, idx) = get_token_if_permitted(
             deps,
             block,
             &burn.token_id,
-            &tokens,
-            sender,
+            &id_map,
+            Some(sender),
             PermissionType::Transfer,
             &mut oper_for,
             config.token_supply_is_public,
@@ -2308,8 +2667,9 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
         if !found {
             inv_updates.push(new_inv);
         }
-        // remove from token list
-        tokens.remove(&burn.token_id);
+        // remove from token maps
+        id_map.remove(&burn.token_id);
+        index_map.remove(&idx);
         // remove the token info
         let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
         remove(&mut info_store, &token_key);
@@ -2335,7 +2695,8 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
         )?;
     }
     save(&mut deps.storage, CONFIG_KEY, &config)?;
-    save(&mut deps.storage, TOKENS_KEY, &tokens)?;
+    save(&mut deps.storage, IDS_KEY, &id_map)?;
+    save(&mut deps.storage, INDEX_KEY, &index_map)?;
     update_owner_inventory(&mut deps.storage, &inv_updates)?;
     Ok(())
 }

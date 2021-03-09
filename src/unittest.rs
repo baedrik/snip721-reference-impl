@@ -3,7 +3,7 @@ mod tests {
     use crate::contract::{handle, init};
     use crate::expiration::Expiration;
     use crate::msg::{
-        Access, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg, QueryAnswer,
+        AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg, QueryAnswer,
         Send, Transfer,
     };
     use crate::receiver::receive_nft_msg;
@@ -11,7 +11,7 @@ mod tests {
         get_txs, json_load, json_may_load, load, may_load, AuthList, Config, Permission,
         PermissionType, TxAction, CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
         PREFIX_INFOS, PREFIX_OWNED, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS,
-        PREFIX_VIEW_KEY, TOKENS_KEY,
+        PREFIX_VIEW_KEY, IDS_KEY, INDEX_KEY,
     };
     use crate::token::{Metadata, Token};
     use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -96,28 +96,21 @@ mod tests {
 
     fn extract_error_msg<T: Any>(error: StdResult<T>) -> String {
         match error {
-            Ok(response) => {
-                let bin_err = (&response as &dyn Any)
-                    .downcast_ref::<QueryResponse>()
-                    .expect("An error was expected, but no error could be extracted");
-                match from_binary(bin_err).unwrap() {
-                    QueryAnswer::ViewingKeyError { msg } => msg,
-                    _ => panic!("Unexpected query answer"),
-                }
-            }
+            Ok(_response) => panic!("Expected error, but had Ok response"),
             Err(err) => match err {
                 StdError::GenericErr { msg, .. } => msg,
                 _ => panic!(format!("Unexpected error result {:?}", err)),
             },
         }
     }
-
+/*
     fn extract_log(resp: StdResult<HandleResponse>) -> String {
         match resp {
             Ok(response) => response.log[0].value.clone(),
             Err(_err) => "These are not the logs you are looking for".to_string(),
         }
     }
+*/
 
     // Init tests
 
@@ -278,9 +271,12 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        // verify the token is in the token list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
-        let token_key = tokens.get("MyNFT").unwrap().to_le_bytes();
+        // verify the token is in the id and index maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
+        let index = tokens.get("MyNFT").unwrap();
+        let token_key = index.to_le_bytes();
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert_eq!(&*index_map.get(&index).unwrap(), "MyNFT");
         // verify all the token info
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &token_key).unwrap();
@@ -294,7 +290,7 @@ mod tests {
             .unwrap();
         assert_eq!(token.owner, alice_raw);
         assert_eq!(token.permissions, Vec::new());
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // verify the token metadata
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &token_key).unwrap();
@@ -360,8 +356,11 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         // verify token is in the token list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
-        let token_key = tokens.get("1").unwrap().to_le_bytes();
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
+        let index = tokens.get("1").unwrap();
+        let token_key = index.to_le_bytes();
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert_eq!(&*index_map.get(&index).unwrap(), "1");
         // verifyt token info
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &token_key).unwrap();
@@ -371,7 +370,7 @@ mod tests {
             .unwrap();
         assert_eq!(token.owner, admin_raw);
         assert_eq!(token.permissions, Vec::new());
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // verify metadata
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &token_key).unwrap();
@@ -714,7 +713,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         let token_key = tokens.get("MyNFT").unwrap().to_le_bytes();
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &token_key).unwrap();
@@ -951,7 +950,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         let token_key = tokens.get("MyNFT").unwrap().to_le_bytes();
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &token_key).unwrap();
@@ -1028,9 +1027,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -1050,9 +1049,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -1122,9 +1121,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -1142,9 +1141,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -1156,9 +1155,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::All),
-            view_private_metadata: Some(Access::All),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: Some(AccessLevel::All),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -1170,9 +1169,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -1186,9 +1185,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::RevokeToken),
+            transfer: Some(AccessLevel::RevokeToken),
             expires: None,
             padding: None,
         };
@@ -1202,9 +1201,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
@@ -1256,7 +1255,7 @@ mod tests {
         let nft4_key = 3u32.to_le_bytes();
         let token: Token = json_load(&info_store, &nft1_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
         assert_eq!(pub_meta.name, Some("My1".to_string()));
@@ -1292,9 +1291,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
@@ -1314,7 +1313,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft1_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
         assert_eq!(pub_meta.name, Some("My1".to_string()));
@@ -1349,9 +1348,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: Some(Expiration::AtHeight(1000)),
             padding: None,
         };
@@ -1371,7 +1370,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft2_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft2_key).unwrap();
         assert_eq!(pub_meta.name, Some("My2".to_string()));
@@ -1409,7 +1408,7 @@ mod tests {
             token_id: Some("NFT3".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -1447,7 +1446,7 @@ mod tests {
             token_id: Some("NFT4".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::RevokeToken),
+            transfer: Some(AccessLevel::RevokeToken),
             expires: None,
             padding: None,
         };
@@ -1471,7 +1470,7 @@ mod tests {
             token_id: Some("NFT2".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -1481,7 +1480,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: Some(Expiration::AtTime(1500000)),
             padding: None,
         };
@@ -1491,7 +1490,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: Some(Expiration::AtHeight(2000)),
             padding: None,
         };
@@ -1503,7 +1502,7 @@ mod tests {
             token_id: Some("NFT2".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::RevokeToken),
+            transfer: Some(AccessLevel::RevokeToken),
             // expiration is ignored when only performing revoking actions
             expires: Some(Expiration::AtTime(5)),
             padding: None,
@@ -1538,7 +1537,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft2_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft2_key).unwrap();
         assert_eq!(pub_meta.name, Some("My2".to_string()));
@@ -1587,7 +1586,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
-            view_owner: Some(Access::RevokeToken),
+            view_owner: Some(AccessLevel::RevokeToken),
             view_private_metadata: None,
             transfer: None,
             expires: Some(Expiration::AtTime(5)),
@@ -1652,7 +1651,7 @@ mod tests {
             Some(Expiration::AtTime(1000000))
         );
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
         assert_eq!(pub_meta.name, Some("My1".to_string()));
@@ -1691,7 +1690,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft3_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
@@ -1752,7 +1751,7 @@ mod tests {
             address: HumanAddr("bob".to_string()),
             // will be ignored but specifying shouldn't screw anything up
             token_id: Some("NFT4".to_string()),
-            view_owner: Some(Access::None),
+            view_owner: Some(AccessLevel::None),
             view_private_metadata: None,
             transfer: None,
             // will be ignored but specifying shouldn't screw anything up
@@ -1796,7 +1795,7 @@ mod tests {
             Some(Expiration::AtTime(1000000))
         );
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
         assert_eq!(pub_meta.name, Some("My1".to_string()));
@@ -1829,7 +1828,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft3_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
@@ -1877,7 +1876,7 @@ mod tests {
             token_id: Some("NFT4".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: Some(Expiration::AtHeight(2000)),
             padding: None,
         };
@@ -1916,7 +1915,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft4_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft4_key).unwrap();
         assert_eq!(pub_meta.name, Some("My4".to_string()));
@@ -1940,7 +1939,7 @@ mod tests {
             token_id: Some("NFT4".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: Some(Expiration::AtHeight(3000)),
             padding: None,
         };
@@ -2038,7 +2037,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft3_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
@@ -2117,7 +2116,7 @@ mod tests {
             token_id: Some("NFT4".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: Some(Expiration::Never),
             padding: None,
         };
@@ -2150,7 +2149,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft3_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
@@ -2242,7 +2241,7 @@ mod tests {
             address: HumanAddr("frank".to_string()),
             // will be ignored but specifying shouldn't screw anything up
             token_id: Some("NFT4".to_string()),
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
             transfer: None,
             expires: Some(Expiration::AtHeight(5000)),
@@ -2264,7 +2263,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft4_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft4_key).unwrap();
         assert_eq!(pub_meta.name, Some("My4".to_string()));
@@ -2338,7 +2337,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("frank".to_string()),
             token_id: Some("NFT3".to_string()),
-            view_owner: Some(Access::RevokeToken),
+            view_owner: Some(AccessLevel::RevokeToken),
             view_private_metadata: None,
             transfer: None,
             // this will be ignored
@@ -2408,7 +2407,7 @@ mod tests {
         assert_eq!(frank_tok_perm.expirations[view_meta_idx], None);
         assert_eq!(frank_tok_perm.expirations[transfer_idx], None);
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
         assert_eq!(pub_meta.name, Some("My1".to_string()));
@@ -2459,7 +2458,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft3_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
@@ -2574,7 +2573,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("frank".to_string()),
             token_id: None,
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
             transfer: None,
             expires: Some(Expiration::AtHeight(2500)),
@@ -2719,7 +2718,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("frank".to_string()),
             token_id: None,
-            view_owner: Some(Access::None),
+            view_owner: Some(AccessLevel::None),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -2859,7 +2858,7 @@ mod tests {
             token_id: Some("NFT2".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::RevokeToken),
+            transfer: Some(AccessLevel::RevokeToken),
             expires: None,
             padding: None,
         };
@@ -2898,7 +2897,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::None),
+            transfer: Some(AccessLevel::None),
             expires: None,
             padding: None,
         };
@@ -2908,7 +2907,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::None),
+            transfer: Some(AccessLevel::None),
             expires: None,
             padding: None,
         };
@@ -2918,7 +2917,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::None),
+            transfer: Some(AccessLevel::None),
             expires: None,
             padding: None,
         };
@@ -2939,7 +2938,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft3_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
@@ -2962,9 +2961,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("edmund".to_string()),
             token_id: Some("NFT3".to_string()),
-            view_owner: Some(Access::RevokeToken),
+            view_owner: Some(AccessLevel::RevokeToken),
             view_private_metadata: None,
-            transfer: Some(Access::None),
+            transfer: Some(AccessLevel::None),
             expires: None,
             padding: None,
         };
@@ -2985,7 +2984,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &nft3_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
@@ -3099,7 +3098,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
@@ -3109,7 +3108,7 @@ mod tests {
             token_id: Some("MyNFT".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: Some(Expiration::AtTime(500000)),
             padding: None,
         };
@@ -3252,7 +3251,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
         assert_eq!(priv_meta.name, Some("MyNFT".to_string()));
@@ -3318,7 +3317,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
         assert_eq!(priv_meta.name, Some("MyNFT".to_string()));
@@ -3382,7 +3381,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
@@ -3459,7 +3458,7 @@ mod tests {
         assert_eq!(david_tok_perm.expirations[view_meta_idx], None);
         assert_eq!(david_tok_perm.expirations[view_owner_idx], None);
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok2_key).unwrap();
         assert_eq!(priv_meta.name, Some("MyNFT2".to_string()));
@@ -3586,7 +3585,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
@@ -3596,7 +3595,7 @@ mod tests {
             token_id: Some("MyNFT".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: Some(Expiration::AtTime(500000)),
             padding: None,
         };
@@ -3809,7 +3808,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
         assert_eq!(priv_meta.name, Some("MyNFT".to_string()));
@@ -3840,7 +3839,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
         assert_eq!(priv_meta.name, Some("MyNFT".to_string()));
@@ -3889,7 +3888,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
         assert_eq!(priv_meta.name, Some("MyNFT".to_string()));
@@ -3942,7 +3941,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: Some(Expiration::Never),
             padding: None,
         };
@@ -4007,7 +4006,7 @@ mod tests {
         let token: Token = json_load(&info_store, &tok2_key).unwrap();
         assert!(token.permissions.is_empty());
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok2_key).unwrap();
         assert_eq!(priv_meta.name, Some("MyNFT2".to_string()));
@@ -4282,9 +4281,11 @@ mod tests {
             },
             handle_msg,
         );
-        // confirm token was removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.is_empty());
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.is_empty());
         // confirm token info was deleted from storage
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Option<Token> = json_may_load(&info_store, &tok_key).unwrap();
@@ -4395,9 +4396,11 @@ mod tests {
             },
             handle_msg,
         );
-        // confirm token was removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(!tokens.contains_key("MyNFT2"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(!index_map.contains_key(&1u32));
         // confirm token info was deleted from storage
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Option<Token> = json_may_load(&info_store, &tok2_key).unwrap();
@@ -4407,7 +4410,7 @@ mod tests {
         let david_perm = token.permissions.iter().find(|p| p.address == david_raw);
         assert!(david_perm.is_some());
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok3_key).unwrap();
         assert_eq!(priv_meta.name, Some("MyNFT3".to_string()));
@@ -4460,9 +4463,11 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        // confirm token was removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.is_empty());
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.is_empty());
         // confirm token info was deleted from storage
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Option<Token> = json_may_load(&info_store, &tok3_key).unwrap();
@@ -4639,9 +4644,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -4649,9 +4654,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -4660,7 +4665,7 @@ mod tests {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -4671,7 +4676,7 @@ mod tests {
             token_id: Some("NFT3".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -4679,7 +4684,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -4689,9 +4694,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -4699,8 +4704,8 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT5".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -4709,8 +4714,8 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT6".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -4721,7 +4726,7 @@ mod tests {
             token_id: Some("NFT7".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -4731,7 +4736,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -4863,9 +4868,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -4873,9 +4878,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -4884,7 +4889,7 @@ mod tests {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -4895,7 +4900,7 @@ mod tests {
             token_id: Some("NFT3".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -4903,7 +4908,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -4913,9 +4918,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -4923,8 +4928,8 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT5".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -4933,8 +4938,8 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT6".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -4945,7 +4950,7 @@ mod tests {
             token_id: Some("NFT7".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -4955,7 +4960,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -5085,9 +5090,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -5095,9 +5100,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -5106,7 +5111,7 @@ mod tests {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -5117,7 +5122,7 @@ mod tests {
             token_id: Some("NFT3".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -5125,7 +5130,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -5135,9 +5140,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -5145,8 +5150,8 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT5".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -5155,8 +5160,8 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT6".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -5167,7 +5172,7 @@ mod tests {
             token_id: Some("NFT7".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -5177,7 +5182,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -5238,8 +5243,8 @@ mod tests {
             .canonical_address(&HumanAddr("charlie".to_string()))
             .unwrap();
         let charlie_key = charlie_raw.as_slice();
-        // confirm correct tokens were removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm correct tokens were removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert_eq!(tokens.len(), 3);
         assert!(!tokens.contains_key("NFT1"));
         assert!(tokens.contains_key("NFT2"));
@@ -5249,6 +5254,16 @@ mod tests {
         assert!(!tokens.contains_key("NFT6"));
         assert!(!tokens.contains_key("NFT7"));
         assert!(!tokens.contains_key("NFT8"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert_eq!(index_map.len(), 3);
+        assert!(!index_map.contains_key(&0u32));
+        assert!(index_map.contains_key(&1u32));
+        assert!(!index_map.contains_key(&2u32));
+        assert!(index_map.contains_key(&3u32));
+        assert!(index_map.contains_key(&4u32));
+        assert!(!index_map.contains_key(&5u32));
+        assert!(!index_map.contains_key(&6u32));
+        assert!(!index_map.contains_key(&7u32));
         // confirm token infos were deleted from storage
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Option<Token> = json_may_load(&info_store, &tok1_key).unwrap();
@@ -5283,7 +5298,7 @@ mod tests {
         assert_eq!(charlie_tok_perm.expirations[transfer_idx], None);
         assert_eq!(charlie_tok_perm.expirations[view_owner_idx], None);
         assert_eq!(token.owner, alice_raw);
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm owner lists are correct
         let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
         // alice only owns NFT2
@@ -5455,7 +5470,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("MyNFT".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -5599,9 +5614,11 @@ mod tests {
             },
             handle_msg,
         );
-        // confirm token was not removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was not removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.contains_key("MyNFT"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.contains_key(&0u32));
         // confirm token info is the same
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
@@ -5629,7 +5646,7 @@ mod tests {
             bob_tok_perm.expirations[view_owner_idx],
             Some(Expiration::Never)
         );
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm no transfer tx was logged (latest should be the mint tx)
         let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
         assert_eq!(
@@ -5689,15 +5706,17 @@ mod tests {
             },
             handle_msg,
         );
-        // confirm token was not removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was not removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.contains_key("MyNFT"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.contains_key(&0u32));
         // confirm token belongs to david now and permissions have been cleared
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, david_raw);
         assert!(token.permissions.is_empty());
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm the metadata is intact
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
@@ -5776,14 +5795,16 @@ mod tests {
             handle_msg,
         );
         // confirm token was not removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.contains_key("MyNFT"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.contains_key(&0u32));
         // confirm token belongs to charlie now and permissions have been cleared
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, charlie_raw);
         assert!(token.permissions.is_empty());
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm the metadata is intact
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
@@ -5833,15 +5854,17 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        // confirm token was not removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was not removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.contains_key("MyNFT"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.contains_key(&0u32));
         // confirm token belongs to alice now and permissions have been cleared
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, alice_raw);
         assert!(token.permissions.is_empty());
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm the tx was logged to all involved parties
         let txs = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
         assert_eq!(txs[0].token_id, "MyNFT".to_string());
@@ -6037,9 +6060,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -6047,7 +6070,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -6058,7 +6081,7 @@ mod tests {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -6067,9 +6090,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -6078,7 +6101,7 @@ mod tests {
             address: HumanAddr("david".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -6087,9 +6110,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -6097,7 +6120,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -6108,7 +6131,7 @@ mod tests {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT6".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -6119,7 +6142,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -6129,7 +6152,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -6139,7 +6162,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -6247,9 +6270,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -6257,7 +6280,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -6268,7 +6291,7 @@ mod tests {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -6277,9 +6300,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -6288,7 +6311,7 @@ mod tests {
             address: HumanAddr("david".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -6297,9 +6320,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -6307,7 +6330,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -6318,7 +6341,7 @@ mod tests {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT6".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -6329,7 +6352,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -6339,7 +6362,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -6349,7 +6372,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -6379,15 +6402,17 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("david", &[]), handle_msg);
-        // confirm token was not removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was not removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.contains_key("NFT1"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.contains_key(&0u32));
         // confirm token has the correct owner and the permissions were cleared
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, bob_raw);
         assert!(token.permissions.is_empty());
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm transfer txs were logged
         let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 10).unwrap();
         assert_eq!(txs.len(), 6);
@@ -6651,7 +6676,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("MyNFT".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -6816,9 +6841,11 @@ mod tests {
         .unwrap();
         assert_eq!(handle_result.unwrap().messages[0], alice_receive);
 
-        // confirm token was not removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was not removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.contains_key("MyNFT"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.contains_key(&0u32));
         // confirm token info is the same
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
@@ -6846,7 +6873,7 @@ mod tests {
             bob_tok_perm.expirations[view_owner_idx],
             Some(Expiration::Never)
         );
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm no transfer tx was logged (latest should be the mint tx)
         let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
         assert_eq!(
@@ -6932,15 +6959,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(handle_result.unwrap().messages[0], receive);
-        // confirm token was not removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was not removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.contains_key("MyNFT"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.contains_key(&0u32));
         // confirm token belongs to david now and permissions have been cleared
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, david_raw);
         assert!(token.permissions.is_empty());
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm the metadata is intact
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
@@ -7037,14 +7066,16 @@ mod tests {
         .unwrap();
         assert_eq!(handle_result.unwrap().messages[0], receive);
         // confirm token was not removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.contains_key("MyNFT"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.contains_key(&0u32));
         // confirm token belongs to charlie now and permissions have been cleared
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, charlie_raw);
         assert!(token.permissions.is_empty());
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm the metadata is intact
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
@@ -7106,15 +7137,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(handle_result.unwrap().messages[0], receive);
-        // confirm token was not removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was not removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.contains_key("MyNFT"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.contains_key(&0u32));
         // confirm token belongs to alice now and permissions have been cleared
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, alice_raw);
         assert!(token.permissions.is_empty());
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm the tx was logged to all involved parties
         let txs = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
         assert_eq!(txs[0].token_id, "MyNFT".to_string());
@@ -7312,9 +7345,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -7322,7 +7355,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -7333,7 +7366,7 @@ mod tests {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -7342,9 +7375,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -7353,7 +7386,7 @@ mod tests {
             address: HumanAddr("david".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -7362,9 +7395,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
-            view_owner: Some(Access::ApproveToken),
-            view_private_metadata: Some(Access::ApproveToken),
-            transfer: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -7372,7 +7405,7 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
-            view_owner: Some(Access::ApproveToken),
+            view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             transfer: None,
             expires: None,
@@ -7383,7 +7416,7 @@ mod tests {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT6".to_string()),
             view_owner: None,
-            view_private_metadata: Some(Access::ApproveToken),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
             transfer: None,
             expires: None,
             padding: None,
@@ -7394,7 +7427,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -7404,7 +7437,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -7414,7 +7447,7 @@ mod tests {
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::All),
+            transfer: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
@@ -7488,15 +7521,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(resp.messages[1], receive);
-        // confirm token was not removed from the list
-        let tokens: HashMap<String, u32> = load(&deps.storage, TOKENS_KEY).unwrap();
+        // confirm token was not removed from the maps
+        let tokens: HashMap<String, u32> = load(&deps.storage, IDS_KEY).unwrap();
         assert!(tokens.contains_key("NFT1"));
+        let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
+        assert!(index_map.contains_key(&0u32));
         // confirm token has the correct owner and the permissions were cleared
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
         assert_eq!(token.owner, bob_raw);
         assert!(token.permissions.is_empty());
-        assert!(!token.unwrapped);
+        assert!(token.unwrapped);
         // confirm transfer txs were logged
         let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 10).unwrap();
         assert_eq!(txs.len(), 6);
@@ -8310,7 +8345,7 @@ mod tests {
             token_id: Some("NFT1".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -8320,7 +8355,7 @@ mod tests {
             token_id: Some("NFT2".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -8328,9 +8363,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -8518,7 +8553,7 @@ mod tests {
             token_id: Some("NFT1".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -8528,7 +8563,7 @@ mod tests {
             token_id: Some("NFT2".to_string()),
             view_owner: None,
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
@@ -8536,9 +8571,9 @@ mod tests {
         let handle_msg = HandleMsg::SetApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
-            view_owner: Some(Access::All),
+            view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
-            transfer: Some(Access::ApproveToken),
+            transfer: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };

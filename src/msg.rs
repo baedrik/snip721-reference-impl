@@ -30,10 +30,13 @@ pub struct InitMsg {
 #[serde(rename_all = "snake_case")]
 pub struct InitConfig {
     /// indicates whether the token IDs and the number of tokens controlled by the contract are
-    /// public
+    /// public.  If the token supply is private, only minters can view the token IDs and 
+    /// number of tokens controlled by the contract
     /// default: False
     pub public_token_supply: Option<bool>,
-    /// indicates whether token ownership is public
+    /// indicates whether token ownership is public or private when a token is minted.  The
+    /// owner can change the ownership privacy level later, but if the current owner transfers
+    /// the token, ownership privacy will return to this setting.
     /// default: False
     pub public_owner: Option<bool>,
     /// indicates whether private metadata should be enabled.  Private metadata
@@ -47,7 +50,8 @@ pub struct InitConfig {
     /// public metadata (as default).  if unwrapped_metadata_is_private is set to true, it will 
     /// remain as private metadata, but the owner will now be able to see it.  Anyone will be able
     /// to query the token to know that it has been unwrapped.  This simulates buying/selling a 
-    /// wrapped card that non one knows which card it is until it is unwrapped
+    /// wrapped card that non one knows which card it is until it is unwrapped. If sealed metadata
+    /// is not enabled, all tokens are considered unwrapped
     /// default:  False
     pub enable_sealed_metadata: Option<bool>,
     /// indicates if the Reveal function should keep the sealed metadata private after unwrapping
@@ -132,11 +136,11 @@ pub enum HandleMsg {
         /// optional token id to apply approval to
         token_id: Option<String>,
         /// optional permission to view owner
-        view_owner: Option<Access>,
+        view_owner: Option<AccessLevel>,
         /// optional permission to view private metadata
-        view_private_metadata: Option<Access>,
+        view_private_metadata: Option<AccessLevel>,
         /// optional permission to transfer
-        transfer: Option<Access>,
+        transfer: Option<AccessLevel>,
         /// optional expiration
         expires: Option<Expiration>,
         /// optional message length padding
@@ -299,7 +303,7 @@ pub enum HandleMsg {
 /// permission access level
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum Access {
+pub enum AccessLevel {
     /// approve permission only for the specified token
     ApproveToken,
     /// grant permission for all tokens
@@ -312,7 +316,6 @@ pub enum Access {
 
 /// token burn info used when doing a BatchBurnNft
 #[derive(Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
 pub struct Burn {
     /// token being burnt
     pub token_id: String,
@@ -322,7 +325,6 @@ pub struct Burn {
 
 /// token transfer info used when doing a BatchTransferNft
 #[derive(Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
 pub struct Transfer {
     /// recipient of the transferred token
     pub recipient: HumanAddr,
@@ -334,7 +336,6 @@ pub struct Transfer {
 
 /// send token info used when doing a BatchSendNft
 #[derive(Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
 pub struct Send {
     /// recipient of the sent token
     pub contract: HumanAddr,
@@ -418,12 +419,56 @@ pub enum HandleAnswer {
     },
 }
 
+/// the address and viewing key making an authenticated query request
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ViewerInfo {
+    // querying address
+    pub address: HumanAddr,
+    // authentication key string
+    pub viewing_key: String,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    TokenInfo {},
-    TokenConfig {},
-    ExchangeRate {},
+    /// display the contract's name and symbol
+    ContractInfo {},
+    /// display the contract's configuration
+    ContractConfig {},
+    /// display the list of authorized minters
+    Minters {},
+    /// display the number of tokens controlled by the contract.  The token supply must 
+    /// either be public, or the querier must be an authenticated minter
+    NumTokens {
+        /// optional address and key requesting to view the number of tokens
+        viewer: Option<ViewerInfo>,
+    },
+    /// display an optionally paginated list of all the tokens controlled by the contract. 
+    /// The token supply must either be public, or the querier must be an authenticated
+    /// minter
+    AllTokens {
+        /// optional address and key requesting to view the list of tokens
+        viewer: Option<ViewerInfo>,
+        /// optionally display only token ids that come after the input String in
+        /// lexicographical order
+        start_after: Option<String>,
+        /// optional number of token ids to display
+        limit: Option<u32>,
+    },
+    /// display the owner of the specified token if authorized to view it
+    OwnerOf {
+        token_id: String,
+        /// optional address and key requesting to view the token owner
+        viewer: Option<ViewerInfo>,
+        /// optionally include expired Approvals in the response list.  If ommitted or
+        /// false, expired Approvals will be filtered out of the response
+        include_expired: Option<bool>,
+    },
+    /// display if a token has been unwrapped
+    WasTokenUnwrapped {
+        token_id: String,
+    },
+/*    
     Allowance {
         owner: HumanAddr,
         spender: HumanAddr,
@@ -445,9 +490,67 @@ pub enum QueryMsg {
         page: Option<u32>,
         page_size: u32,
     },
-    Minters {},
+*/
 }
 
+/// CW721 Approval
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Cw721Approval {
+    /// address that can transfer the token
+    pub spender: HumanAddr,
+    /// expiration of this approval
+    pub expires: Expiration,
+}
+
+/// response of CW721 OwnerOf
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Cw721OwnerOfResponse {
+    /// Owner of the token
+    pub owner: HumanAddr,
+    /// list of addresses approved to transfer this token
+    pub approvals: Vec<Cw721Approval>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryAnswer {
+    ContractInfo {
+        name: String,
+        symbol: String,
+    },
+    ContractConfig {
+        token_supply_is_public: bool,
+        owner_is_public: bool,
+        private_metadata_is_enabled: bool,
+        sealed_metadata_is_enabled: bool,
+        unwrapped_metadata_is_private: bool,
+        minter_may_update_metadata: bool,
+        owner_may_update_metadata: bool,
+        burn_is_enabled: bool,
+    },
+    Minters {
+        minters: Vec<HumanAddr>,
+    },
+    NumTokens {
+        count: u32,
+    },
+    TokenList {
+        tokens: Vec<String>,
+    },
+    OwnerOf {
+        owner: HumanAddr,
+        approvals: Vec<Cw721Approval>,
+    },
+    WasTokenUnwrapped {
+        token_was_unwrapped: bool,
+    },
+}
+
+/// 
+
+
+
+/*
 impl QueryMsg {
     pub fn get_validation_params(&self) -> (Vec<&HumanAddr>, ViewingKey) {
         match self {
@@ -476,13 +579,6 @@ pub enum QueryAnswer {
         decimals: u8,
         total_supply: Option<Uint128>,
     },
-    TokenConfig {
-        public_total_supply: bool,
-        deposit_enabled: bool,
-        redeem_enabled: bool,
-        mint_enabled: bool,
-        burn_enabled: bool,
-    },
     ExchangeRate {
         rate: Uint128,
         denom: String,
@@ -502,15 +598,15 @@ pub enum QueryAnswer {
     ViewingKeyError {
         msg: String,
     },
-    Minters {
-        minters: Vec<HumanAddr>,
-    },
+
 }
+
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 pub struct CreateViewingKeyResponse {
     pub key: String,
 }
+*/
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -535,30 +631,5 @@ impl ContractStatus {
             ContractStatus::StopTransactions => 1,
             ContractStatus::StopAll => 2,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use cosmwasm_std::{from_slice, StdResult};
-
-    #[derive(Serialize, Deserialize, JsonSchema, Debug, PartialEq)]
-    #[serde(rename_all = "snake_case")]
-    pub enum Something {
-        Var { padding: Option<String> },
-    }
-
-    #[test]
-    fn test_deserialization_of_missing_option_fields() -> StdResult<()> {
-        let input = b"{ \"var\": {} }";
-        let obj: Something = from_slice(input)?;
-        assert_eq!(
-            obj,
-            Something::Var { padding: None },
-            "unexpected value: {:?}",
-            obj
-        );
-        Ok(())
     }
 }
