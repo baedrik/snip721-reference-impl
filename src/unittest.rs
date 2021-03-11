@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::contract::{handle, init};
+    use crate::contract::{handle, init, check_permission};
     use crate::expiration::Expiration;
     use crate::msg::{
         AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg,
@@ -11,7 +11,7 @@ mod tests {
         get_txs, json_load, json_may_load, load, may_load, AuthList, Config, Permission,
         PermissionType, TxAction, CONFIG_KEY, IDS_KEY, INDEX_KEY, MINTERS_KEY,
         PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_OWNED, PREFIX_PRIV_META,
-        PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY,
+        PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY, PREFIX_OWNER_PRIV, 
     };
     use crate::token::{Metadata, Token};
     use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -968,9 +968,9 @@ mod tests {
         assert!(pub_meta.is_none());
     }
 
-    // test owner setting approval
+    // test owner setting approval for specific addresses
     #[test]
-    fn test_set_approval() {
+    fn test_set_whitelisted_approval() {
         let (init_result, mut deps) =
             init_helper_with_config(true, false, false, false, false, false, false);
         assert!(
@@ -980,7 +980,7 @@ mod tests {
         );
 
         // test token does not exist when supply is public
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -1002,7 +1002,7 @@ mod tests {
         );
 
         // test token does not exist when supply is private
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -1020,7 +1020,7 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
                 name: Some("My1".to_string()),
-                description: Some("Private 1".to_string()),
+                description: Some("Public 1".to_string()),
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
@@ -1033,7 +1033,7 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
                 name: Some("My2".to_string()),
-                description: Some("Private 2".to_string()),
+                description: Some("Public 2".to_string()),
                 image: Some("URI 2".to_string()),
             }),
             private_metadata: None,
@@ -1046,7 +1046,7 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
                 name: Some("My3".to_string()),
-                description: Some("Private 3".to_string()),
+                description: Some("Public 3".to_string()),
                 image: Some("URI 3".to_string()),
             }),
             private_metadata: None,
@@ -1059,7 +1059,7 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
                 name: Some("My4".to_string()),
-                description: Some("Private 4".to_string()),
+                description: Some("Public 4".to_string()),
                 image: Some("URI 4".to_string()),
             }),
             private_metadata: None,
@@ -1074,7 +1074,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -1093,8 +1093,8 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        // only allow the owner to use SetApproval
-        let handle_msg = HandleMsg::SetApproval {
+        // only allow the owner to use SetWhitelistedApproval
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -1108,7 +1108,7 @@ mod tests {
         assert!(error.contains("You do not own token NFT1"));
 
         // try approving a token without specifying which token
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: Some(AccessLevel::All),
@@ -1124,7 +1124,7 @@ mod tests {
         ));
 
         // try revoking a token approval without specifying which token
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: Some(AccessLevel::All),
@@ -1140,7 +1140,7 @@ mod tests {
         ));
 
         // sanity check
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -1201,7 +1201,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
         assert_eq!(pub_meta.name, Some("My1".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 1".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 1".to_string()));
         assert_eq!(pub_meta.image, Some("URI 1".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft1_key).unwrap();
@@ -1230,7 +1230,7 @@ mod tests {
 
         // verify it doesn't duplicate any entries if adding permissions that already
         // exist
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -1259,7 +1259,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
         assert_eq!(pub_meta.name, Some("My1".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 1".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 1".to_string()));
         assert_eq!(pub_meta.image, Some("URI 1".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft1_key).unwrap();
@@ -1287,7 +1287,7 @@ mod tests {
         assert!(bob_auth.tokens[view_owner_idx].is_empty());
 
         // verify changing an existing ALL expiration while adding token access
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -1316,7 +1316,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft2_key).unwrap();
         assert_eq!(pub_meta.name, Some("My2".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 2".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 2".to_string()));
         assert_eq!(pub_meta.image, Some("URI 2".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft2_key).unwrap();
@@ -1345,7 +1345,7 @@ mod tests {
         assert!(bob_auth.tokens[view_owner_idx].is_empty());
 
         // verify default expiration of "never"
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: None,
@@ -1383,7 +1383,7 @@ mod tests {
         assert!(bob_auth.tokens[view_owner_idx].is_empty());
 
         // verify revoking a token permission that never existed doesn't break anything
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT4".to_string()),
             view_owner: None,
@@ -1407,7 +1407,7 @@ mod tests {
         assert!(bob_auth.tokens[view_meta_idx].is_empty());
         assert!(bob_auth.tokens[view_owner_idx].is_empty());
 
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -1417,7 +1417,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: None,
             view_owner: None,
@@ -1427,7 +1427,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("edmund".to_string()),
             token_id: None,
             view_owner: None,
@@ -1439,7 +1439,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
 
         // test revoking token permission
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -1483,7 +1483,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft2_key).unwrap();
         assert_eq!(pub_meta.name, Some("My2".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 2".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 2".to_string()));
         assert_eq!(pub_meta.image, Some("URI 2".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft2_key).unwrap();
@@ -1525,7 +1525,7 @@ mod tests {
         // test revoking a token permission when address has ALL permission removes the ALL
         // permission, and adds token permissions for all the other tokens not revoked
         // giving them the expiration of the removed ALL permission
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: Some(AccessLevel::RevokeToken),
@@ -1597,7 +1597,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
         assert_eq!(pub_meta.name, Some("My1".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 1".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 1".to_string()));
         assert_eq!(pub_meta.image, Some("URI 1".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft1_key).unwrap();
@@ -1636,7 +1636,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 3".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 3".to_string()));
         assert_eq!(pub_meta.image, Some("URI 3".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
@@ -1689,7 +1689,7 @@ mod tests {
         assert!(charlie_auth.tokens[view_owner_idx].is_empty());
 
         // test revoking all view_owner permission
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             // will be ignored but specifying shouldn't screw anything up
             token_id: Some("NFT4".to_string()),
@@ -1741,7 +1741,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
         assert_eq!(pub_meta.name, Some("My1".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 1".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 1".to_string()));
         assert_eq!(pub_meta.image, Some("URI 1".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft1_key).unwrap();
@@ -1774,7 +1774,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 3".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 3".to_string()));
         assert_eq!(pub_meta.image, Some("URI 3".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
@@ -1813,7 +1813,7 @@ mod tests {
 
         // test if approving a token for an address that already has ALL permission does
         // nothing if the given expiration is the same
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("edmund".to_string()),
             token_id: Some("NFT4".to_string()),
             view_owner: None,
@@ -1861,7 +1861,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft4_key).unwrap();
         assert_eq!(pub_meta.name, Some("My4".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 4".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 4".to_string()));
         assert_eq!(pub_meta.image, Some("URI 4".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft4_key).unwrap();
@@ -1876,7 +1876,7 @@ mod tests {
         // test approving a token for an address that already has ALL permission updates that
         // token's permission's expiration, removes ALL permission, and sets token permission
         // for all other tokens using the ALL permission's expiration
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("edmund".to_string()),
             token_id: Some("NFT4".to_string()),
             view_owner: None,
@@ -1983,7 +1983,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 3".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 3".to_string()));
         assert_eq!(pub_meta.image, Some("URI 3".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
@@ -2053,7 +2053,7 @@ mod tests {
         // test that approving a token when the address has an expired ALL permission
         // deletes the ALL permission and performs like a regular ApproveToken (does not
         // add approve permission to all the other tokens)
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: Some("NFT4".to_string()),
             view_owner: None,
@@ -2095,7 +2095,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 3".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 3".to_string()));
         assert_eq!(pub_meta.image, Some("URI 3".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
@@ -2179,7 +2179,7 @@ mod tests {
         assert!(david_auth.tokens[view_owner_idx].is_empty());
 
         // giving frank ALL permission for later test
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("frank".to_string()),
             // will be ignored but specifying shouldn't screw anything up
             token_id: Some("NFT4".to_string()),
@@ -2209,7 +2209,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft4_key).unwrap();
         assert_eq!(pub_meta.name, Some("My4".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 4".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 4".to_string()));
         assert_eq!(pub_meta.image, Some("URI 4".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
@@ -2276,7 +2276,7 @@ mod tests {
         // permission, and adds token permissions for all the other tokens not revoked
         // giving them the expiration of the removed ALL permission
         // This is same as above, but testing when the address has no AuthList already
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("frank".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: Some(AccessLevel::RevokeToken),
@@ -2353,7 +2353,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
         assert_eq!(pub_meta.name, Some("My1".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 1".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 1".to_string()));
         assert_eq!(pub_meta.image, Some("URI 1".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft1_key).unwrap();
@@ -2404,7 +2404,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 3".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 3".to_string()));
         assert_eq!(pub_meta.image, Some("URI 3".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
@@ -2512,7 +2512,7 @@ mod tests {
 
         // test granting ALL permission when the address has some token permissions
         // This should remove all the token permissions and the AuthList
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("frank".to_string()),
             token_id: None,
             view_owner: Some(AccessLevel::All),
@@ -2657,7 +2657,7 @@ mod tests {
         assert!(david_auth.tokens[view_owner_idx].is_empty());
 
         // test revoking all permissions when address has ALL
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("frank".to_string()),
             token_id: None,
             view_owner: Some(AccessLevel::None),
@@ -2795,7 +2795,7 @@ mod tests {
         assert!(david_auth.tokens[view_owner_idx].is_empty());
 
         // test revoking a token which is address' last permission
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -2834,7 +2834,7 @@ mod tests {
             .is_none());
 
         // verify that storage entry for AuthLists gets removed when all are gone
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: None,
@@ -2844,7 +2844,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: None,
             view_owner: None,
@@ -2854,7 +2854,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("edmund".to_string()),
             token_id: None,
             view_owner: None,
@@ -2884,7 +2884,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 3".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 3".to_string()));
         assert_eq!(pub_meta.image, Some("URI 3".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
@@ -2900,7 +2900,7 @@ mod tests {
         assert!(auth_list.is_none());
 
         // verify revoking doesn't break anything when there are no permissions
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("edmund".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: Some(AccessLevel::RevokeToken),
@@ -2930,7 +2930,7 @@ mod tests {
         let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
         assert_eq!(pub_meta.name, Some("My3".to_string()));
-        assert_eq!(pub_meta.description, Some("Private 3".to_string()));
+        assert_eq!(pub_meta.description, Some("Public 3".to_string()));
         assert_eq!(pub_meta.image, Some("URI 3".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
@@ -3038,7 +3038,7 @@ mod tests {
         );
 
         // test expired operator attempt
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: None,
@@ -3048,7 +3048,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("MyNFT".to_string()),
             view_owner: None,
@@ -3321,7 +3321,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: None,
             view_owner: None,
@@ -3528,7 +3528,7 @@ mod tests {
         );
 
         // test expired operator attempt
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: None,
@@ -3538,7 +3538,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("MyNFT".to_string()),
             view_owner: None,
@@ -3884,7 +3884,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: None,
             view_owner: None,
@@ -4589,7 +4589,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4599,7 +4599,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4609,7 +4609,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -4619,7 +4619,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: None,
@@ -4629,7 +4629,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4639,7 +4639,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4649,7 +4649,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4659,7 +4659,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT6".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4669,7 +4669,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT7".to_string()),
             view_owner: None,
@@ -4679,7 +4679,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: None,
@@ -4813,7 +4813,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4823,7 +4823,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4833,7 +4833,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -4843,7 +4843,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: None,
@@ -4853,7 +4853,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4863,7 +4863,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4873,7 +4873,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4883,7 +4883,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT6".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -4893,7 +4893,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT7".to_string()),
             view_owner: None,
@@ -4903,7 +4903,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: None,
@@ -5035,7 +5035,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -5045,7 +5045,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -5055,7 +5055,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -5065,7 +5065,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: None,
@@ -5075,7 +5075,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -5085,7 +5085,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -5095,7 +5095,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -5105,7 +5105,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT6".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -5115,7 +5115,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT7".to_string()),
             view_owner: None,
@@ -5125,7 +5125,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: None,
@@ -5415,7 +5415,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         // test unauthorized sender (but we'll give him view owner access)
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("MyNFT".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6005,7 +6005,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6015,7 +6015,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6025,7 +6025,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -6035,7 +6035,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6045,7 +6045,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: None,
@@ -6055,7 +6055,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6065,7 +6065,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6075,7 +6075,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT6".to_string()),
             view_owner: None,
@@ -6085,7 +6085,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: None,
             view_owner: None,
@@ -6095,7 +6095,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: None,
             view_owner: None,
@@ -6105,7 +6105,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: None,
@@ -6215,7 +6215,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6225,7 +6225,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6235,7 +6235,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -6245,7 +6245,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6255,7 +6255,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: None,
@@ -6265,7 +6265,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6275,7 +6275,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -6285,7 +6285,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT6".to_string()),
             view_owner: None,
@@ -6295,7 +6295,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: None,
             view_owner: None,
@@ -6305,7 +6305,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: None,
             view_owner: None,
@@ -6315,7 +6315,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: None,
@@ -6621,7 +6621,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         // test unauthorized sender (but we'll give him view owner access)
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("MyNFT".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -7290,7 +7290,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -7300,7 +7300,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -7310,7 +7310,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -7320,7 +7320,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -7330,7 +7330,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: None,
@@ -7340,7 +7340,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT4".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -7350,7 +7350,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("alice".to_string()),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -7360,7 +7360,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT6".to_string()),
             view_owner: None,
@@ -7370,7 +7370,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: None,
             view_owner: None,
@@ -7380,7 +7380,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("david".to_string()),
             token_id: None,
             view_owner: None,
@@ -7390,7 +7390,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: None,
             view_owner: None,
@@ -8288,7 +8288,7 @@ mod tests {
         let nft2_key = 1u32.to_le_bytes();
         let nft3_key = 2u32.to_le_bytes();
 
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -8298,7 +8298,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -8308,7 +8308,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -8496,7 +8496,7 @@ mod tests {
         let nft2_key = 1u32.to_le_bytes();
         let nft3_key = 2u32.to_le_bytes();
 
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -8506,7 +8506,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
             view_owner: None,
@@ -8516,7 +8516,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetApproval {
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT3".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -8663,5 +8663,968 @@ mod tests {
         );
         assert_eq!(bob_oper_perm.expirations[view_meta_idx], None);
         assert_eq!(bob_oper_perm.expirations[transfer_idx], None);
+    }
+
+    // test set ownership privacy
+    #[test]
+    fn test_set_ownership_privacy() {
+        let (init_result, mut deps) = init_helper_default();
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test setting privacy when status prevents it
+        let handle_msg = HandleMsg::SetContractStatus {
+            level: ContractStatus::StopAll,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetOwnershipPrivacy {
+            owner_is_public: true,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("The contract admin has temporarily disabled this action"));
+
+        // you can still set privacy when transactions are stopped
+        let handle_msg = HandleMsg::SetContractStatus {
+            level: ContractStatus::StopTransactions,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+
+        // sanity check when contract default is private
+        let handle_msg = HandleMsg::SetOwnershipPrivacy {
+            owner_is_public: true,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let alice_raw = deps
+            .api
+            .canonical_address(&HumanAddr("alice".to_string()))
+            .unwrap();
+        let alice_key = alice_raw.as_slice();
+        let store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
+        let pub_priv: bool = load(&store, alice_key).unwrap();
+        assert!(pub_priv);
+        let handle_msg = HandleMsg::SetOwnershipPrivacy {
+            owner_is_public: false,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
+        let pub_priv: Option<bool> = may_load(&store, alice_key).unwrap();
+        assert!(pub_priv.is_none());
+
+        // test when contract default is public
+        let (init_result, mut deps) =
+            init_helper_with_config(false, true, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+        let handle_msg = HandleMsg::SetOwnershipPrivacy {
+            owner_is_public: true,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
+        let pub_priv: Option<bool> = may_load(&store, alice_key).unwrap();
+        assert!(pub_priv.is_none());
+        let handle_msg = HandleMsg::SetOwnershipPrivacy {
+            owner_is_public: false,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
+        let pub_priv: bool = load(&store, alice_key).unwrap();
+        assert!(!pub_priv);
+    }
+
+    // test owner setting global approvals
+    #[test]
+    fn test_set_global_approval() {
+        let (init_result, mut deps) =
+            init_helper_with_config(true, false, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test token does not exist when supply is public
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: None,
+            expires: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Token ID: NFT1 not found"));
+
+        let (init_result, mut deps) =
+            init_helper_with_config(false, false, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test token does not exist when supply is private
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: None,
+            expires: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("You do not own token NFT1"));
+
+        let handle_msg = HandleMsg::Mint {
+            token_id: Some("NFT1".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: Some(Metadata {
+                name: Some("My1".to_string()),
+                description: Some("Pub 1".to_string()),
+                image: Some("URI 1".to_string()),
+            }),
+            private_metadata: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+ 
+        // test trying to set approval when status does not allow
+        let handle_msg = HandleMsg::SetContractStatus {
+            level: ContractStatus::StopAll,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: None,
+            expires: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("The contract admin has temporarily disabled this action"));
+        // setting approval is ok even during StopTransactions status
+        let handle_msg = HandleMsg::SetContractStatus {
+            level: ContractStatus::StopTransactions,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+
+        // only allow the owner to use SetGlobalApproval
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: None,
+            expires: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("You do not own token NFT1"));
+
+        // try approving a token without specifying which token
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: None,
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: None,
+            expires: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains(
+            "Attempted to grant/revoke permission for a token, but did not specify a token ID"
+        ));
+
+        // try revoking a token approval without specifying which token
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: None,
+            view_owner: Some(AccessLevel::RevokeToken),
+            view_private_metadata: None,
+            expires: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains(
+            "Attempted to grant/revoke permission for a token, but did not specify a token ID"
+        ));
+
+        // sanity check
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            expires: Some(Expiration::AtTime(1000000)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let global_raw = CanonicalAddr(Binary::from(b"public"));
+        let global_key = global_raw.as_slice();
+        let alice_raw = deps
+            .api
+            .canonical_address(&HumanAddr("alice".to_string()))
+            .unwrap();
+        let alice_key = alice_raw.as_slice();
+        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
+        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
+        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        // confirm ALL permission
+        let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
+        let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
+        assert_eq!(all_perm.len(), 1);
+        let global_perm = all_perm.iter().find(|p| p.address == global_raw).unwrap();
+        assert_eq!(
+            global_perm.expirations[view_owner_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(global_perm.expirations[view_meta_idx], None);
+        assert_eq!(global_perm.expirations[transfer_idx], None);
+        // confirm NFT1 permissions and that the token data did not get modified
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let nft1_key = 0u32.to_le_bytes();
+        let token: Token = json_load(&info_store, &nft1_key).unwrap();
+        assert_eq!(token.owner, alice_raw);
+        assert!(token.unwrapped);
+        let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
+        let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
+        assert_eq!(pub_meta.name, Some("My1".to_string()));
+        assert_eq!(pub_meta.description, Some("Pub 1".to_string()));
+        assert_eq!(pub_meta.image, Some("URI 1".to_string()));
+        let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
+        let priv_meta: Option<Metadata> = may_load(&priv_store, &nft1_key).unwrap();
+        assert!(priv_meta.is_none());
+        assert_eq!(token.permissions.len(), 1);
+        let global_tok_perm = token
+            .permissions
+            .iter()
+            .find(|p| p.address == global_raw)
+            .unwrap();
+        assert_eq!(
+            global_tok_perm.expirations[view_meta_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(global_tok_perm.expirations[transfer_idx], None);
+        assert_eq!(global_tok_perm.expirations[view_owner_idx], None);
+        // confirm AuthLists has public with NFT1 permission
+        let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
+        let auth_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
+        assert_eq!(auth_list.len(), 1);
+        let global_auth = auth_list.iter().find(|a| a.address == global_raw).unwrap();
+        assert_eq!(global_auth.tokens[view_meta_idx].len(), 1);
+        assert!(global_auth.tokens[view_meta_idx].contains(&0u32));
+        assert!(global_auth.tokens[transfer_idx].is_empty());
+        assert!(global_auth.tokens[view_owner_idx].is_empty());
+
+        // bob approvals to make sure whitelisted addresses don't break
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: None,
+            transfer: Some(AccessLevel::ApproveToken),
+            expires: Some(Expiration::AtTime(1000000)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let bob_raw = deps
+            .api
+            .canonical_address(&HumanAddr("bob".to_string()))
+            .unwrap();
+        // confirm ALL permission
+        let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
+        let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
+        assert_eq!(all_perm.len(), 2);
+        let bob_oper_perm = all_perm.iter().find(|p| p.address == bob_raw).unwrap();
+        assert_eq!(
+            bob_oper_perm.expirations[view_owner_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(bob_oper_perm.expirations[view_meta_idx], None);
+        assert_eq!(bob_oper_perm.expirations[transfer_idx], None);
+        let global_perm = all_perm.iter().find(|p| p.address == global_raw).unwrap();
+        assert_eq!(
+            global_perm.expirations[view_owner_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(global_perm.expirations[view_meta_idx], None);
+        assert_eq!(global_perm.expirations[transfer_idx], None);
+        // confirm NFT1 permissions
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token: Token = json_load(&info_store, &nft1_key).unwrap();
+        assert_eq!(token.permissions.len(), 2);
+        let bob_tok_perm = token
+            .permissions
+            .iter()
+            .find(|p| p.address == bob_raw)
+            .unwrap();
+        assert_eq!(
+            bob_tok_perm.expirations[transfer_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(bob_tok_perm.expirations[view_meta_idx], None);
+        assert_eq!(bob_tok_perm.expirations[view_owner_idx], None);
+        assert_eq!(
+            global_tok_perm.expirations[view_meta_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(global_tok_perm.expirations[transfer_idx], None);
+        assert_eq!(global_tok_perm.expirations[view_owner_idx], None);
+        // confirm AuthLists has bob with NFT1 permission
+        let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
+        let auth_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
+        assert_eq!(auth_list.len(), 2);
+        let bob_auth = auth_list.iter().find(|a| a.address == bob_raw).unwrap();
+        assert_eq!(bob_auth.tokens[transfer_idx].len(), 1);
+        assert!(bob_auth.tokens[transfer_idx].contains(&0u32));
+        assert!(bob_auth.tokens[view_meta_idx].is_empty());
+        assert!(bob_auth.tokens[view_owner_idx].is_empty());
+        let global_auth = auth_list.iter().find(|a| a.address == global_raw).unwrap();
+        assert_eq!(global_auth.tokens[view_meta_idx].len(), 1);
+        assert!(global_auth.tokens[view_meta_idx].contains(&0u32));
+        assert!(global_auth.tokens[transfer_idx].is_empty());
+        assert!(global_auth.tokens[view_owner_idx].is_empty());
+
+        // confirm ALL permission
+        let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
+        let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
+        assert_eq!(all_perm.len(), 2);
+        let bob_oper_perm = all_perm.iter().find(|p| p.address == bob_raw).unwrap();
+        assert_eq!(
+            bob_oper_perm.expirations[view_owner_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(bob_oper_perm.expirations[view_meta_idx], None);
+        assert_eq!(bob_oper_perm.expirations[transfer_idx], None);
+        let global_perm = all_perm.iter().find(|p| p.address == global_raw).unwrap();
+        assert_eq!(
+            global_perm.expirations[view_owner_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(global_perm.expirations[view_meta_idx], None);
+        assert_eq!(global_perm.expirations[transfer_idx], None);
+        // confirm NFT1 permissions
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token: Token = json_load(&info_store, &nft1_key).unwrap();
+        assert_eq!(token.permissions.len(), 2);
+        let bob_tok_perm = token
+            .permissions
+            .iter()
+            .find(|p| p.address == bob_raw)
+            .unwrap();
+        assert_eq!(
+            bob_tok_perm.expirations[transfer_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(bob_tok_perm.expirations[view_meta_idx], None);
+        assert_eq!(bob_tok_perm.expirations[view_owner_idx], None);
+        assert_eq!(
+            global_tok_perm.expirations[view_meta_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(global_tok_perm.expirations[transfer_idx], None);
+        assert_eq!(global_tok_perm.expirations[view_owner_idx], None);
+        // confirm AuthLists has bob with NFT1 permission
+        let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
+        let auth_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
+        assert_eq!(auth_list.len(), 2);
+        let bob_auth = auth_list.iter().find(|a| a.address == bob_raw).unwrap();
+        assert_eq!(bob_auth.tokens[transfer_idx].len(), 1);
+        assert!(bob_auth.tokens[transfer_idx].contains(&0u32));
+        assert!(bob_auth.tokens[view_meta_idx].is_empty());
+        assert!(bob_auth.tokens[view_owner_idx].is_empty());
+        let global_auth = auth_list.iter().find(|a| a.address == global_raw).unwrap();
+        assert_eq!(global_auth.tokens[view_meta_idx].len(), 1);
+        assert!(global_auth.tokens[view_meta_idx].contains(&0u32));
+        assert!(global_auth.tokens[transfer_idx].is_empty());
+        assert!(global_auth.tokens[view_owner_idx].is_empty());
+    
+        // test revoking global approval
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: Some(AccessLevel::None),
+            expires: Some(Expiration::AtTime(1000000)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        // confirm ALL permission
+        let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
+        let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
+        assert_eq!(all_perm.len(), 2);
+        let bob_oper_perm = all_perm.iter().find(|p| p.address == bob_raw).unwrap();
+        assert_eq!(
+            bob_oper_perm.expirations[view_owner_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(bob_oper_perm.expirations[view_meta_idx], None);
+        assert_eq!(bob_oper_perm.expirations[transfer_idx], None);
+        let global_perm = all_perm.iter().find(|p| p.address == global_raw).unwrap();
+        assert_eq!(
+            global_perm.expirations[view_owner_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(global_perm.expirations[view_meta_idx], None);
+        assert_eq!(global_perm.expirations[transfer_idx], None);
+        // confirm NFT1 permissions
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token: Token = json_load(&info_store, &nft1_key).unwrap();
+        assert_eq!(token.permissions.len(), 1);
+        let bob_tok_perm = token
+            .permissions
+            .iter()
+            .find(|p| p.address == bob_raw)
+            .unwrap();
+        assert_eq!(
+            bob_tok_perm.expirations[transfer_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(bob_tok_perm.expirations[view_meta_idx], None);
+        assert_eq!(bob_tok_perm.expirations[view_owner_idx], None);
+        let global_tok_perm = token
+        .permissions
+        .iter()
+        .find(|p| p.address == global_raw);
+        assert!(global_tok_perm.is_none());
+        // confirm AuthLists has bob with NFT1 permission
+        let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
+        let auth_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
+        assert_eq!(auth_list.len(), 1);
+        let bob_auth = auth_list.iter().find(|a| a.address == bob_raw).unwrap();
+        assert_eq!(bob_auth.tokens[transfer_idx].len(), 1);
+        assert!(bob_auth.tokens[transfer_idx].contains(&0u32));
+        assert!(bob_auth.tokens[view_meta_idx].is_empty());
+        assert!(bob_auth.tokens[view_owner_idx].is_empty());
+        let global_auth = auth_list.iter().find(|a| a.address == global_raw);
+        assert!(global_auth.is_none());
+    }
+
+    // test permissioning works
+    #[test]
+    fn test_check_permission() {
+        let (init_result, mut deps) =
+            init_helper_with_config(true, false, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+        let block = BlockInfo {
+            height: 1,
+            time: 1,
+            chain_id: "secret-2".to_string(),
+        };
+        let alice_raw = deps
+        .api
+        .canonical_address(&HumanAddr("alice".to_string()))
+        .unwrap();
+        let bob_raw = deps
+            .api
+            .canonical_address(&HumanAddr("bob".to_string()))
+            .unwrap();
+        let charlie_raw = deps
+            .api
+            .canonical_address(&HumanAddr("charlie".to_string()))
+            .unwrap();
+        let alice_key = alice_raw.as_slice();
+        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
+        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
+        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        let nft1_key = 0u32.to_le_bytes();
+        let nft2_key = 1u32.to_le_bytes();
+        let handle_msg = HandleMsg::Mint {
+            token_id: Some("NFT1".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: Some(Metadata {
+                name: Some("My1".to_string()),
+                description: Some("Pub 1".to_string()),
+                image: Some("URI 1".to_string()),
+            }),
+            private_metadata: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::Mint {
+            token_id: Some("NFT2".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: Some(Metadata {
+                name: Some("My2".to_string()),
+                description: Some("Pub 2".to_string()),
+                image: Some("URI 2".to_string()),
+            }),
+            private_metadata: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+ 
+        // test not approved 
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token1: Token = json_load(&info_store, &nft1_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("not approved"));
+        
+        // test owner is public for the contract
+        let (init_result, mut deps) =
+        init_helper_with_config(true, true, false, false, false, false, false);
+    assert!(
+        init_result.is_ok(),
+        "Init failed: {}",
+        init_result.err().unwrap()
+    );
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", true);
+        assert!(check_perm.is_ok());
+
+        // test owner makes their tokens private when the contract has public ownership
+        let handle_msg = HandleMsg::SetOwnershipPrivacy {
+            owner_is_public: false,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", true);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("not approved"));
+
+        // test owner makes their tokens public when the contract has private ownership
+        let (init_result, mut deps) =
+        init_helper_with_config(true, false, false, false, false, false, false);
+    assert!(
+        init_result.is_ok(),
+        "Init failed: {}",
+        init_result.err().unwrap()
+    );
+        let handle_msg = HandleMsg::Mint {
+            token_id: Some("NFT1".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: Some(Metadata {
+                name: Some("My1".to_string()),
+                description: Some("Pub 1".to_string()),
+                image: Some("URI 1".to_string()),
+            }),
+            private_metadata: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::Mint {
+            token_id: Some("NFT2".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: Some(Metadata {
+                name: Some("My2".to_string()),
+                description: Some("Pub 2".to_string()),
+                image: Some("URI 2".to_string()),
+            }),
+            private_metadata: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+ 
+        let handle_msg = HandleMsg::SetOwnershipPrivacy {
+            owner_is_public: true,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        // test global approval on a token
+        let handle_msg = HandleMsg::SetOwnershipPrivacy {
+            owner_is_public: false,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("not approved"));
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: None,
+            expires: Some(Expiration::AtTime(1000000)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token1: Token = json_load(&info_store, &nft1_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        // test global approval for all tokens
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token2: Token = json_load(&info_store, &nft2_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("not approved"));
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: Some(AccessLevel::All),
+            expires: Some(Expiration::AtTime(1000000)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token2: Token = json_load(&info_store, &nft2_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        // test those global permissions having expired 
+        let block = BlockInfo {
+            height: 1,
+            time: 2000000,
+            chain_id: "secret-2".to_string(),
+        };
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("not approved"));
+        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("not approved"));
+
+        let block = BlockInfo {
+            height: 1,
+            time: 1,
+            chain_id: "secret-2".to_string(),
+        };
+
+        // test whitelisted approval on a token 
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: Some("NFT2".to_string()),
+            view_owner: None,
+            view_private_metadata: None,
+            transfer: Some(AccessLevel::ApproveToken),
+            expires: Some(Expiration::AtTime(5)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token2: Token = json_load(&info_store, &nft2_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&charlie_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("not approved"));
+
+        // test approval expired 
+        let block = BlockInfo {
+            height: 1,
+            time: 6,
+            chain_id: "secret-2".to_string(),
+        };
+        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("Access to token NFT2 has expired"));
+
+        // test owner access
+        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&alice_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        // test whitelisted approval on all tokens 
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("charlie".to_string()),
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: None,
+            transfer: Some(AccessLevel::All),
+            expires: Some(Expiration::AtTime(7)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token1: Token = json_load(&info_store, &nft1_key).unwrap();
+        let token2: Token = json_load(&info_store, &nft2_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("not approved"));
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&charlie_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        // test whitelisted ALL permission has expired
+        let block = BlockInfo {
+            height: 1,
+            time: 7,
+            chain_id: "secret-2".to_string(),
+        };
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&charlie_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("Access to all tokens of alice has expired"));
+
+        let (init_result, mut deps) =
+        init_helper_default();
+    assert!(
+        init_result.is_ok(),
+        "Init failed: {}",
+        init_result.err().unwrap()
+    );
+        let handle_msg = HandleMsg::Mint {
+            token_id: Some("NFT1".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: Some(Metadata {
+                name: Some("My1".to_string()),
+                description: Some("Pub 1".to_string()),
+                image: Some("URI 1".to_string()),
+            }),
+            private_metadata: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::Mint {
+            token_id: Some("NFT2".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: Some(Metadata {
+                name: Some("My2".to_string()),
+                description: Some("Pub 2".to_string()),
+                image: Some("URI 2".to_string()),
+            }),
+            private_metadata: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+
+        // test whitelist approval expired, but global is good on a token
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: Some("NFT1".to_string()),
+            view_owner: None,
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: None,
+            expires: Some(Expiration::AtTime(10)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: None,
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            expires: Some(Expiration::AtTime(1000)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let block = BlockInfo {
+            height: 1,
+            time: 100,
+            chain_id: "secret-2".to_string(),
+        };
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token1: Token = json_load(&info_store, &nft1_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        // test whitelist approval expired, but global is good on ALL tokens
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: Some(AccessLevel::All),
+            transfer: None,
+            expires: Some(Expiration::AtTime(10)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: Some(AccessLevel::All),
+            expires: Some(Expiration::AtTime(1000)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let block = BlockInfo {
+            height: 1,
+            time: 100,
+            chain_id: "secret-2".to_string(),
+        };
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token1: Token = json_load(&info_store, &nft1_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        // test whitelist approval is good, but global expired on a token
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: Some("NFT1".to_string()),
+            view_owner: None,
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: None,
+            expires: Some(Expiration::AtTime(1000)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: None,
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            expires: Some(Expiration::AtTime(10)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let block = BlockInfo {
+            height: 1,
+            time: 100,
+            chain_id: "secret-2".to_string(),
+        };
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token1: Token = json_load(&info_store, &nft1_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        // test whitelist approval is good, but global expired on ALL tokens
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: Some(AccessLevel::All),
+            transfer: None,
+            expires: Some(Expiration::AtTime(10)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: Some(AccessLevel::All),
+            expires: Some(Expiration::AtTime(1000)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let block = BlockInfo {
+            height: 1,
+            time: 100,
+            chain_id: "secret-2".to_string(),
+        };
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token1: Token = json_load(&info_store, &nft1_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        let (init_result, mut deps) =
+        init_helper_default();
+    assert!(
+        init_result.is_ok(),
+        "Init failed: {}",
+        init_result.err().unwrap()
+    );
+        let handle_msg = HandleMsg::Mint {
+            token_id: Some("NFT1".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: Some(Metadata {
+                name: Some("My1".to_string()),
+                description: Some("Pub 1".to_string()),
+                image: Some("URI 1".to_string()),
+            }),
+            private_metadata: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::Mint {
+            token_id: Some("NFT2".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: Some(Metadata {
+                name: Some("My2".to_string()),
+                description: Some("Pub 2".to_string()),
+                image: Some("URI 2".to_string()),
+            }),
+            private_metadata: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+
+        // test bob has view owner approval on NFT1 and view metadata approval on ALL
+        // while there is global view owner approval on ALL tokens and global view metadata
+        // approval on NFT1
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: Some(AccessLevel::All),
+            transfer: None,
+            expires: Some(Expiration::AtTime(100)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            expires: Some(Expiration::AtTime(10)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let block = BlockInfo {
+            height: 1,
+            time: 1,
+            chain_id: "secret-2".to_string(),
+        };
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token1: Token = json_load(&info_store, &nft1_key).unwrap();
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let error = extract_error_msg(check_perm);
+        assert!(error.contains("not approved"));
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        // now check where the global approvals expired 
+        let block = BlockInfo {
+            height: 1,
+            time: 50,
+            chain_id: "secret-2".to_string(),
+        };
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+
+        // throw a charlie transfer approval and a view meta token approval in the mix
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("charlie".to_string()),
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: None,
+            transfer: Some(AccessLevel::All),
+            expires: Some(Expiration::AtTime(100)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("charlie".to_string()),
+            token_id: Some("NFT1".to_string()),
+            view_owner: None,
+            view_private_metadata: Some(AccessLevel::ApproveToken),
+            transfer: None,
+            expires: Some(Expiration::AtTime(100)),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token1: Token = json_load(&info_store, &nft1_key).unwrap();    
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&charlie_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&charlie_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
     }
 }

@@ -41,6 +41,8 @@ pub const PREFIX_OWNED: &[u8] = b"owned";
 pub const PREFIX_ALL_PERMISSIONS: &[u8] = b"allpermissions";
 /// prefix for storage of owner's list of tokens permitted to addresses
 pub const PREFIX_AUTHLIST: &[u8] = b"authlist";
+/// prefix for storage of an address' ownership prvicacy
+pub const PREFIX_OWNER_PRIV: &[u8] = b"ownerpriv";
 /// prefix for storage of viewing keys
 pub const PREFIX_VIEW_KEY: &[u8] = b"viewkeys";
 /// prefix for the storage of the code hashes of contract's that have implemented ReceiveNft

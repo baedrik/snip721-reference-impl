@@ -34,9 +34,8 @@ pub struct InitConfig {
     /// number of tokens controlled by the contract
     /// default: False
     pub public_token_supply: Option<bool>,
-    /// indicates whether token ownership is public or private when a token is minted.  The
-    /// owner can change the ownership privacy level later, but if the current owner transfers
-    /// the token, ownership privacy will return to this setting.
+    /// indicates whether token ownership is public or private.  A user can still change whether the
+    /// ownership of their tokens is public or private
     /// default: False
     pub public_owner: Option<bool>,
     /// indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the
@@ -123,8 +122,32 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// set approval(s) for token(s) you own.  Any permissions that are omitted will keep current permission
-    SetApproval {
+    /// set whether token ownership for this address is public or private.  This overrides
+    /// the contract default that is set by the instantiation configuration value of `public_owner`
+    SetOwnershipPrivacy {
+        /// true if everyone is permitted to view the owner of all your tokens
+        owner_is_public: bool,
+        /// optional message length padding
+        padding: Option<String>,
+    },
+    /// use this to add/remove approval(s) that whitelist everyone (makes public).  I do
+    /// not include an option to give everyone permission to transfer a token, but the 
+    /// underlying processing would be able to do so if a contract dev wanted to add that
+    /// PermissionType here
+    SetGlobalApproval {
+        /// optional token id to apply approval to
+        token_id: Option<String>,
+        /// optional permission to view owner
+        view_owner: Option<AccessLevel>,
+        /// optional permission to view private metadata
+        view_private_metadata: Option<AccessLevel>,
+        /// optional expiration
+        expires: Option<Expiration>,
+        /// optional message length padding
+        padding: Option<String>,
+    },
+    /// add/remove approval(s) for a specific address on the token(s) you own.  Any permissions that are omitted will keep current permission
+    SetWhitelistedApproval {
         /// address being granted permission
         address: HumanAddr,
         /// optional token id to apply approval to
@@ -141,7 +164,7 @@ pub enum HandleMsg {
         padding: Option<String>,
     },
     /// gives the spender permission to transfer the specified token.  If you are the owner of the token, you
-    /// can use SetApproval to accomplish the same thing.  If you are an operator, you can only use Approve
+    /// can use SetWhitelistedApproval to accomplish the same thing.  If you are an operator, you can only use Approve
     Approve {
         /// address being granted the permission
         spender: HumanAddr,
@@ -153,7 +176,7 @@ pub enum HandleMsg {
         padding: Option<String>,
     },
     /// revokes the spender's permission to transfer the specified token.  If you are the owner of the token, you
-    /// can use SetApproval to accomplish the same thing.  If you are an operator, you can only use Revoke, but
+    /// can use SetWhitelistedApproval to accomplish the same thing.  If you are an operator, you can only use Revoke, but
     /// you can not revoke the transfer permission of another operator
     Revoke {
         /// address whose permission is revoked
@@ -163,7 +186,7 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// provided for cw721 compliance, but can be done with SetApproval...
+    /// provided for cw721 compliance, but can be done with SetWhitelistedApproval...
     /// gives the operator permission to transfer all of the message sender's tokens
     ApproveAll {
         /// address being granted permission to transfer
@@ -173,7 +196,7 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// provided for cw721 compliance, but can be done with SetApproval...
+    /// provided for cw721 compliance, but can be done with SetWhitelistedApproval...
     /// revokes the operator's permission to transfer any of the message sender's tokens
     RevokeAll {
         /// address whose permissions are revoked
@@ -353,6 +376,9 @@ pub enum HandleAnswer {
     SetPrivateMetadata {
         status: ResponseStatus,
     },
+    SetOwnershipPrivacy {
+        status: ResponseStatus,
+    },
     Reveal {
         status: ResponseStatus,
     },
@@ -368,7 +394,10 @@ pub enum HandleAnswer {
     RevokeAll {
         status: ResponseStatus,
     },
-    SetApproval {
+    SetGlobalApproval {
+        status: ResponseStatus,
+    },
+    SetWhitelistedApproval {
         status: ResponseStatus,
     },
     TransferNft {
@@ -449,7 +478,10 @@ pub enum QueryMsg {
         /// optional number of token ids to display
         limit: Option<u32>,
     },
-    /// display the owner of the specified token if authorized to view it
+    /// display the owner of the specified token if authorized to view it.  If the requester
+    /// is also the token's owner, the response will also include a list of any addresses
+    /// that can transfer this token.  The transfer approval list is for CW721 compliance,
+    /// but the NftDossier query will be more complete by showing viewing approvals as well
     OwnerOf {
         token_id: String,
         /// optional address and key requesting to view the token owner
@@ -461,21 +493,6 @@ pub enum QueryMsg {
     /// display if a token has been unwrapped
     WasTokenUnwrapped { token_id: String },
     /*
-        Allowance {
-            owner: HumanAddr,
-            spender: HumanAddr,
-            key: String,
-        },
-        Balance {
-            address: HumanAddr,
-            key: String,
-        },
-        TransferHistory {
-            address: HumanAddr,
-            key: String,
-            page: Option<u32>,
-            page_size: u32,
-        },
         TransactionHistory {
             address: HumanAddr,
             key: String,
@@ -562,25 +579,6 @@ impl QueryMsg {
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryAnswer {
-    TokenInfo {
-        name: String,
-        symbol: String,
-        decimals: u8,
-        total_supply: Option<Uint128>,
-    },
-    ExchangeRate {
-        rate: Uint128,
-        denom: String,
-    },
-    Allowance {
-        spender: HumanAddr,
-        owner: HumanAddr,
-        allowance: Uint128,
-        expiration: Option<u64>,
-    },
-    Balance {
-        amount: Uint128,
-    },
     TransactionHistory {
         txs: Vec<Tx>,
     },
@@ -588,12 +586,6 @@ pub enum QueryAnswer {
         msg: String,
     },
 
-}
-
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
-pub struct CreateViewingKeyResponse {
-    pub key: String,
 }
 */
 
