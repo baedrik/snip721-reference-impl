@@ -513,6 +513,15 @@ pub enum QueryMsg {
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
     },
+    // lists all the inventory-wide approvals in place for the specified address
+    InventoryApprovals {
+        address: HumanAddr,
+        /// the viewing key
+        viewing_key: String,
+        /// optionally include expired Approvals in the response list.  If ommitted or
+        /// false, expired Approvals will be filtered out of the response
+        include_expired: Option<bool>,
+    },
     /// displays a list of all the CW721-style operators (any address that was granted
     /// approval to transfer all of the owner's tokens).  This query is provided to maintain
     /// CW721 compliance, however, approvals are private on secret network, so only the
@@ -543,14 +552,17 @@ pub enum QueryMsg {
     },
     /// display if a token has been unwrapped
     WasTokenUnwrapped { token_id: String },
-    /*
-        TransactionHistory {
-            address: HumanAddr,
-            key: String,
-            page: Option<u32>,
-            page_size: u32,
-        },
-    */
+    /// display the transaction history for the specified address in reverse
+    /// chronological order
+    TransactionHistory {
+        address: HumanAddr,
+        /// viewing key
+        viewing_key: String,
+        /// optional page to display
+        page: Option<u32>,
+        /// optional number of transactions per page
+        page_size: Option<u32>,
+    },
 }
 
 /// SNIP721 Approval
@@ -618,6 +630,12 @@ pub enum QueryAnswer {
         private_metadata_is_public: bool,
         token_approvals: Vec<Snip721Approval>,
     },
+    InventoryApprovals {
+        owner_is_public: bool,
+        private_metadata_is_public: bool,
+        inventory_approvals: Vec<Snip721Approval>,
+    
+    },
     NftInfo {
         name: Option<String>,
         description: Option<String>,
@@ -633,42 +651,10 @@ pub enum QueryAnswer {
     WasTokenUnwrapped {
         token_was_unwrapped: bool,
     },
-}
-
-///
-
-/*
-impl QueryMsg {
-    pub fn get_validation_params(&self) -> (Vec<&HumanAddr>, ViewingKey) {
-        match self {
-            Self::Balance { address, key } => (vec![address], ViewingKey(key.clone())),
-            Self::TransferHistory { address, key, .. } => (vec![address], ViewingKey(key.clone())),
-            Self::TransactionHistory { address, key, .. } => {
-                (vec![address], ViewingKey(key.clone()))
-            }
-            Self::Allowance {
-                owner,
-                spender,
-                key,
-                ..
-            } => (vec![owner, spender], ViewingKey(key.clone())),
-            _ => panic!("This query type does not require authentication"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, JsonSchema, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum QueryAnswer {
     TransactionHistory {
         txs: Vec<Tx>,
     },
-    ViewingKeyError {
-        msg: String,
-    },
-
 }
-*/
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
