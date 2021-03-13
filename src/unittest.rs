@@ -1175,9 +1175,9 @@ mod tests {
             .canonical_address(&HumanAddr("alice".to_string()))
             .unwrap();
         let alice_key = alice_raw.as_slice();
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
+        let transfer_idx = PermissionType::Transfer.to_usize();
         // confirm ALL permission
         let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -3108,9 +3108,9 @@ mod tests {
             .canonical_address(&HumanAddr("alice".to_string()))
             .unwrap();
         let alice_key = alice_raw.as_slice();
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
+        let transfer_idx = PermissionType::Transfer.to_usize();
 
         // test operator tries to grant permission to another operator.  This should
         // not do anything but end successfully
@@ -3593,9 +3593,9 @@ mod tests {
             .canonical_address(&HumanAddr("alice".to_string()))
             .unwrap();
         let alice_key = alice_raw.as_slice();
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
+        let transfer_idx = PermissionType::Transfer.to_usize();
 
         // test operator tries to revoke permission from another operator
         let handle_msg = HandleMsg::Revoke {
@@ -4268,7 +4268,7 @@ mod tests {
         let owned: Option<HashSet<u32>> = may_load(&owned_store, alice_key).unwrap();
         assert!(owned.is_none());
 
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        let transfer_idx = PermissionType::Transfer.to_usize();
 
         // sanity check: address with token permission burns it
         let handle_msg = HandleMsg::Mint {
@@ -5167,9 +5167,9 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
 
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
+        let transfer_idx = PermissionType::Transfer.to_usize();
         let tok1_key = 0u32.to_le_bytes();
         let tok2_key = 1u32.to_le_bytes();
         let tok3_key = 2u32.to_le_bytes();
@@ -5530,9 +5530,9 @@ mod tests {
             .canonical_address(&HumanAddr("david".to_string()))
             .unwrap();
         let david_key = david_raw.as_slice();
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
+        let transfer_idx = PermissionType::Transfer.to_usize();
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
 
         // confirm that transfering to the same address that owns the token does not
         // erase the current permissions
@@ -5938,9 +5938,9 @@ mod tests {
             .canonical_address(&HumanAddr("david".to_string()))
             .unwrap();
         let david_key = david_raw.as_slice();
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
+        let transfer_idx = PermissionType::Transfer.to_usize();
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
 
         // set up for batch transfer test
         let (init_result, mut deps) =
@@ -6739,9 +6739,9 @@ mod tests {
             .canonical_address(&HumanAddr("david".to_string()))
             .unwrap();
         let david_key = david_raw.as_slice();
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
+        let transfer_idx = PermissionType::Transfer.to_usize();
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
 
         // confirm that sending to the same address that owns the token does not
         // erase the current permissions
@@ -7223,9 +7223,9 @@ mod tests {
             .canonical_address(&HumanAddr("david".to_string()))
             .unwrap();
         let david_key = david_raw.as_slice();
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
+        let transfer_idx = PermissionType::Transfer.to_usize();
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
 
         // set up for batch send test
         let (init_result, mut deps) =
@@ -8281,9 +8281,9 @@ mod tests {
             .canonical_address(&HumanAddr("alice".to_string()))
             .unwrap();
         let alice_key = alice_raw.as_slice();
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
+        let transfer_idx = PermissionType::Transfer.to_usize();
         let nft1_key = 0u32.to_le_bytes();
         let nft2_key = 1u32.to_le_bytes();
         let nft3_key = 2u32.to_le_bytes();
@@ -8489,9 +8489,9 @@ mod tests {
             .canonical_address(&HumanAddr("alice".to_string()))
             .unwrap();
         let alice_key = alice_raw.as_slice();
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
+        let transfer_idx = PermissionType::Transfer.to_usize();
         let nft1_key = 0u32.to_le_bytes();
         let nft2_key = 1u32.to_le_bytes();
         let nft3_key = 2u32.to_le_bytes();
@@ -8881,9 +8881,9 @@ mod tests {
             .canonical_address(&HumanAddr("alice".to_string()))
             .unwrap();
         let alice_key = alice_raw.as_slice();
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
+        let transfer_idx = PermissionType::Transfer.to_usize();
         // confirm ALL permission
         let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -9142,9 +9142,9 @@ mod tests {
             .canonical_address(&HumanAddr("charlie".to_string()))
             .unwrap();
         let alice_key = alice_raw.as_slice();
-        let view_owner_idx = PermissionType::ViewOwner.to_u8() as usize;
-        let view_meta_idx = PermissionType::ViewMetadata.to_u8() as usize;
-        let transfer_idx = PermissionType::Transfer.to_u8() as usize;
+        let view_owner_idx = PermissionType::ViewOwner.to_usize();
+        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
+        let transfer_idx = PermissionType::Transfer.to_usize();
         let nft1_key = 0u32.to_le_bytes();
         let nft2_key = 1u32.to_le_bytes();
         let handle_msg = HandleMsg::Mint {

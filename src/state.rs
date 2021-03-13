@@ -508,12 +508,17 @@ pub enum PermissionType {
 
 impl PermissionType {
     /// Returns usize representation of the enum variant
-    pub fn to_u8(&self) -> u8 {
+    pub fn to_usize(&self) -> usize {
         match self {
             PermissionType::ViewOwner => 0,
             PermissionType::ViewMetadata => 1,
             PermissionType::Transfer => 2,
         }
+    }
+
+    /// returns the number of permission types
+    pub fn num_types(&self) -> usize {
+        3
     }
 }
 

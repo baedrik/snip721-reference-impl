@@ -490,6 +490,57 @@ pub enum QueryMsg {
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
     },
+    /// displays the public metadata of a token
+    NftInfo {
+        token_id: String,
+    },
+    /// displays all the information contained in the OwnerOf and NftInfo queries
+    AllNftInfo {
+        token_id: String,
+        /// optional address and key requesting to view the token owner
+        viewer: Option<ViewerInfo>,
+        /// optionally include expired Approvals in the response list.  If ommitted or
+        /// false, expired Approvals will be filtered out of the response
+        include_expired: Option<bool>,
+    },
+    /// allows only the token owner to list all the approvals in place for a specified
+    /// token
+    TokenApprovals {
+        token_id: String,
+        /// the token owner's viewing key
+        viewing_key: String,
+        /// optionally include expired Approvals in the response list.  If ommitted or
+        /// false, expired Approvals will be filtered out of the response
+        include_expired: Option<bool>,
+    },
+    /// displays a list of all the CW721-style operators (any address that was granted
+    /// approval to transfer all of the owner's tokens).  This query is provided to maintain
+    /// CW721 compliance, however, approvals are private on secret network, so only the
+    /// owner's viewing key will authorize the ability to see the list of operators
+    ApprovedForAll {
+        owner: HumanAddr,
+        /// optional viewing key to authenticate this query.  It is "optional" only in the
+        /// sense that a CW721 query does not have this field.  However, not providing the
+        /// key will always result in the contract throwing a viewing key error
+        viewing_key: Option<String>,
+        /// optionally include expired Approvals in the response list.  If ommitted or
+        /// false, expired Approvals will be filtered out of the response
+        include_expired: Option<bool>,
+    },
+    /// displays a list of all the tokens belonging to the input owner in which the viewer
+    /// has view_owner permission
+    Tokens {
+        owner: HumanAddr,
+        /// optional address of the querier if different from the owner
+        viewer: Option<HumanAddr>,
+        /// optional viewing key
+        viewing_key: Option<String>,
+        /// optionally display only token ids that come after the input String in
+        /// lexicographical order
+        start_after: Option<String>,
+        /// optional number of token ids to display
+        limit: Option<u32>,
+    },
     /// display if a token has been unwrapped
     WasTokenUnwrapped { token_id: String },
     /*
@@ -500,6 +551,19 @@ pub enum QueryMsg {
             page_size: u32,
         },
     */
+}
+
+/// SNIP721 Approval
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Snip721Approval {
+    /// whitelisted address
+    pub address: HumanAddr,
+    /// optional expiration if the address has view owner permission
+    pub view_owner_expiration: Option<Expiration>,
+    /// optional expiration if the address has view private metadata permission
+    pub view_private_metadata_expiration: Option<Expiration>,
+    /// optional expiration if the address has transfer permission
+    pub transfer_expiration: Option<Expiration>,
 }
 
 /// CW721 Approval
@@ -548,6 +612,23 @@ pub enum QueryAnswer {
     OwnerOf {
         owner: HumanAddr,
         approvals: Vec<Cw721Approval>,
+    },
+    TokenApprovals {
+        owner_is_public: bool,
+        private_metadata_is_public: bool,
+        token_approvals: Vec<Snip721Approval>,
+    },
+    NftInfo {
+        name: Option<String>,
+        description: Option<String>,
+        image: Option<String>,
+    },
+    AllNftInfo {
+        access: Cw721OwnerOfResponse,
+        info: Metadata,
+    },
+    ApprovedForAll {
+        operators: Vec<Cw721Approval>,
     },
     WasTokenUnwrapped {
         token_was_unwrapped: bool,
