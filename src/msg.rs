@@ -1,12 +1,11 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Binary, HumanAddr, Uint128};
+use cosmwasm_std::{Binary, HumanAddr};
 
 use crate::expiration::Expiration;
 use crate::state::Tx;
 use crate::token::Metadata;
-use crate::viewing_key::ViewingKey;
 
 /// Instantiation message
 #[derive(Serialize, Deserialize, JsonSchema)]

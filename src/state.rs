@@ -49,7 +49,7 @@ pub const PREFIX_VIEW_KEY: &[u8] = b"viewkeys";
 pub const PREFIX_RECEIVERS: &[u8] = b"receivers";
 
 /// Token contract config
-#[derive(Serialize, Debug, Deserialize, Clone, PartialEq, JsonSchema)]
+#[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
 pub struct Config {
     /// name of token contract
     pub name: String,
@@ -287,6 +287,7 @@ impl StoredTx {
 /// * `sender` - optional address that sent the token
 /// * `recipient` - the recipient's address
 /// * `memo` - optional memo for the tx
+#[allow(clippy::too_many_arguments)]
 pub fn store_transfer<S: Storage>(
     storage: &mut S,
     config: &mut Config,

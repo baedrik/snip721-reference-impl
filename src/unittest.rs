@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::contract::{handle, init, check_permission};
+    use crate::contract::{check_permission, handle, init};
     use crate::expiration::Expiration;
     use crate::msg::{
         AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg,
@@ -10,8 +10,8 @@ mod tests {
     use crate::state::{
         get_txs, json_load, json_may_load, load, may_load, AuthList, Config, Permission,
         PermissionType, TxAction, CONFIG_KEY, IDS_KEY, INDEX_KEY, MINTERS_KEY,
-        PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_OWNED, PREFIX_PRIV_META,
-        PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY, PREFIX_OWNER_PRIV, 
+        PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_OWNED, PREFIX_OWNER_PRIV,
+        PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY,
     };
     use crate::token::{Metadata, Token};
     use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -8681,9 +8681,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MakeOwnershipPrivate {
-            padding: None,
-        };
+        let handle_msg = HandleMsg::MakeOwnershipPrivate { padding: None };
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
@@ -8696,9 +8694,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         // sanity check when contract default is private
-        let handle_msg = HandleMsg::MakeOwnershipPrivate {
-            padding: None,
-        };
+        let handle_msg = HandleMsg::MakeOwnershipPrivate { padding: None };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let alice_raw = deps
             .api
@@ -8717,9 +8713,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::MakeOwnershipPrivate {
-            padding: None,
-        };
+        let handle_msg = HandleMsg::MakeOwnershipPrivate { padding: None };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
         let owner_priv: bool = load(&store, alice_key).unwrap();
@@ -8782,7 +8776,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
- 
+
         // test trying to set approval when status does not allow
         let handle_msg = HandleMsg::SetContractStatus {
             level: ContractStatus::StopAll,
@@ -9034,7 +9028,7 @@ mod tests {
         assert!(global_auth.tokens[view_meta_idx].contains(&0u32));
         assert!(global_auth.tokens[transfer_idx].is_empty());
         assert!(global_auth.tokens[view_owner_idx].is_empty());
-    
+
         // test revoking global approval
         let handle_msg = HandleMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
@@ -9077,10 +9071,7 @@ mod tests {
         );
         assert_eq!(bob_tok_perm.expirations[view_meta_idx], None);
         assert_eq!(bob_tok_perm.expirations[view_owner_idx], None);
-        let global_tok_perm = token
-        .permissions
-        .iter()
-        .find(|p| p.address == global_raw);
+        let global_tok_perm = token.permissions.iter().find(|p| p.address == global_raw);
         assert!(global_tok_perm.is_none());
         // confirm AuthLists has bob with NFT1 permission
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
@@ -9111,9 +9102,9 @@ mod tests {
             chain_id: "secret-2".to_string(),
         };
         let alice_raw = deps
-        .api
-        .canonical_address(&HumanAddr("alice".to_string()))
-        .unwrap();
+            .api
+            .canonical_address(&HumanAddr("alice".to_string()))
+            .unwrap();
         let bob_raw = deps
             .api
             .canonical_address(&HumanAddr("bob".to_string()))
@@ -9154,22 +9145,32 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
- 
-        // test not approved 
+
+        // test not approved
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewOwner,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         let error = extract_error_msg(check_perm);
         assert!(error.contains("not approved"));
-        
+
         // test owner is public for the contract
         let (init_result, mut deps) =
-        init_helper_with_config(true, true, false, false, false, false, false);
-    assert!(
-        init_result.is_ok(),
-        "Init failed: {}",
-        init_result.err().unwrap()
-    );
+            init_helper_with_config(true, true, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
         let handle_msg = HandleMsg::Mint {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -9196,16 +9197,34 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
- 
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", true);
+
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewOwner,
+            &mut Vec::new(),
+            "not approved",
+            true,
+        );
         assert!(check_perm.is_ok());
 
         // test owner makes their tokens private when the contract has public ownership
-        let handle_msg = HandleMsg::MakeOwnershipPrivate {
-            padding: None,
-        };
+        let handle_msg = HandleMsg::MakeOwnershipPrivate { padding: None };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", true);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewOwner,
+            &mut Vec::new(),
+            "not approved",
+            true,
+        );
         let error = extract_error_msg(check_perm);
         assert!(error.contains("not approved"));
 
@@ -9220,16 +9239,46 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewOwner,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
-        // test public approval when no address is given 
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", None, PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        // test public approval when no address is given
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            None,
+            PermissionType::ViewOwner,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
 
         // test global approval for all tokens
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token2: Token = json_load(&info_store, &nft2_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token2,
+            "NFT2",
+            Some(&bob_raw),
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         let error = extract_error_msg(check_perm);
         assert!(error.contains("not approved"));
         let handle_msg = HandleMsg::SetGlobalApproval {
@@ -9242,22 +9291,62 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token2: Token = json_load(&info_store, &nft2_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token2,
+            "NFT2",
+            Some(&bob_raw),
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
-        // test public approval when no address is given 
-        let check_perm = check_permission(&deps, &block, &token2, "NFT2", None, PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        // test public approval when no address is given
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token2,
+            "NFT2",
+            None,
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
 
-        // test those global permissions having expired 
+        // test those global permissions having expired
         let block = BlockInfo {
             height: 1,
             time: 2000000,
             chain_id: "secret-2".to_string(),
         };
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewOwner,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         let error = extract_error_msg(check_perm);
         assert!(error.contains("not approved"));
-        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token2,
+            "NFT2",
+            Some(&bob_raw),
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         let error = extract_error_msg(check_perm);
         assert!(error.contains("not approved"));
 
@@ -9267,7 +9356,7 @@ mod tests {
             chain_id: "secret-2".to_string(),
         };
 
-        // test whitelisted approval on a token 
+        // test whitelisted approval on a token
         let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),
             token_id: Some("NFT2".to_string()),
@@ -9280,27 +9369,67 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token2: Token = json_load(&info_store, &nft2_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token2,
+            "NFT2",
+            Some(&bob_raw),
+            PermissionType::Transfer,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
-        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&charlie_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token2,
+            "NFT2",
+            Some(&charlie_raw),
+            PermissionType::Transfer,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         let error = extract_error_msg(check_perm);
         assert!(error.contains("not approved"));
 
-        // test approval expired 
+        // test approval expired
         let block = BlockInfo {
             height: 1,
             time: 6,
             chain_id: "secret-2".to_string(),
         };
-        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token2,
+            "NFT2",
+            Some(&bob_raw),
+            PermissionType::Transfer,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         let error = extract_error_msg(check_perm);
         assert!(error.contains("Access to token NFT2 has expired"));
 
         // test owner access
-        let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&alice_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token2,
+            "NFT2",
+            Some(&alice_raw),
+            PermissionType::Transfer,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
 
-        // test whitelisted approval on all tokens 
+        // test whitelisted approval on all tokens
         let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("charlie".to_string()),
             token_id: None,
@@ -9314,10 +9443,30 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
         let token2: Token = json_load(&info_store, &nft2_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::Transfer,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         let error = extract_error_msg(check_perm);
         assert!(error.contains("not approved"));
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&charlie_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&charlie_raw),
+            PermissionType::Transfer,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
 
         // test whitelisted ALL permission has expired
@@ -9326,17 +9475,26 @@ mod tests {
             time: 7,
             chain_id: "secret-2".to_string(),
         };
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&charlie_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&charlie_raw),
+            PermissionType::Transfer,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         let error = extract_error_msg(check_perm);
         assert!(error.contains("Access to all tokens of alice has expired"));
 
-        let (init_result, mut deps) =
-        init_helper_default();
-    assert!(
-        init_result.is_ok(),
-        "Init failed: {}",
-        init_result.err().unwrap()
-    );
+        let (init_result, mut deps) = init_helper_default();
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
         let handle_msg = HandleMsg::Mint {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -9390,7 +9548,17 @@ mod tests {
         };
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
 
         // test whitelist approval expired, but global is good on ALL tokens
@@ -9419,7 +9587,17 @@ mod tests {
         };
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
 
         // test whitelist approval is good, but global expired on a token
@@ -9448,7 +9626,17 @@ mod tests {
         };
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
 
         // test whitelist approval is good, but global expired on ALL tokens
@@ -9477,16 +9665,25 @@ mod tests {
         };
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
 
-        let (init_result, mut deps) =
-        init_helper_default();
-    assert!(
-        init_result.is_ok(),
-        "Init failed: {}",
-        init_result.err().unwrap()
-    );
+        let (init_result, mut deps) = init_helper_default();
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
         let handle_msg = HandleMsg::Mint {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -9542,23 +9739,73 @@ mod tests {
         };
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::Transfer,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         let error = extract_error_msg(check_perm);
         assert!(error.contains("not approved"));
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewOwner,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
 
-        // now check where the global approvals expired 
+        // now check where the global approvals expired
         let block = BlockInfo {
             height: 1,
             time: 50,
             chain_id: "secret-2".to_string(),
         };
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewOwner,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&bob_raw),
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
 
         // throw a charlie transfer approval and a view meta token approval in the mix
@@ -9583,10 +9830,30 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
-        let token1: Token = json_load(&info_store, &nft1_key).unwrap();    
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&charlie_raw), PermissionType::Transfer, &mut Vec::new(), "not approved", false);
+        let token1: Token = json_load(&info_store, &nft1_key).unwrap();
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&charlie_raw),
+            PermissionType::Transfer,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&charlie_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(
+            &deps,
+            &block,
+            &token1,
+            "NFT1",
+            Some(&charlie_raw),
+            PermissionType::ViewMetadata,
+            &mut Vec::new(),
+            "not approved",
+            false,
+        );
         assert!(check_perm.is_ok());
     }
 }
