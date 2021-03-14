@@ -3,163 +3,31 @@
   "title": "QueryMsg",
   "anyOf": [
     {
+      "description": "display the contract's name and symbol",
       "type": "object",
       "required": [
-        "token_info"
+        "contract_info"
       ],
       "properties": {
-        "token_info": {
+        "contract_info": {
           "type": "object"
         }
       }
     },
     {
+      "description": "display the contract's configuration",
       "type": "object",
       "required": [
-        "token_config"
+        "contract_config"
       ],
       "properties": {
-        "token_config": {
+        "contract_config": {
           "type": "object"
         }
       }
     },
     {
-      "type": "object",
-      "required": [
-        "exchange_rate"
-      ],
-      "properties": {
-        "exchange_rate": {
-          "type": "object"
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "allowance"
-      ],
-      "properties": {
-        "allowance": {
-          "type": "object",
-          "required": [
-            "key",
-            "owner",
-            "spender"
-          ],
-          "properties": {
-            "key": {
-              "type": "string"
-            },
-            "owner": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "balance"
-      ],
-      "properties": {
-        "balance": {
-          "type": "object",
-          "required": [
-            "address",
-            "key"
-          ],
-          "properties": {
-            "address": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "key": {
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "transfer_history"
-      ],
-      "properties": {
-        "transfer_history": {
-          "type": "object",
-          "required": [
-            "address",
-            "key",
-            "page_size"
-          ],
-          "properties": {
-            "address": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "key": {
-              "type": "string"
-            },
-            "page": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "format": "uint32",
-              "minimum": 0.0
-            },
-            "page_size": {
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "transaction_history"
-      ],
-      "properties": {
-        "transaction_history": {
-          "type": "object",
-          "required": [
-            "address",
-            "key",
-            "page_size"
-          ],
-          "properties": {
-            "address": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "key": {
-              "type": "string"
-            },
-            "page": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "format": "uint32",
-              "minimum": 0.0
-            },
-            "page_size": {
-              "type": "integer",
-              "format": "uint32",
-              "minimum": 0.0
-            }
-          }
-        }
-      }
-    },
-    {
+      "description": "display the list of authorized minters",
       "type": "object",
       "required": [
         "minters"
@@ -169,11 +37,472 @@
           "type": "object"
         }
       }
+    },
+    {
+      "description": "display the number of tokens controlled by the contract.  The token supply must either be public, or the querier must be an authenticated minter",
+      "type": "object",
+      "required": [
+        "num_tokens"
+      ],
+      "properties": {
+        "num_tokens": {
+          "type": "object",
+          "properties": {
+            "viewer": {
+              "description": "optional address and key requesting to view the number of tokens",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ViewerInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "display an optionally paginated list of all the tokens controlled by the contract. The token supply must either be public, or the querier must be an authenticated minter",
+      "type": "object",
+      "required": [
+        "all_tokens"
+      ],
+      "properties": {
+        "all_tokens": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "optional number of token ids to display",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "start_after": {
+              "description": "optionally display only token ids that come after the input String in lexicographical order",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "viewer": {
+              "description": "optional address and key requesting to view the list of tokens",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ViewerInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "display the owner of the specified token if authorized to view it.  If the requester is also the token's owner, the response will also include a list of any addresses that can transfer this token.  The transfer approval list is for CW721 compliance, but the NftDossier query will be more complete by showing viewing approvals as well",
+      "type": "object",
+      "required": [
+        "owner_of"
+      ],
+      "properties": {
+        "owner_of": {
+          "type": "object",
+          "required": [
+            "token_id"
+          ],
+          "properties": {
+            "include_expired": {
+              "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "token_id": {
+              "type": "string"
+            },
+            "viewer": {
+              "description": "optional address and key requesting to view the token owner",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ViewerInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "displays the public metadata of a token",
+      "type": "object",
+      "required": [
+        "nft_info"
+      ],
+      "properties": {
+        "nft_info": {
+          "type": "object",
+          "required": [
+            "token_id"
+          ],
+          "properties": {
+            "token_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "displays all the information contained in the OwnerOf and NftInfo queries",
+      "type": "object",
+      "required": [
+        "all_nft_info"
+      ],
+      "properties": {
+        "all_nft_info": {
+          "type": "object",
+          "required": [
+            "token_id"
+          ],
+          "properties": {
+            "include_expired": {
+              "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "token_id": {
+              "type": "string"
+            },
+            "viewer": {
+              "description": "optional address and key requesting to view the token owner",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ViewerInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "displays the private metadata if permitted to view it",
+      "type": "object",
+      "required": [
+        "private_metadata"
+      ],
+      "properties": {
+        "private_metadata": {
+          "type": "object",
+          "required": [
+            "token_id"
+          ],
+          "properties": {
+            "token_id": {
+              "type": "string"
+            },
+            "viewer": {
+              "description": "optional address and key requesting to view the private metadata",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ViewerInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "displays all the information about a token that the viewer has permission to see.  This may include the owner, the public metadata, the private metadata, and the token and inventory approvals",
+      "type": "object",
+      "required": [
+        "nft_dossier"
+      ],
+      "properties": {
+        "nft_dossier": {
+          "type": "object",
+          "required": [
+            "token_id"
+          ],
+          "properties": {
+            "include_expired": {
+              "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "token_id": {
+              "type": "string"
+            },
+            "viewer": {
+              "description": "optional address and key requesting to view the token information",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ViewerInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "allows only the token owner to list all the approvals in place for a specified token",
+      "type": "object",
+      "required": [
+        "token_approvals"
+      ],
+      "properties": {
+        "token_approvals": {
+          "type": "object",
+          "required": [
+            "token_id",
+            "viewing_key"
+          ],
+          "properties": {
+            "include_expired": {
+              "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "token_id": {
+              "type": "string"
+            },
+            "viewing_key": {
+              "description": "the token owner's viewing key",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "inventory_approvals"
+      ],
+      "properties": {
+        "inventory_approvals": {
+          "type": "object",
+          "required": [
+            "address",
+            "viewing_key"
+          ],
+          "properties": {
+            "address": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "include_expired": {
+              "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "viewing_key": {
+              "description": "the viewing key",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "displays a list of all the CW721-style operators (any address that was granted approval to transfer all of the owner's tokens).  This query is provided to maintain CW721 compliance, however, approvals are private on secret network, so only the owner's viewing key will authorize the ability to see the list of operators",
+      "type": "object",
+      "required": [
+        "approved_for_all"
+      ],
+      "properties": {
+        "approved_for_all": {
+          "type": "object",
+          "required": [
+            "owner"
+          ],
+          "properties": {
+            "include_expired": {
+              "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "owner": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "viewing_key": {
+              "description": "optional viewing key to authenticate this query.  It is \"optional\" only in the sense that a CW721 query does not have this field.  However, not providing the key will always result in an empty list",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "displays a list of all the tokens belonging to the input owner in which the viewer has view_owner permission",
+      "type": "object",
+      "required": [
+        "tokens"
+      ],
+      "properties": {
+        "tokens": {
+          "type": "object",
+          "required": [
+            "owner"
+          ],
+          "properties": {
+            "limit": {
+              "description": "optional number of token ids to display",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "owner": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "start_after": {
+              "description": "optionally display only token ids that come after the input String in lexicographical order",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "viewer": {
+              "description": "optional address of the querier if different from the owner",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "viewing_key": {
+              "description": "optional viewing key",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "display if a token has been unwrapped",
+      "type": "object",
+      "required": [
+        "was_token_unwrapped"
+      ],
+      "properties": {
+        "was_token_unwrapped": {
+          "type": "object",
+          "required": [
+            "token_id"
+          ],
+          "properties": {
+            "token_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "display the transaction history for the specified address in reverse chronological order",
+      "type": "object",
+      "required": [
+        "transaction_history"
+      ],
+      "properties": {
+        "transaction_history": {
+          "type": "object",
+          "required": [
+            "address",
+            "viewing_key"
+          ],
+          "properties": {
+            "address": {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            "page": {
+              "description": "optional page to display",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "page_size": {
+              "description": "optional number of transactions per page",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "viewing_key": {
+              "description": "viewing key",
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {
     "HumanAddr": {
       "type": "string"
+    },
+    "ViewerInfo": {
+      "description": "the address and viewing key making an authenticated query request",
+      "type": "object",
+      "required": [
+        "address",
+        "viewing_key"
+      ],
+      "properties": {
+        "address": {
+          "$ref": "#/definitions/HumanAddr"
+        },
+        "viewing_key": {
+          "type": "string"
+        }
+      }
     }
   }
 }

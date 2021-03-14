@@ -1486,7 +1486,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
             viewer,
             include_expired,
         } => query_owner_of(deps, &token_id, viewer, include_expired),
-        QueryMsg::NftInfo { token_id } => query_nft_info(deps, &token_id),
+        QueryMsg::NftInfo { token_id } => query_nft_info(&deps.storage, &token_id),
         QueryMsg::PrivateMetadata { token_id, viewer } => {
             query_private_meta(deps, &token_id, viewer)
         }
@@ -1522,9 +1522,8 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
             start_after,
             limit,
         } => query_tokens(deps, &owner, viewer, viewing_key, start_after, limit),
-        QueryMsg::WasTokenUnwrapped { token_id } => {
-            query_was_token_unwrapped(&deps.storage, &token_id)
-        }
+        QueryMsg::VerifyTransferApproval { tokens, address, viewing_key } => query_verify_approval(deps, &tokens, &address, viewing_key),
+        QueryMsg::WasTokenUnwrapped { token_id } => query_was_token_unwrapped(&deps.storage, &token_id),
         QueryMsg::TransactionHistory {
             address,
             viewing_key,
@@ -1666,18 +1665,18 @@ pub fn query_owner_of<S: Storage, A: Api, Q: Querier>(
 ///
 /// # Arguments
 ///
-/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `storage` - a reference to the contract's storage
 /// * `token_id` - string slice of the token id
-pub fn query_nft_info<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
+pub fn query_nft_info<S: ReadonlyStorage>(
+    storage: &S,
     token_id: &str,
 ) -> QueryResult {
-    let config: Config = load(&deps.storage, CONFIG_KEY)?;
+    let config: Config = load(storage, CONFIG_KEY)?;
     let id_map: HashMap<String, u32> =
-        may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(HashMap::new);
+        may_load(storage, IDS_KEY)?.unwrap_or_else(HashMap::new);
     // if token id was found
     if let Some(idx) = id_map.get(token_id) {
-        let meta_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
+        let meta_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, storage);
         let meta: Metadata =
             may_load(&meta_store, &idx.to_le_bytes())?.unwrap_or(Metadata {
                 name: None,
@@ -2270,6 +2269,53 @@ pub fn query_transactions<S: Storage, A: Api, Q: Querier>(
         page_size.unwrap_or(30),
     )?;
     to_binary(&QueryAnswer::TransactionHistory { txs })
+}
+
+/// Returns QueryResult after verifying that the specified address has transfer approval
+/// for all the listed tokens
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `tokens` - a list of token ids to check if the address has transfer approval
+/// * `address` - a reference to the address whose transactions should be displayed
+/// * `viewing_key` - viewing key String
+pub fn query_verify_approval<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    tokens: &[String],
+    address: &HumanAddr,
+    viewing_key: String,
+) -> StdResult<Binary> {
+    let address_raw = deps.api.canonical_address(address)?;
+    check_key(&deps.storage, &address_raw, viewing_key)?;
+    let config: Config = load(&deps.storage, CONFIG_KEY)?;
+    // TODO remove this when BlockInfo becomes available to queries
+    let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
+        height: 1,
+        time: 1,
+        chain_id: "secret-2".to_string(),
+    });
+    let id_map: HashMap<String, u32> =
+        may_load(&deps.storage, IDS_KEY)?.unwrap_or_else(HashMap::new);
+    let mut oper_for: Vec<CanonicalAddr> = Vec::new();
+    for id in tokens {
+        if get_token_if_permitted(
+            deps,
+            &block,
+            id,
+            &id_map,
+            Some(&address_raw),
+            PermissionType::Transfer,
+            &mut oper_for,
+            &config,
+        ).is_err() {
+            return to_binary(&QueryAnswer::VerifyTransferApproval {
+                approved_for_all: false,
+                first_unapproved_token: Some(id.to_string()),
+            });
+        }
+    }
+    to_binary(&QueryAnswer::VerifyTransferApproval { approved_for_all: true, first_unapproved_token: None })
 }
 
 // bundled info when prepping an authenticated token query

@@ -3,33 +3,64 @@
   "title": "HandleMsg",
   "anyOf": [
     {
+      "description": "mint new token",
       "type": "object",
       "required": [
-        "redeem"
+        "mint"
       ],
       "properties": {
-        "redeem": {
+        "mint": {
           "type": "object",
-          "required": [
-            "amount"
-          ],
           "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "denom": {
+            "memo": {
+              "description": "optional memo for the tx",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "memo": {
-              "type": [
-                "string",
-                "null"
+            "owner": {
+              "description": "optional owner address, owned by the minter otherwise",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "private_metadata": {
+              "description": "optional private metadata that can only be seen by owner and whitelist",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Metadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "public_metadata": {
+              "description": "optional public metadata that can be seen by everyone",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Metadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "token_id": {
+              "description": "optional token id, if omitted, use current token index",
               "type": [
                 "string",
                 "null"
@@ -40,129 +71,538 @@
       }
     },
     {
+      "description": "set the public metadata.  This can be called by either the token owner or a valid minter if they have been given this power by the appropriate config values",
       "type": "object",
       "required": [
-        "redeem_to"
+        "set_public_metadata"
       ],
       "properties": {
-        "redeem_to": {
+        "set_public_metadata": {
           "type": "object",
           "required": [
-            "amount",
-            "recipient"
+            "metadata",
+            "token_id"
           ],
           "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
+            "metadata": {
+              "description": "the new public metadata",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Metadata"
+                }
+              ]
             },
-            "denom": {
+            "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
               ]
             },
+            "token_id": {
+              "description": "id of the token whose public metadata should be updated",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "set the private metadata.  This can be called by either the token owner or a valid minter if they have been given this power by the appropriate config values",
+      "type": "object",
+      "required": [
+        "set_private_metadata"
+      ],
+      "properties": {
+        "set_private_metadata": {
+          "type": "object",
+          "required": [
+            "metadata",
+            "token_id"
+          ],
+          "properties": {
+            "metadata": {
+              "description": "the new private metadata",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Metadata"
+                }
+              ]
+            },
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "token_id": {
+              "description": "id of the token whose private metadata should be updated",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Reveal the private metadata of a sealed token and mark the token as having been unwrapped",
+      "type": "object",
+      "required": [
+        "reveal"
+      ],
+      "properties": {
+        "reveal": {
+          "type": "object",
+          "required": [
+            "token_id"
+          ],
+          "properties": {
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "token_id": {
+              "description": "id of the token to unwrap",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "if a contract was instantiated to make ownership public by default, this will allow an address to make the ownership of their tokens private.  The address can still use SetGlobalApproval to make ownership public either inventory-wide or for a specific token",
+      "type": "object",
+      "required": [
+        "make_ownership_private"
+      ],
+      "properties": {
+        "make_ownership_private": {
+          "type": "object",
+          "properties": {
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "use this to add/remove approval(s) that whitelist everyone (makes public).  I do not include an option to give everyone permission to transfer a token, but the underlying processing would be able to do so if a contract dev wanted to add that PermissionType here",
+      "type": "object",
+      "required": [
+        "set_global_approval"
+      ],
+      "properties": {
+        "set_global_approval": {
+          "type": "object",
+          "properties": {
+            "expires": {
+              "description": "optional expiration",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "token_id": {
+              "description": "optional token id to apply approval to",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "view_owner": {
+              "description": "optional permission to view owner",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/AccessLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "view_private_metadata": {
+              "description": "optional permission to view private metadata",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/AccessLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "add/remove approval(s) for a specific address on the token(s) you own.  Any permissions that are omitted will keep current permission",
+      "type": "object",
+      "required": [
+        "set_whitelisted_approval"
+      ],
+      "properties": {
+        "set_whitelisted_approval": {
+          "type": "object",
+          "required": [
+            "address"
+          ],
+          "properties": {
+            "address": {
+              "description": "address being granted permission",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "expires": {
+              "description": "optional expiration",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "token_id": {
+              "description": "optional token id to apply approval to",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "transfer": {
+              "description": "optional permission to transfer",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/AccessLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "view_owner": {
+              "description": "optional permission to view owner",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/AccessLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "view_private_metadata": {
+              "description": "optional permission to view private metadata",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/AccessLevel"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "gives the spender permission to transfer the specified token.  If you are the owner of the token, you can use SetWhitelistedApproval to accomplish the same thing.  If you are an operator, you can only use Approve",
+      "type": "object",
+      "required": [
+        "approve"
+      ],
+      "properties": {
+        "approve": {
+          "type": "object",
+          "required": [
+            "spender",
+            "token_id"
+          ],
+          "properties": {
+            "expires": {
+              "description": "optional expiration for this approval",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "spender": {
+              "description": "address being granted the permission",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "token_id": {
+              "description": "id of the token that spender can transfer",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "revokes the spender's permission to transfer the specified token.  If you are the owner of the token, you can use SetWhitelistedApproval to accomplish the same thing.  If you are an operator, you can only use Revoke, but you can not revoke the transfer permission of another operator",
+      "type": "object",
+      "required": [
+        "revoke"
+      ],
+      "properties": {
+        "revoke": {
+          "type": "object",
+          "required": [
+            "spender",
+            "token_id"
+          ],
+          "properties": {
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "spender": {
+              "description": "address whose permission is revoked",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "token_id": {
+              "description": "id of the token that spender can no longer transfer",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "provided for cw721 compliance, but can be done with SetWhitelistedApproval... gives the operator permission to transfer all of the message sender's tokens",
+      "type": "object",
+      "required": [
+        "approve_all"
+      ],
+      "properties": {
+        "approve_all": {
+          "type": "object",
+          "required": [
+            "operator"
+          ],
+          "properties": {
+            "expires": {
+              "description": "optional expiration for this approval",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "operator": {
+              "description": "address being granted permission to transfer",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "provided for cw721 compliance, but can be done with SetWhitelistedApproval... revokes the operator's permission to transfer any of the message sender's tokens",
+      "type": "object",
+      "required": [
+        "revoke_all"
+      ],
+      "properties": {
+        "revoke_all": {
+          "type": "object",
+          "required": [
+            "operator"
+          ],
+          "properties": {
+            "operator": {
+              "description": "address whose permissions are revoked",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "transfer a token",
+      "type": "object",
+      "required": [
+        "transfer_nft"
+      ],
+      "properties": {
+        "transfer_nft": {
+          "type": "object",
+          "required": [
+            "recipient",
+            "token_id"
+          ],
+          "properties": {
             "memo": {
+              "description": "optional memo for the tx",
               "type": [
                 "string",
                 "null"
               ]
             },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
               ]
             },
             "recipient": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "deposit"
-      ],
-      "properties": {
-        "deposit": {
-          "type": "object",
-          "properties": {
-            "memo": {
-              "type": [
-                "string",
-                "null"
+              "description": "recipient of the transfer",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
               ]
             },
-            "padding": {
-              "type": [
-                "string",
-                "null"
-              ]
+            "token_id": {
+              "description": "id of the token to transfer",
+              "type": "string"
             }
           }
         }
       }
     },
     {
+      "description": "transfer many tokens",
       "type": "object",
       "required": [
-        "transfer"
+        "batch_transfer_nft"
       ],
       "properties": {
-        "transfer": {
+        "batch_transfer_nft": {
           "type": "object",
           "required": [
-            "amount",
-            "recipient"
+            "transfers"
           ],
           "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "memo": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "recipient": {
-              "$ref": "#/definitions/HumanAddr"
+            "transfers": {
+              "description": "list of transfers to perform",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Transfer"
+              }
             }
           }
         }
       }
     },
     {
+      "description": "send a token and call receiving contract's ReceiveNft",
       "type": "object",
       "required": [
-        "send"
+        "send_nft"
       ],
       "properties": {
-        "send": {
+        "send_nft": {
           "type": "object",
           "required": [
-            "amount",
-            "recipient"
+            "contract",
+            "token_id"
           ],
           "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
+            "contract": {
+              "description": "contract to send the token to",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
             },
             "memo": {
+              "description": "optional memo for the tx",
               "type": [
                 "string",
                 "null"
               ]
             },
             "msg": {
+              "description": "optional message to send with the RecieveNft callback",
               "anyOf": [
                 {
                   "$ref": "#/definitions/Binary"
@@ -173,40 +613,108 @@
               ]
             },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
               ]
             },
-            "recipient": {
-              "$ref": "#/definitions/HumanAddr"
+            "token_id": {
+              "description": "id of the token to send",
+              "type": "string"
             }
           }
         }
       }
     },
     {
+      "description": "send many tokens and call receiving contracts' ReceiveNft",
       "type": "object",
       "required": [
-        "burn"
+        "batch_send_nft"
       ],
       "properties": {
-        "burn": {
+        "batch_send_nft": {
           "type": "object",
           "required": [
-            "amount"
+            "sends"
           ],
           "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
             },
+            "sends": {
+              "description": "list of sends to perform",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Send"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "burn a token",
+      "type": "object",
+      "required": [
+        "burn_nft"
+      ],
+      "properties": {
+        "burn_nft": {
+          "type": "object",
+          "required": [
+            "token_id"
+          ],
+          "properties": {
             "memo": {
+              "description": "optional memo for the tx",
               "type": [
                 "string",
                 "null"
               ]
             },
             "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "token_id": {
+              "description": "token to burn",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "burn many tokens",
+      "type": "object",
+      "required": [
+        "batch_burn_nft"
+      ],
+      "properties": {
+        "batch_burn_nft": {
+          "type": "object",
+          "required": [
+            "burns"
+          ],
+          "properties": {
+            "burns": {
+              "description": "list of burns to perform",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Burn"
+              }
+            },
+            "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
@@ -217,21 +725,24 @@
       }
     },
     {
+      "description": "register that the contract implements ReceiveNft",
       "type": "object",
       "required": [
-        "register_receive"
+        "register_receive_nft"
       ],
       "properties": {
-        "register_receive": {
+        "register_receive_nft": {
           "type": "object",
           "required": [
             "code_hash"
           ],
           "properties": {
             "code_hash": {
+              "description": "receving contract's code hash",
               "type": "string"
             },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
@@ -242,6 +753,7 @@
       }
     },
     {
+      "description": "create a viewing key",
       "type": "object",
       "required": [
         "create_viewing_key"
@@ -254,9 +766,11 @@
           ],
           "properties": {
             "entropy": {
+              "description": "entropy String used in random key generation",
               "type": "string"
             },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
@@ -267,6 +781,7 @@
       }
     },
     {
+      "description": "set viewing key",
       "type": "object",
       "required": [
         "set_viewing_key"
@@ -279,9 +794,11 @@
           ],
           "properties": {
             "key": {
+              "description": "desired viewing key",
               "type": "string"
             },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
@@ -292,238 +809,7 @@
       }
     },
     {
-      "type": "object",
-      "required": [
-        "increase_allowance"
-      ],
-      "properties": {
-        "increase_allowance": {
-          "type": "object",
-          "required": [
-            "amount",
-            "spender"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "expiration": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "format": "uint64",
-              "minimum": 0.0
-            },
-            "padding": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "decrease_allowance"
-      ],
-      "properties": {
-        "decrease_allowance": {
-          "type": "object",
-          "required": [
-            "amount",
-            "spender"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "expiration": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "format": "uint64",
-              "minimum": 0.0
-            },
-            "padding": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "transfer_from"
-      ],
-      "properties": {
-        "transfer_from": {
-          "type": "object",
-          "required": [
-            "amount",
-            "owner",
-            "recipient"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "memo": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "owner": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "padding": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "recipient": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "send_from"
-      ],
-      "properties": {
-        "send_from": {
-          "type": "object",
-          "required": [
-            "amount",
-            "owner",
-            "recipient"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "memo": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "msg": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Binary"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "owner": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "padding": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "recipient": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "burn_from"
-      ],
-      "properties": {
-        "burn_from": {
-          "type": "object",
-          "required": [
-            "amount",
-            "owner"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "memo": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "owner": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "padding": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "mint"
-      ],
-      "properties": {
-        "mint": {
-          "type": "object",
-          "required": [
-            "amount",
-            "recipient"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            },
-            "memo": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "padding": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "recipient": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
+      "description": "add addresses with minting authority",
       "type": "object",
       "required": [
         "add_minters"
@@ -536,12 +822,14 @@
           ],
           "properties": {
             "minters": {
+              "description": "list of addresses that can now mint",
               "type": "array",
               "items": {
                 "$ref": "#/definitions/HumanAddr"
               }
             },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
@@ -552,6 +840,7 @@
       }
     },
     {
+      "description": "revoke minting authority from addresses",
       "type": "object",
       "required": [
         "remove_minters"
@@ -564,12 +853,14 @@
           ],
           "properties": {
             "minters": {
+              "description": "list of addresses no longer allowed to mint",
               "type": "array",
               "items": {
                 "$ref": "#/definitions/HumanAddr"
               }
             },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
@@ -580,6 +871,7 @@
       }
     },
     {
+      "description": "define list of addresses with minting authority",
       "type": "object",
       "required": [
         "set_minters"
@@ -592,12 +884,14 @@
           ],
           "properties": {
             "minters": {
+              "description": "list of addresses with minting authority",
               "type": "array",
               "items": {
                 "$ref": "#/definitions/HumanAddr"
               }
             },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
@@ -608,6 +902,7 @@
       }
     },
     {
+      "description": "change address with administrative power",
       "type": "object",
       "required": [
         "change_admin"
@@ -620,9 +915,15 @@
           ],
           "properties": {
             "address": {
-              "$ref": "#/definitions/HumanAddr"
+              "description": "address with admin authority",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
             },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
@@ -633,6 +934,7 @@
       }
     },
     {
+      "description": "set contract status level to determine which functions are allowed.  StopTransactions status prevent mints, burns, sends, and transfers, but allows all other functions",
       "type": "object",
       "required": [
         "set_contract_status"
@@ -645,9 +947,15 @@
           ],
           "properties": {
             "level": {
-              "$ref": "#/definitions/ContractStatusLevel"
+              "description": "status level",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/ContractStatus"
+                }
+              ]
             },
             "padding": {
+              "description": "optional message length padding",
               "type": [
                 "string",
                 "null"
@@ -659,23 +967,185 @@
     }
   ],
   "definitions": {
+    "AccessLevel": {
+      "description": "permission access level",
+      "type": "string",
+      "enum": [
+        "approve_token",
+        "all",
+        "revoke_token",
+        "none"
+      ]
+    },
     "Binary": {
       "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
       "type": "string"
     },
-    "ContractStatusLevel": {
+    "Burn": {
+      "description": "token burn info used when doing a BatchBurnNft",
+      "type": "object",
+      "required": [
+        "token_id"
+      ],
+      "properties": {
+        "memo": {
+          "description": "optional memo for the tx",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "token_id": {
+          "description": "token being burnt",
+          "type": "string"
+        }
+      }
+    },
+    "ContractStatus": {
       "type": "string",
       "enum": [
-        "normal_run",
-        "stop_all_but_redeems",
+        "normal",
+        "stop_transactions",
         "stop_all"
+      ]
+    },
+    "Expiration": {
+      "description": "at the given point in time and after, Expiration will be considered expired",
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "never"
+          ]
+        },
+        {
+          "description": "expires at this block height",
+          "type": "object",
+          "required": [
+            "at_height"
+          ],
+          "properties": {
+            "at_height": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "expires at the time in seconds since 01/01/1970",
+          "type": "object",
+          "required": [
+            "at_time"
+          ],
+          "properties": {
+            "at_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
       ]
     },
     "HumanAddr": {
       "type": "string"
     },
-    "Uint128": {
-      "type": "string"
+    "Metadata": {
+      "description": "token metadata",
+      "type": "object",
+      "properties": {
+        "description": {
+          "description": "optional description",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "image": {
+          "description": "optional uri to contain an image, additional data fields, etc...",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "optional indentifier",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "Send": {
+      "description": "send token info used when doing a BatchSendNft",
+      "type": "object",
+      "required": [
+        "contract",
+        "token_id"
+      ],
+      "properties": {
+        "contract": {
+          "description": "recipient of the sent token",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        },
+        "memo": {
+          "description": "optional memo for the tx",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "msg": {
+          "description": "optional message to send with the RecieveNft callback",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Binary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "token_id": {
+          "description": "token being sent",
+          "type": "string"
+        }
+      }
+    },
+    "Transfer": {
+      "description": "token transfer info used when doing a BatchTransferNft",
+      "type": "object",
+      "required": [
+        "recipient",
+        "token_id"
+      ],
+      "properties": {
+        "memo": {
+          "description": "optional memo for the tx",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recipient": {
+          "description": "recipient of the transferred token",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        },
+        "token_id": {
+          "description": "token being transferred",
+          "type": "string"
+        }
+      }
     }
   }
 }

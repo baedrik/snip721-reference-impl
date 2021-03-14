@@ -1,15 +1,16 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "InitMsg",
+  "description": "Instantiation message",
   "type": "object",
   "required": [
-    "decimals",
+    "entropy",
     "name",
-    "prng_seed",
     "symbol"
   ],
   "properties": {
     "admin": {
+      "description": "optional admin address, env.message.sender if missing",
       "anyOf": [
         {
           "$ref": "#/definitions/HumanAddr"
@@ -20,6 +21,7 @@
       ]
     },
     "config": {
+      "description": "optional privacy configuration for the contract",
       "anyOf": [
         {
           "$ref": "#/definitions/InitConfig"
@@ -29,35 +31,20 @@
         }
       ]
     },
-    "decimals": {
-      "type": "integer",
-      "format": "uint8",
-      "minimum": 0.0
-    },
-    "initial_balances": {
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/definitions/InitialBalance"
-      }
-    },
-    "name": {
+    "entropy": {
+      "description": "entropy used for prng seed",
       "type": "string"
     },
-    "prng_seed": {
-      "$ref": "#/definitions/Binary"
+    "name": {
+      "description": "name of token contract",
+      "type": "string"
     },
     "symbol": {
+      "description": "token contract symbol",
       "type": "string"
     }
   },
   "definitions": {
-    "Binary": {
-      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
-      "type": "string"
-    },
     "HumanAddr": {
       "type": "string"
     },
@@ -72,53 +59,49 @@
             "null"
           ]
         },
-        "enable_deposit": {
-          "description": "Indicates whether deposit functionality should be enabled default: False",
+        "enable_sealed_metadata": {
+          "description": "indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the private metadata is not viewable by anyone, not even the owner, until the owner calls the Reveal function.  When Reveal is called, the sealed metadata is irreversibly moved to the public metadata (as default).  if unwrapped_metadata_is_private is set to true, it will remain as private metadata, but the owner will now be able to see it.  Anyone will be able to query the token to know that it has been unwrapped.  This simulates buying/selling a wrapped card that non one knows which card it is until it is unwrapped. If sealed metadata is not enabled, all tokens are considered unwrapped default:  False",
           "type": [
             "boolean",
             "null"
           ]
         },
-        "enable_mint": {
-          "description": "Indicates whether mint functionality should be enabled default: False",
+        "minter_may_update_metadata": {
+          "description": "indicates whether a minter is permitted to update a token's metadata default: True",
           "type": [
             "boolean",
             "null"
           ]
         },
-        "enable_redeem": {
-          "description": "Indicates whether redeem functionality should be enabled default: False",
+        "owner_may_update_metadata": {
+          "description": "indicates whether the owner of a token is permitted to update a token's metadata default: False",
           "type": [
             "boolean",
             "null"
           ]
         },
-        "public_total_supply": {
-          "description": "Indicates whether the total supply is public or should be kept secret. default: False",
+        "public_owner": {
+          "description": "indicates whether token ownership is public or private.  A user can still change whether the ownership of their tokens is public or private default: False",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "public_token_supply": {
+          "description": "indicates whether the token IDs and the number of tokens controlled by the contract are public.  If the token supply is private, only minters can view the token IDs and number of tokens controlled by the contract default: False",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "unwrapped_metadata_is_private": {
+          "description": "indicates if the Reveal function should keep the sealed metadata private after unwrapping This config value is ignored if sealed metadata is not enabled default: False",
           "type": [
             "boolean",
             "null"
           ]
         }
       }
-    },
-    "InitialBalance": {
-      "type": "object",
-      "required": [
-        "address",
-        "amount"
-      ],
-      "properties": {
-        "address": {
-          "$ref": "#/definitions/HumanAddr"
-        },
-        "amount": {
-          "$ref": "#/definitions/Uint128"
-        }
-      }
-    },
-    "Uint128": {
-      "type": "string"
     }
   }
 }

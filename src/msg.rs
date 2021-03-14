@@ -567,6 +567,15 @@ pub enum QueryMsg {
     },
     /// display if a token has been unwrapped
     WasTokenUnwrapped { token_id: String },
+    /// verify that the specified address has approval to transfer every listed token
+    VerifyTransferApproval { 
+        /// list of tokens to very approval for
+        tokens: Vec<String>,
+        /// address that has approval
+        address: HumanAddr,
+        /// viewing key
+        viewing_key: String,
+    },
     /// display the transaction history for the specified address in reverse
     /// chronological order
     TransactionHistory {
@@ -685,6 +694,10 @@ pub enum QueryAnswer {
     },
     WasTokenUnwrapped {
         token_was_unwrapped: bool,
+    },
+    VerifyTransferApproval {
+        approved_for_all: bool,
+        first_unapproved_token: Option<String>,
     },
     TransactionHistory {
         txs: Vec<Tx>,

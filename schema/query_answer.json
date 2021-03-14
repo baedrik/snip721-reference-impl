@@ -5,37 +5,21 @@
     {
       "type": "object",
       "required": [
-        "token_info"
+        "contract_info"
       ],
       "properties": {
-        "token_info": {
+        "contract_info": {
           "type": "object",
           "required": [
-            "decimals",
             "name",
             "symbol"
           ],
           "properties": {
-            "decimals": {
-              "type": "integer",
-              "format": "uint8",
-              "minimum": 0.0
-            },
             "name": {
               "type": "string"
             },
             "symbol": {
               "type": "string"
-            },
-            "total_supply": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Uint128"
-                },
-                {
-                  "type": "null"
-                }
-              ]
             }
           }
         }
@@ -44,173 +28,41 @@
     {
       "type": "object",
       "required": [
-        "token_config"
+        "contract_config"
       ],
       "properties": {
-        "token_config": {
+        "contract_config": {
           "type": "object",
           "required": [
-            "burn_enabled",
-            "deposit_enabled",
-            "mint_enabled",
-            "public_total_supply",
-            "redeem_enabled"
+            "burn_is_enabled",
+            "minter_may_update_metadata",
+            "owner_is_public",
+            "owner_may_update_metadata",
+            "sealed_metadata_is_enabled",
+            "token_supply_is_public",
+            "unwrapped_metadata_is_private"
           ],
           "properties": {
-            "burn_enabled": {
+            "burn_is_enabled": {
               "type": "boolean"
             },
-            "deposit_enabled": {
+            "minter_may_update_metadata": {
               "type": "boolean"
             },
-            "mint_enabled": {
+            "owner_is_public": {
               "type": "boolean"
             },
-            "public_total_supply": {
+            "owner_may_update_metadata": {
               "type": "boolean"
             },
-            "redeem_enabled": {
+            "sealed_metadata_is_enabled": {
               "type": "boolean"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "exchange_rate"
-      ],
-      "properties": {
-        "exchange_rate": {
-          "type": "object",
-          "required": [
-            "denom",
-            "rate"
-          ],
-          "properties": {
-            "denom": {
-              "type": "string"
             },
-            "rate": {
-              "$ref": "#/definitions/Uint128"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "allowance"
-      ],
-      "properties": {
-        "allowance": {
-          "type": "object",
-          "required": [
-            "allowance",
-            "owner",
-            "spender"
-          ],
-          "properties": {
-            "allowance": {
-              "$ref": "#/definitions/Uint128"
+            "token_supply_is_public": {
+              "type": "boolean"
             },
-            "expiration": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "format": "uint64",
-              "minimum": 0.0
-            },
-            "owner": {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            "spender": {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "balance"
-      ],
-      "properties": {
-        "balance": {
-          "type": "object",
-          "required": [
-            "amount"
-          ],
-          "properties": {
-            "amount": {
-              "$ref": "#/definitions/Uint128"
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "transfer_history"
-      ],
-      "properties": {
-        "transfer_history": {
-          "type": "object",
-          "required": [
-            "txs"
-          ],
-          "properties": {
-            "txs": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/LegacyTx"
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "transaction_history"
-      ],
-      "properties": {
-        "transaction_history": {
-          "type": "object",
-          "required": [
-            "txs"
-          ],
-          "properties": {
-            "txs": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/Tx"
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "type": "object",
-      "required": [
-        "viewing_key_error"
-      ],
-      "properties": {
-        "viewing_key_error": {
-          "type": "object",
-          "required": [
-            "msg"
-          ],
-          "properties": {
-            "msg": {
-              "type": "string"
+            "unwrapped_metadata_is_private": {
+              "type": "boolean"
             }
           }
         }
@@ -237,76 +89,532 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "num_tokens"
+      ],
+      "properties": {
+        "num_tokens": {
+          "type": "object",
+          "required": [
+            "count"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "token_list"
+      ],
+      "properties": {
+        "token_list": {
+          "type": "object",
+          "required": [
+            "tokens"
+          ],
+          "properties": {
+            "tokens": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "owner_of"
+      ],
+      "properties": {
+        "owner_of": {
+          "type": "object",
+          "required": [
+            "approvals",
+            "owner"
+          ],
+          "properties": {
+            "approvals": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Cw721Approval"
+              }
+            },
+            "owner": {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "token_approvals"
+      ],
+      "properties": {
+        "token_approvals": {
+          "type": "object",
+          "required": [
+            "owner_is_public",
+            "private_metadata_is_public",
+            "token_approvals"
+          ],
+          "properties": {
+            "owner_is_public": {
+              "type": "boolean"
+            },
+            "private_metadata_is_public": {
+              "type": "boolean"
+            },
+            "private_metadata_is_public_expiration": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "public_ownership_expiration": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "token_approvals": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Snip721Approval"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "inventory_approvals"
+      ],
+      "properties": {
+        "inventory_approvals": {
+          "type": "object",
+          "required": [
+            "inventory_approvals",
+            "owner_is_public",
+            "private_metadata_is_public"
+          ],
+          "properties": {
+            "inventory_approvals": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Snip721Approval"
+              }
+            },
+            "owner_is_public": {
+              "type": "boolean"
+            },
+            "private_metadata_is_public": {
+              "type": "boolean"
+            },
+            "private_metadata_is_public_expiration": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "public_ownership_expiration": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "nft_info"
+      ],
+      "properties": {
+        "nft_info": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "image": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "private_metadata"
+      ],
+      "properties": {
+        "private_metadata": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "image": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "all_nft_info"
+      ],
+      "properties": {
+        "all_nft_info": {
+          "type": "object",
+          "required": [
+            "access",
+            "info"
+          ],
+          "properties": {
+            "access": {
+              "$ref": "#/definitions/Cw721OwnerOfResponse"
+            },
+            "info": {
+              "$ref": "#/definitions/Metadata"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "nft_dossier"
+      ],
+      "properties": {
+        "nft_dossier": {
+          "type": "object",
+          "required": [
+            "owner_is_public",
+            "private_metadata_is_public"
+          ],
+          "properties": {
+            "inventory_approvals": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/definitions/Snip721Approval"
+              }
+            },
+            "owner": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "owner_is_public": {
+              "type": "boolean"
+            },
+            "private_metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Metadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "private_metadata_is_public": {
+              "type": "boolean"
+            },
+            "private_metadata_is_public_expiration": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "public_metadata": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Metadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "public_ownership_expiration": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "token_approvals": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/definitions/Snip721Approval"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "approved_for_all"
+      ],
+      "properties": {
+        "approved_for_all": {
+          "type": "object",
+          "required": [
+            "operators"
+          ],
+          "properties": {
+            "operators": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Cw721Approval"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "was_token_unwrapped"
+      ],
+      "properties": {
+        "was_token_unwrapped": {
+          "type": "object",
+          "required": [
+            "token_was_unwrapped"
+          ],
+          "properties": {
+            "token_was_unwrapped": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "transaction_history"
+      ],
+      "properties": {
+        "transaction_history": {
+          "type": "object",
+          "required": [
+            "txs"
+          ],
+          "properties": {
+            "txs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Tx"
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {
-    "Coin": {
+    "Cw721Approval": {
+      "description": "CW721 Approval",
       "type": "object",
       "required": [
-        "amount",
-        "denom"
+        "expires",
+        "spender"
       ],
       "properties": {
-        "amount": {
-          "$ref": "#/definitions/Uint128"
+        "expires": {
+          "description": "expiration of this approval",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Expiration"
+            }
+          ]
         },
-        "denom": {
-          "type": "string"
+        "spender": {
+          "description": "address that can transfer the token",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
         }
       }
+    },
+    "Cw721OwnerOfResponse": {
+      "description": "response of CW721 OwnerOf",
+      "type": "object",
+      "required": [
+        "approvals"
+      ],
+      "properties": {
+        "approvals": {
+          "description": "list of addresses approved to transfer this token",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Cw721Approval"
+          }
+        },
+        "owner": {
+          "description": "Owner of the token if permitted to view it",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Expiration": {
+      "description": "at the given point in time and after, Expiration will be considered expired",
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "never"
+          ]
+        },
+        {
+          "description": "expires at this block height",
+          "type": "object",
+          "required": [
+            "at_height"
+          ],
+          "properties": {
+            "at_height": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        },
+        {
+          "description": "expires at the time in seconds since 01/01/1970",
+          "type": "object",
+          "required": [
+            "at_time"
+          ],
+          "properties": {
+            "at_time": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      ]
     },
     "HumanAddr": {
       "type": "string"
     },
-    "LegacyTx": {
+    "Metadata": {
+      "description": "token metadata",
       "type": "object",
-      "required": [
-        "coins",
-        "from",
-        "id",
-        "receiver",
-        "sender"
-      ],
       "properties": {
-        "coins": {
-          "$ref": "#/definitions/Coin"
+        "description": {
+          "description": "optional description",
+          "type": [
+            "string",
+            "null"
+          ]
         },
-        "from": {
-          "$ref": "#/definitions/HumanAddr"
+        "image": {
+          "description": "optional uri to contain an image, additional data fields, etc...",
+          "type": [
+            "string",
+            "null"
+          ]
         },
-        "id": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "receiver": {
-          "$ref": "#/definitions/HumanAddr"
-        },
-        "sender": {
-          "$ref": "#/definitions/HumanAddr"
-        }
-      }
-    },
-    "Tx": {
-      "type": "object",
-      "required": [
-        "action",
-        "coins",
-        "id"
-      ],
-      "properties": {
-        "action": {
-          "$ref": "#/definitions/TxAction"
-        },
-        "coins": {
-          "$ref": "#/definitions/Coin"
-        },
-        "id": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "memo": {
+        "name": {
+          "description": "optional indentifier",
           "type": [
             "string",
             "null"
@@ -314,9 +622,104 @@
         }
       }
     },
+    "Snip721Approval": {
+      "description": "SNIP721 Approval",
+      "type": "object",
+      "required": [
+        "address"
+      ],
+      "properties": {
+        "address": {
+          "description": "whitelisted address",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        },
+        "transfer_expiration": {
+          "description": "optional expiration if the address has transfer permission",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Expiration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "view_owner_expiration": {
+          "description": "optional expiration if the address has view owner permission",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Expiration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "view_private_metadata_expiration": {
+          "description": "optional expiration if the address has view private metadata permission",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Expiration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Tx": {
+      "description": "tx for display",
+      "type": "object",
+      "required": [
+        "action",
+        "blockheight",
+        "token_id",
+        "tx_id"
+      ],
+      "properties": {
+        "action": {
+          "description": "tx type and specifics",
+          "allOf": [
+            {
+              "$ref": "#/definitions/TxAction"
+            }
+          ]
+        },
+        "blockheight": {
+          "description": "the block containing this tx",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "memo": {
+          "description": "optional memo",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "token_id": {
+          "description": "token id",
+          "type": "string"
+        },
+        "tx_id": {
+          "description": "tx id",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      }
+    },
     "TxAction": {
+      "description": "tx type and specifics",
       "anyOf": [
         {
+          "description": "transferred token ownership",
           "type": "object",
           "required": [
             "transfer"
@@ -330,12 +733,23 @@
               ],
               "properties": {
                 "from": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "description": "previous owner",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/HumanAddr"
+                    }
+                  ]
                 },
                 "recipient": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "description": "new owner",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/HumanAddr"
+                    }
+                  ]
                 },
                 "sender": {
+                  "description": "optional sender if not owner",
                   "anyOf": [
                     {
                       "$ref": "#/definitions/HumanAddr"
@@ -350,54 +764,7 @@
           }
         },
         {
-          "type": "object",
-          "required": [
-            "deposit"
-          ],
-          "properties": {
-            "deposit": {
-              "type": "object",
-              "required": [
-                "recipient"
-              ],
-              "properties": {
-                "recipient": {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              }
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "redeem"
-          ],
-          "properties": {
-            "redeem": {
-              "type": "object",
-              "required": [
-                "owner"
-              ],
-              "properties": {
-                "owner": {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                "recipient": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/definitions/HumanAddr"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        {
+          "description": "minted new token",
           "type": "object",
           "required": [
             "mint"
@@ -411,16 +778,27 @@
               ],
               "properties": {
                 "minter": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "description": "minter's address",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/HumanAddr"
+                    }
+                  ]
                 },
                 "recipient": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "description": "token's first owner",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/HumanAddr"
+                    }
+                  ]
                 }
               }
             }
           }
         },
         {
+          "description": "burned a token",
           "type": "object",
           "required": [
             "burn"
@@ -433,6 +811,7 @@
               ],
               "properties": {
                 "burner": {
+                  "description": "burner's address if not owner",
                   "anyOf": [
                     {
                       "$ref": "#/definitions/HumanAddr"
@@ -443,16 +822,18 @@
                   ]
                 },
                 "owner": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "description": "previous owner",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/HumanAddr"
+                    }
+                  ]
                 }
               }
             }
           }
         }
       ]
-    },
-    "Uint128": {
-      "type": "string"
     }
   }
 }
