@@ -8665,9 +8665,9 @@ mod tests {
         assert_eq!(bob_oper_perm.expirations[transfer_idx], None);
     }
 
-    // test set ownership privacy
+    // test making ownership private
     #[test]
-    fn test_set_ownership_privacy() {
+    fn test_make_ownership_private() {
         let (init_result, mut deps) = init_helper_default();
         assert!(
             init_result.is_ok(),
@@ -8681,8 +8681,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetOwnershipPrivacy {
-            owner_is_public: true,
+        let handle_msg = HandleMsg::MakeOwnershipPrivate {
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
@@ -8697,8 +8696,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         // sanity check when contract default is private
-        let handle_msg = HandleMsg::SetOwnershipPrivacy {
-            owner_is_public: true,
+        let handle_msg = HandleMsg::MakeOwnershipPrivate {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
@@ -8708,16 +8706,8 @@ mod tests {
             .unwrap();
         let alice_key = alice_raw.as_slice();
         let store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
-        let pub_priv: bool = load(&store, alice_key).unwrap();
-        assert!(pub_priv);
-        let handle_msg = HandleMsg::SetOwnershipPrivacy {
-            owner_is_public: false,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
-        let pub_priv: Option<bool> = may_load(&store, alice_key).unwrap();
-        assert!(pub_priv.is_none());
+        let owner_priv: Option<bool> = may_load(&store, alice_key).unwrap();
+        assert!(owner_priv.is_none());
 
         // test when contract default is public
         let (init_result, mut deps) =
@@ -8727,22 +8717,13 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::SetOwnershipPrivacy {
-            owner_is_public: true,
+        let handle_msg = HandleMsg::MakeOwnershipPrivate {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
-        let pub_priv: Option<bool> = may_load(&store, alice_key).unwrap();
-        assert!(pub_priv.is_none());
-        let handle_msg = HandleMsg::SetOwnershipPrivacy {
-            owner_is_public: false,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
-        let pub_priv: bool = load(&store, alice_key).unwrap();
-        assert!(!pub_priv);
+        let owner_priv: bool = load(&store, alice_key).unwrap();
+        assert!(!owner_priv);
     }
 
     // test owner setting global approvals
@@ -9189,27 +9170,6 @@ mod tests {
         "Init failed: {}",
         init_result.err().unwrap()
     );
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", true);
-        assert!(check_perm.is_ok());
-
-        // test owner makes their tokens private when the contract has public ownership
-        let handle_msg = HandleMsg::SetOwnershipPrivacy {
-            owner_is_public: false,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", true);
-        let error = extract_error_msg(check_perm);
-        assert!(error.contains("not approved"));
-
-        // test owner makes their tokens public when the contract has private ownership
-        let (init_result, mut deps) =
-        init_helper_with_config(true, false, false, false, false, false, false);
-    assert!(
-        init_result.is_ok(),
-        "Init failed: {}",
-        init_result.err().unwrap()
-    );
         let handle_msg = HandleMsg::Mint {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -9237,23 +9197,19 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
  
-        let handle_msg = HandleMsg::SetOwnershipPrivacy {
-            owner_is_public: true,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", true);
         assert!(check_perm.is_ok());
 
-        // test global approval on a token
-        let handle_msg = HandleMsg::SetOwnershipPrivacy {
-            owner_is_public: false,
+        // test owner makes their tokens private when the contract has public ownership
+        let handle_msg = HandleMsg::MakeOwnershipPrivate {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", true);
         let error = extract_error_msg(check_perm);
         assert!(error.contains("not approved"));
+
+        // test owner later makes ownership of a single token public
         let handle_msg = HandleMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -9265,6 +9221,9 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
         let check_perm = check_permission(&deps, &block, &token1, "NFT1", Some(&bob_raw), PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+        // test public approval when no address is given 
+        let check_perm = check_permission(&deps, &block, &token1, "NFT1", None, PermissionType::ViewOwner, &mut Vec::new(), "not approved", false);
         assert!(check_perm.is_ok());
 
         // test global approval for all tokens
@@ -9284,6 +9243,9 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token2: Token = json_load(&info_store, &nft2_key).unwrap();
         let check_perm = check_permission(&deps, &block, &token2, "NFT2", Some(&bob_raw), PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
+        assert!(check_perm.is_ok());
+        // test public approval when no address is given 
+        let check_perm = check_permission(&deps, &block, &token2, "NFT2", None, PermissionType::ViewMetadata, &mut Vec::new(), "not approved", false);
         assert!(check_perm.is_ok());
 
         // test those global permissions having expired 

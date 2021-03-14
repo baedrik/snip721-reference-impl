@@ -122,11 +122,10 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// set whether token ownership for this address is public or private.  This overrides
-    /// the contract default that is set by the instantiation configuration value of `public_owner`
-    SetOwnershipPrivacy {
-        /// true if everyone is permitted to view the owner of all your tokens
-        owner_is_public: bool,
+    /// if a contract was instantiated to make ownership public by default, this will allow
+    /// an address to make the ownership of their tokens private.  The address can still use
+    /// SetGlobalApproval to make ownership public either inventory-wide or for a specific token
+    MakeOwnershipPrivate {
         /// optional message length padding
         padding: Option<String>,
     },
@@ -376,7 +375,7 @@ pub enum HandleAnswer {
     SetPrivateMetadata {
         status: ResponseStatus,
     },
-    SetOwnershipPrivacy {
+    MakeOwnershipPrivate {
         status: ResponseStatus,
     },
     Reveal {
@@ -503,6 +502,23 @@ pub enum QueryMsg {
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
     },
+    /// displays the private metadata if permitted to view it
+    PrivateMetadata {
+        token_id: String,
+        /// optional address and key requesting to view the private metadata
+        viewer: Option<ViewerInfo>,
+    },
+    /// displays all the information about a token that the viewer has permission to 
+    /// see.  This may include the owner, the public metadata, the private metadata, and 
+    /// the token and inventory approvals
+    NftDossier {
+        token_id: String,
+        /// optional address and key requesting to view the token information
+        viewer: Option<ViewerInfo>,
+        /// optionally include expired Approvals in the response list.  If ommitted or
+        /// false, expired Approvals will be filtered out of the response
+        include_expired: Option<bool>,
+    },
     /// allows only the token owner to list all the approvals in place for a specified
     /// token
     TokenApprovals {
@@ -530,7 +546,7 @@ pub enum QueryMsg {
         owner: HumanAddr,
         /// optional viewing key to authenticate this query.  It is "optional" only in the
         /// sense that a CW721 query does not have this field.  However, not providing the
-        /// key will always result in the contract throwing a viewing key error
+        /// key will always result in an empty list
         viewing_key: Option<String>,
         /// optionally include expired Approvals in the response list.  If ommitted or
         /// false, expired Approvals will be filtered out of the response
@@ -590,8 +606,8 @@ pub struct Cw721Approval {
 /// response of CW721 OwnerOf
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Cw721OwnerOfResponse {
-    /// Owner of the token
-    pub owner: HumanAddr,
+    /// Owner of the token if permitted to view it
+    pub owner: Option<HumanAddr>,
     /// list of addresses approved to transfer this token
     pub approvals: Vec<Cw721Approval>,
 }
@@ -627,12 +643,16 @@ pub enum QueryAnswer {
     },
     TokenApprovals {
         owner_is_public: bool,
+        public_ownership_expiration: Option<Expiration>,
         private_metadata_is_public: bool,
+        private_metadata_is_public_expiration: Option<Expiration>,
         token_approvals: Vec<Snip721Approval>,
     },
     InventoryApprovals {
         owner_is_public: bool,
+        public_ownership_expiration: Option<Expiration>,
         private_metadata_is_public: bool,
+        private_metadata_is_public_expiration: Option<Expiration>,
         inventory_approvals: Vec<Snip721Approval>,
     
     },
@@ -641,9 +661,25 @@ pub enum QueryAnswer {
         description: Option<String>,
         image: Option<String>,
     },
+    PrivateMetadata {
+        name: Option<String>,
+        description: Option<String>,
+        image: Option<String>,
+    },
     AllNftInfo {
         access: Cw721OwnerOfResponse,
         info: Metadata,
+    },
+    NftDossier {
+        owner: Option<HumanAddr>,
+        public_metadata: Option<Metadata>,
+        private_metadata: Option<Metadata>,
+        owner_is_public: bool,
+        public_ownership_expiration: Option<Expiration>,
+        private_metadata_is_public: bool,
+        private_metadata_is_public_expiration: Option<Expiration>,
+        token_approvals: Option<Vec<Snip721Approval>>,
+        inventory_approvals: Option<Vec<Snip721Approval>>,
     },
     ApprovedForAll {
         operators: Vec<Cw721Approval>,
