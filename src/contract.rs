@@ -1773,6 +1773,7 @@ pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
     };
     to_binary(&QueryAnswer::NftDossier { owner, public_metadata, private_metadata, owner_is_public, public_ownership_expiration, private_metadata_is_public, private_metadata_is_public_expiration, token_approvals, inventory_approvals })
 }
+
 /// Returns QueryResult displaying the approvals in place for a specified token
 ///
 /// # Arguments
