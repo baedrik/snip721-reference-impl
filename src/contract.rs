@@ -424,8 +424,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     // add token to owner's list
     let owner_slice = recipient.as_slice();
     let mut owned_store = PrefixedStorage::new(PREFIX_OWNED, &mut deps.storage);
-    let mut owned: HashSet<u32> =
-        may_load(&owned_store, owner_slice)?.unwrap_or_else(HashSet::new);
+    let mut owned: HashSet<u32> = may_load(&owned_store, owner_slice)?.unwrap_or_else(HashSet::new);
     owned.insert(config.mint_cnt);
     save(&mut owned_store, owner_slice, &owned)?;
     // add to id and index maps
@@ -1522,8 +1521,14 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
             start_after,
             limit,
         } => query_tokens(deps, &owner, viewer, viewing_key, start_after, limit),
-        QueryMsg::VerifyTransferApproval { tokens, address, viewing_key } => query_verify_approval(deps, &tokens, &address, viewing_key),
-        QueryMsg::WasTokenUnwrapped { token_id } => query_was_token_unwrapped(&deps.storage, &token_id),
+        QueryMsg::VerifyTransferApproval {
+            tokens,
+            address,
+            viewing_key,
+        } => query_verify_approval(deps, &tokens, &address, viewing_key),
+        QueryMsg::WasTokenUnwrapped { token_id } => {
+            query_was_token_unwrapped(&deps.storage, &token_id)
+        }
         QueryMsg::TransactionHistory {
             address,
             viewing_key,
@@ -1667,22 +1672,17 @@ pub fn query_owner_of<S: Storage, A: Api, Q: Querier>(
 ///
 /// * `storage` - a reference to the contract's storage
 /// * `token_id` - string slice of the token id
-pub fn query_nft_info<S: ReadonlyStorage>(
-    storage: &S,
-    token_id: &str,
-) -> QueryResult {
+pub fn query_nft_info<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryResult {
     let config: Config = load(storage, CONFIG_KEY)?;
-    let id_map: HashMap<String, u32> =
-        may_load(storage, IDS_KEY)?.unwrap_or_else(HashMap::new);
+    let id_map: HashMap<String, u32> = may_load(storage, IDS_KEY)?.unwrap_or_else(HashMap::new);
     // if token id was found
     if let Some(idx) = id_map.get(token_id) {
         let meta_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, storage);
-        let meta: Metadata =
-            may_load(&meta_store, &idx.to_le_bytes())?.unwrap_or(Metadata {
-                name: None,
-                description: None,
-                image: None,
-            });
+        let meta: Metadata = may_load(&meta_store, &idx.to_le_bytes())?.unwrap_or(Metadata {
+            name: None,
+            description: None,
+            image: None,
+        });
         return to_binary(&QueryAnswer::NftInfo {
             name: meta.name,
             description: meta.description,
@@ -1742,12 +1742,11 @@ pub fn query_private_meta<S: Storage, A: Api, Q: Querier>(
         ));
     }
     let meta_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
-    let meta: Metadata =
-        may_load(&meta_store, &prep_info.idx.to_le_bytes())?.unwrap_or(Metadata {
-            name: None,
-            description: None,
-            image: None,
-        });
+    let meta: Metadata = may_load(&meta_store, &prep_info.idx.to_le_bytes())?.unwrap_or(Metadata {
+        name: None,
+        description: None,
+        image: None,
+    });
     to_binary(&QueryAnswer::PrivateMetadata {
         name: meta.name,
         description: meta.description,
@@ -2142,8 +2141,7 @@ pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
         may_load(&deps.storage, INDEX_KEY)?.unwrap_or_else(HashMap::new);
     // get list of owner's tokens
     let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-    let owned: HashSet<u32> =
-        may_load(&owned_store, owner_slice)?.unwrap_or_else(HashSet::new);
+    let owned: HashSet<u32> = may_load(&owned_store, owner_slice)?.unwrap_or_else(HashSet::new);
     // if querier is different than the owner, check if ownership is public
     let mut known_pass = if !is_owner {
         let config: Config = load(&deps.storage, CONFIG_KEY)?;
@@ -2219,8 +2217,7 @@ pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
 /// * `storage` - a reference to the contract's storage
 pub fn query_was_token_unwrapped<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryResult {
     let config: Config = load(storage, CONFIG_KEY)?;
-    let tokens: HashMap<String, u32> =
-        may_load(storage, IDS_KEY)?.unwrap_or_else(HashMap::new);
+    let tokens: HashMap<String, u32> = may_load(storage, IDS_KEY)?.unwrap_or_else(HashMap::new);
     let get_token_res = get_token(storage, token_id, &tokens, None);
     match get_token_res {
         Err(err) => match err {
@@ -2308,14 +2305,19 @@ pub fn query_verify_approval<S: Storage, A: Api, Q: Querier>(
             PermissionType::Transfer,
             &mut oper_for,
             &config,
-        ).is_err() {
+        )
+        .is_err()
+        {
             return to_binary(&QueryAnswer::VerifyTransferApproval {
                 approved_for_all: false,
                 first_unapproved_token: Some(id.to_string()),
             });
         }
     }
-    to_binary(&QueryAnswer::VerifyTransferApproval { approved_for_all: true, first_unapproved_token: None })
+    to_binary(&QueryAnswer::VerifyTransferApproval {
+        approved_for_all: true,
+        first_unapproved_token: None,
+    })
 }
 
 // bundled info when prepping an authenticated token query
@@ -2942,8 +2944,7 @@ fn set_metadata<S: Storage>(
     metadata: &Metadata,
     config: &Config,
 ) -> StdResult<()> {
-    let tokens: HashMap<String, u32> =
-        may_load(storage, IDS_KEY)?.unwrap_or_else(HashMap::new);
+    let tokens: HashMap<String, u32> = may_load(storage, IDS_KEY)?.unwrap_or_else(HashMap::new);
     let custom_err = format!("Not authorized to update metadata of token {}", token_id);
     // if token supply is private, don't leak that the token id does not exist
     // instead just say they are not authorized for that token
@@ -2960,8 +2961,7 @@ fn set_metadata<S: Storage>(
         ));
     }
     if !(token.owner == *sender && config.owner_may_update_metadata) {
-        let minters: Vec<CanonicalAddr> =
-            may_load(storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+        let minters: Vec<CanonicalAddr> = may_load(storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
         if !(minters.contains(sender) && config.minter_may_update_metadata) {
             return Err(StdError::generic_err(custom_err));
         }
@@ -3100,8 +3100,8 @@ fn process_accesses<S: Storage>(
                         if !proc_info.from_oper {
                             let all_store =
                                 ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, storage);
-                            all_perm = json_may_load(&all_store, owner_slice)?
-                                .unwrap_or_else(Vec::new);
+                            all_perm =
+                                json_may_load(&all_store, owner_slice)?.unwrap_or_else(Vec::new);
                         }
                         if let Some(pos) = all_perm.iter().position(|p| p.address == *address) {
                             found_perm = true;
@@ -3619,8 +3619,8 @@ fn transfer_impl<S: Storage, A: Api, Q: Querier>(
                 (inv, true)
             } else {
                 let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-                let retain: HashSet<u32> = may_load(&owned_store, new_inv.owner.as_slice())?
-                    .unwrap_or_else(HashSet::new);
+                let retain: HashSet<u32> =
+                    may_load(&owned_store, new_inv.owner.as_slice())?.unwrap_or_else(HashSet::new);
                 new_inv.retain = retain;
                 (&mut new_inv, false)
             };
@@ -3783,8 +3783,8 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
                 (inv, true)
             } else {
                 let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-                let retain: HashSet<u32> = may_load(&owned_store, new_inv.owner.as_slice())?
-                    .unwrap_or_else(HashSet::new);
+                let retain: HashSet<u32> =
+                    may_load(&owned_store, new_inv.owner.as_slice())?.unwrap_or_else(HashSet::new);
                 new_inv.retain = retain;
                 (&mut new_inv, false)
             };

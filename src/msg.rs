@@ -129,7 +129,7 @@ pub enum HandleMsg {
         padding: Option<String>,
     },
     /// use this to add/remove approval(s) that whitelist everyone (makes public).  I do
-    /// not include an option to give everyone permission to transfer a token, but the 
+    /// not include an option to give everyone permission to transfer a token, but the
     /// underlying processing would be able to do so if a contract dev wanted to add that
     /// PermissionType here
     SetGlobalApproval {
@@ -489,9 +489,7 @@ pub enum QueryMsg {
         include_expired: Option<bool>,
     },
     /// displays the public metadata of a token
-    NftInfo {
-        token_id: String,
-    },
+    NftInfo { token_id: String },
     /// displays all the information contained in the OwnerOf and NftInfo queries
     AllNftInfo {
         token_id: String,
@@ -507,8 +505,8 @@ pub enum QueryMsg {
         /// optional address and key requesting to view the private metadata
         viewer: Option<ViewerInfo>,
     },
-    /// displays all the information about a token that the viewer has permission to 
-    /// see.  This may include the owner, the public metadata, the private metadata, and 
+    /// displays all the information about a token that the viewer has permission to
+    /// see.  This may include the owner, the public metadata, the private metadata, and
     /// the token and inventory approvals
     NftDossier {
         token_id: String,
@@ -568,7 +566,7 @@ pub enum QueryMsg {
     /// display if a token has been unwrapped
     WasTokenUnwrapped { token_id: String },
     /// verify that the specified address has approval to transfer every listed token
-    VerifyTransferApproval { 
+    VerifyTransferApproval {
         /// list of tokens to very approval for
         tokens: Vec<String>,
         /// address that has approval
@@ -662,7 +660,6 @@ pub enum QueryAnswer {
         private_metadata_is_public: bool,
         private_metadata_is_public_expiration: Option<Expiration>,
         inventory_approvals: Vec<Snip721Approval>,
-    
     },
     NftInfo {
         name: Option<String>,
