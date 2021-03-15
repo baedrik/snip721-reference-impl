@@ -1,4 +1,4 @@
-#![allow(clippy::field_reassign_with_default)]
+// #![allow(clippy::field_reassign_with_default)]
 pub mod contract;
 pub mod expiration;
 pub mod msg;
