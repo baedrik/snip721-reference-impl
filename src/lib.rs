@@ -6,7 +6,8 @@ mod rand;
 pub mod receiver;
 pub mod state;
 pub mod token;
-mod unittest;
+mod unittest_handles;
+mod unittest_queries;
 mod utils;
 mod viewing_key;
 

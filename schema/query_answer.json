@@ -479,6 +479,31 @@
     {
       "type": "object",
       "required": [
+        "verify_transfer_approval"
+      ],
+      "properties": {
+        "verify_transfer_approval": {
+          "type": "object",
+          "required": [
+            "approved_for_all"
+          ],
+          "properties": {
+            "approved_for_all": {
+              "type": "boolean"
+            },
+            "first_unapproved_token": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
         "transaction_history"
       ],
       "properties": {

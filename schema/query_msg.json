@@ -441,6 +441,44 @@
       }
     },
     {
+      "description": "verify that the specified address has approval to transfer every listed token",
+      "type": "object",
+      "required": [
+        "verify_transfer_approval"
+      ],
+      "properties": {
+        "verify_transfer_approval": {
+          "type": "object",
+          "required": [
+            "address",
+            "tokens",
+            "viewing_key"
+          ],
+          "properties": {
+            "address": {
+              "description": "address that has approval",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            },
+            "tokens": {
+              "description": "list of tokens to very approval for",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "viewing_key": {
+              "description": "viewing key",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
       "description": "display the transaction history for the specified address in reverse chronological order",
       "type": "object",
       "required": [
