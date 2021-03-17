@@ -330,15 +330,21 @@
         "all_nft_info": {
           "type": "object",
           "required": [
-            "access",
-            "info"
+            "access"
           ],
           "properties": {
             "access": {
               "$ref": "#/definitions/Cw721OwnerOfResponse"
             },
             "info": {
-              "$ref": "#/definitions/Metadata"
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Metadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         }
@@ -357,6 +363,12 @@
             "private_metadata_is_public"
           ],
           "properties": {
+            "display_private_metadata_error": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "inventory_approvals": {
               "type": [
                 "array",
@@ -460,16 +472,16 @@
     {
       "type": "object",
       "required": [
-        "was_token_unwrapped"
+        "is_unwrapped"
       ],
       "properties": {
-        "was_token_unwrapped": {
+        "is_unwrapped": {
           "type": "object",
           "required": [
-            "token_was_unwrapped"
+            "token_is_unwrapped"
           ],
           "properties": {
-            "token_was_unwrapped": {
+            "token_is_unwrapped": {
               "type": "boolean"
             }
           }

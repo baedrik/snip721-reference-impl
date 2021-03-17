@@ -421,13 +421,13 @@
       }
     },
     {
-      "description": "display if a token has been unwrapped",
+      "description": "display if a token is unwrapped",
       "type": "object",
       "required": [
-        "was_token_unwrapped"
+        "is_unwrapped"
       ],
       "properties": {
-        "was_token_unwrapped": {
+        "is_unwrapped": {
           "type": "object",
           "required": [
             "token_id"
