@@ -1526,9 +1526,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
             address,
             viewing_key,
         } => query_verify_approval(deps, &tokens, &address, viewing_key),
-        QueryMsg::WasTokenUnwrapped { token_id } => {
-            query_was_token_unwrapped(&deps.storage, &token_id)
-        }
+        QueryMsg::IsUnwrapped { token_id } => query_is_unwrapped(&deps.storage, &token_id),
         QueryMsg::TransactionHistory {
             address,
             viewing_key,
@@ -1770,11 +1768,7 @@ pub fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
 ) -> QueryResult {
     let (owner, approvals, idx) = process_cw721_owner_of(deps, token_id, viewer, include_expired)?;
     let meta_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
-    let info: Metadata = may_load(&meta_store, &idx.to_le_bytes())?.unwrap_or(Metadata {
-        name: None,
-        description: None,
-        image: None,
-    });
+    let info: Option<Metadata> = may_load(&meta_store, &idx.to_le_bytes())?;
     let access = Cw721OwnerOfResponse { owner, approvals };
     to_binary(&QueryAnswer::AllNftInfo { access, info })
 }
@@ -1836,25 +1830,32 @@ pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
     let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
     let public_metadata: Option<Metadata> = may_load(&pub_store, &token_key)?;
     // get the private metadata if it is not sealed and if the viewer is permitted
-    let private_metadata = if prep_info.token.unwrapped
-        && check_perm_core(
-            deps,
-            &prep_info.block,
-            &prep_info.token,
-            token_id,
-            opt_viewer,
-            owner_slice,
-            perm_type_info.view_meta_idx,
-            &mut Vec::new(),
-            &prep_info.err_msg,
-        )
-        .is_ok()
-    {
+    let mut display_private_metadata_error = None;
+    let private_metadata = if let Err(err) = check_perm_core(
+        deps,
+        &prep_info.block,
+        &prep_info.token,
+        token_id,
+        opt_viewer,
+        owner_slice,
+        perm_type_info.view_meta_idx,
+        &mut Vec::new(),
+        &prep_info.err_msg,
+    ) {
+        if let StdError::GenericErr { msg, .. } = err {
+            display_private_metadata_error = Some(msg);
+        }
+        None
+    } else if !prep_info.token.unwrapped {
+        display_private_metadata_error = Some(
+            "Sealed metadata must be unwrapped by calling Reveal before it can be viewed"
+                .to_string(),
+        );
+        None
+    } else {
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &token_key)?;
         priv_meta
-    } else {
-        None
     };
     // get the approvals
     let (token_approv, token_owner_exp, token_meta_exp) = gen_snip721_approvals(
@@ -1900,6 +1901,7 @@ pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
         owner,
         public_metadata,
         private_metadata,
+        display_private_metadata_error,
         owner_is_public,
         public_ownership_expiration,
         private_metadata_is_public,
@@ -1939,9 +1941,10 @@ pub fn query_token_approvals<S: Storage, A: Api, Q: Querier>(
     };
     let (mut token, _idx) = get_token(&deps.storage, token_id, &id_map, opt_err)?;
     check_key(&deps.storage, &token.owner, viewing_key)?;
+    let owner_slice = token.owner.as_slice();
     let own_priv_store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
     let global_pass: bool =
-        may_load(&own_priv_store, token.owner.as_slice())?.unwrap_or(config.owner_is_public);
+        may_load(&own_priv_store, owner_slice)?.unwrap_or(config.owner_is_public);
     // TODO remove this when BlockInfo becomes available to queries
     let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
         height: 1,
@@ -1954,21 +1957,34 @@ pub fn query_token_approvals<S: Storage, A: Api, Q: Querier>(
         transfer_idx: PermissionType::Transfer.to_usize(),
         num_types: PermissionType::Transfer.num_types(),
     };
-    let (token_approvals, mut public_ownership_expiration, private_metadata_is_public_expiration) =
-        gen_snip721_approvals(
-            &deps.api,
-            &block,
-            &mut token.permissions,
-            include_expired.unwrap_or(false),
-            &perm_type_info,
-        )?;
-    let owner_is_public = if global_pass {
-        public_ownership_expiration = Some(Expiration::Never);
-        true
+    let incl_exp = include_expired.unwrap_or(false);
+    let (token_approvals, token_owner_exp, token_meta_exp) = gen_snip721_approvals(
+        &deps.api,
+        &block,
+        &mut token.permissions,
+        incl_exp,
+        &perm_type_info,
+    )?;
+    let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
+    let mut all_perm: Vec<Permission> =
+        json_may_load(&all_store, owner_slice)?.unwrap_or_else(Vec::new);
+    let (_inventory_approv, all_owner_exp, all_meta_exp) =
+        gen_snip721_approvals(&deps.api, &block, &mut all_perm, incl_exp, &perm_type_info)?;
+    // determine if ownership is public
+    let (public_ownership_expiration, owner_is_public) = if global_pass {
+        (Some(Expiration::Never), true)
+    } else if token_owner_exp.is_some() {
+        (token_owner_exp, true)
     } else {
-        public_ownership_expiration.is_some()
+        (all_owner_exp, all_owner_exp.is_some())
     };
-    let private_metadata_is_public = private_metadata_is_public_expiration.is_some();
+    // determine if private metadata is public
+    let (private_metadata_is_public_expiration, private_metadata_is_public) =
+        if token_meta_exp.is_some() {
+            (token_meta_exp, true)
+        } else {
+            (all_meta_exp, all_meta_exp.is_some())
+        };
     to_binary(&QueryAnswer::TokenApprovals {
         owner_is_public,
         public_ownership_expiration,
@@ -2215,7 +2231,7 @@ pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
 /// # Arguments
 ///
 /// * `storage` - a reference to the contract's storage
-pub fn query_was_token_unwrapped<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryResult {
+pub fn query_is_unwrapped<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryResult {
     let config: Config = load(storage, CONFIG_KEY)?;
     let tokens: HashMap<String, u32> = may_load(storage, IDS_KEY)?.unwrap_or_else(HashMap::new);
     let get_token_res = get_token(storage, token_id, &tokens, None);
@@ -2226,14 +2242,14 @@ pub fn query_was_token_unwrapped<S: ReadonlyStorage>(storage: &S, token_id: &str
             StdError::GenericErr { msg, .. }
                 if !config.token_supply_is_public && msg.contains("Token ID") =>
             {
-                to_binary(&QueryAnswer::WasTokenUnwrapped {
-                    token_was_unwrapped: !config.sealed_metadata_is_enabled,
+                to_binary(&QueryAnswer::IsUnwrapped {
+                    token_is_unwrapped: !config.sealed_metadata_is_enabled,
                 })
             }
             _ => Err(err),
         },
-        Ok((token, _idx)) => to_binary(&QueryAnswer::WasTokenUnwrapped {
-            token_was_unwrapped: token.unwrapped,
+        Ok((token, _idx)) => to_binary(&QueryAnswer::IsUnwrapped {
+            token_is_unwrapped: token.unwrapped,
         }),
     }
 }
@@ -2571,7 +2587,7 @@ fn gen_snip721_approvals<A: Api>(
             for i in 0..perm_type_info.num_types {
                 perm.expirations[i] =
                     perm.expirations[i].filter(|e| include_expired || !e.is_expired(block));
-                if perm.expirations[i].is_some() {
+                if !has_some && perm.expirations[i].is_some() {
                     has_some = true;
                 }
             }

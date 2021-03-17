@@ -563,8 +563,8 @@ pub enum QueryMsg {
         /// optional number of token ids to display
         limit: Option<u32>,
     },
-    /// display if a token has been unwrapped
-    WasTokenUnwrapped { token_id: String },
+    /// display if a token is unwrapped
+    IsUnwrapped { token_id: String },
     /// verify that the specified address has approval to transfer every listed token
     VerifyTransferApproval {
         /// list of tokens to very approval for
@@ -673,12 +673,13 @@ pub enum QueryAnswer {
     },
     AllNftInfo {
         access: Cw721OwnerOfResponse,
-        info: Metadata,
+        info: Option<Metadata>,
     },
     NftDossier {
         owner: Option<HumanAddr>,
         public_metadata: Option<Metadata>,
         private_metadata: Option<Metadata>,
+        display_private_metadata_error: Option<String>,
         owner_is_public: bool,
         public_ownership_expiration: Option<Expiration>,
         private_metadata_is_public: bool,
@@ -689,8 +690,8 @@ pub enum QueryAnswer {
     ApprovedForAll {
         operators: Vec<Cw721Approval>,
     },
-    WasTokenUnwrapped {
-        token_was_unwrapped: bool,
+    IsUnwrapped {
+        token_is_unwrapped: bool,
     },
     VerifyTransferApproval {
         approved_for_all: bool,

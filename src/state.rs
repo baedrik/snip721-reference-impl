@@ -127,57 +127,6 @@ pub struct Tx {
     pub memo: Option<String>,
 }
 
-impl Tx {
-    /// Returns StdResult<StoredTx> from converting a displayable tx to a stored tx
-    ///
-    /// # Arguments
-    ///
-    /// * `api` - a reference to the Api used to convert human and canonical addresses
-    pub fn into_stored<A: Api>(self, api: &A) -> StdResult<StoredTx> {
-        let action = match self.action {
-            TxAction::Transfer {
-                from,
-                sender,
-                recipient,
-            } => {
-                let sndr = if let Some(s) = sender {
-                    Some(api.canonical_address(&s)?)
-                } else {
-                    None
-                };
-                StoredTxAction::Transfer {
-                    from: api.canonical_address(&from)?,
-                    sender: sndr,
-                    recipient: api.canonical_address(&recipient)?,
-                }
-            }
-            TxAction::Mint { minter, recipient } => StoredTxAction::Mint {
-                minter: api.canonical_address(&minter)?,
-                recipient: api.canonical_address(&recipient)?,
-            },
-            TxAction::Burn { owner, burner } => {
-                let bnr = if let Some(b) = burner {
-                    Some(api.canonical_address(&b)?)
-                } else {
-                    None
-                };
-                StoredTxAction::Burn {
-                    owner: api.canonical_address(&owner)?,
-                    burner: bnr,
-                }
-            }
-        };
-        let tx = StoredTx {
-            tx_id: self.tx_id,
-            blockheight: self.blockheight,
-            token_id: self.token_id,
-            action,
-            memo: self.memo,
-        };
-        Ok(tx)
-    }
-}
-
 /// tx type and specifics
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -464,14 +413,6 @@ pub fn get_txs<A: Api, S: ReadonlyStorage>(
     };
     // try to access tx storage
     let tx_store = ReadonlyPrefixedStorage::new(PREFIX_TXS, storage);
-    //    let tx_store = if let Some(res) =
-    //      AppendStore::<StoredTx, _, _>::attach_with_serialization(&tx_store, Json) {
-    //        res?
-    //  } else {
-    //    return Err(StdError::generic_err(
-    //      "Unable to retrieve tx data",
-    //            ));
-    //      };
     let tx_store = AppendStore::<StoredTx, _, _>::attach_with_serialization(&tx_store, Json)
         .ok_or_else(|| StdError::generic_err("Unable to retrieve tx data"))??;
     // Take `page_size` txs starting from the latest tx, potentially skipping `page * page_size`
@@ -520,24 +461,6 @@ impl PermissionType {
     /// returns the number of permission types
     pub fn num_types(&self) -> usize {
         3
-    }
-}
-
-// probably delete this
-/// metadata types
-#[derive(Serialize, Deserialize)]
-pub enum MetadataType {
-    Public,
-    Private,
-}
-
-impl MetadataType {
-    /// Returns usize representation of the enum variant
-    pub fn to_u8(&self) -> u8 {
-        match self {
-            MetadataType::Public => 0,
-            MetadataType::Private => 1,
-        }
     }
 }
 

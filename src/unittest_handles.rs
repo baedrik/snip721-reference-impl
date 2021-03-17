@@ -3,8 +3,8 @@ mod tests {
     use crate::contract::{check_permission, handle, init};
     use crate::expiration::Expiration;
     use crate::msg::{
-        AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg,
-        QueryAnswer, Send, Transfer,
+        AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg, Send,
+        Transfer,
     };
     use crate::receiver::receive_nft_msg;
     use crate::state::{
@@ -17,8 +17,8 @@ mod tests {
     use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
     use cosmwasm_std::testing::*;
     use cosmwasm_std::{
-        from_binary, to_binary, Api, Binary, BlockInfo, CanonicalAddr, Env, Extern, HandleResponse,
-        HumanAddr, InitResponse, MessageInfo, QueryResponse, StdError, StdResult, WasmMsg,
+        from_binary, to_binary, Api, Binary, BlockInfo, CanonicalAddr, Env, Extern, HumanAddr,
+        InitResponse, MessageInfo, StdError, StdResult,
     };
     use cosmwasm_storage::ReadonlyPrefixedStorage;
 
@@ -100,14 +100,6 @@ mod tests {
             },
         }
     }
-    /*
-        fn extract_log(resp: StdResult<HandleResponse>) -> String {
-            match resp {
-                Ok(response) => response.log[0].value.clone(),
-                Err(_err) => "These are not the logs you are looking for".to_string(),
-            }
-        }
-    */
 
     // Init tests
 
@@ -332,7 +324,7 @@ mod tests {
         let token_key = index.to_le_bytes();
         let index_map: HashMap<u32, String> = load(&deps.storage, INDEX_KEY).unwrap();
         assert_eq!(&*index_map.get(&index).unwrap(), "1");
-        // verifyt token info
+        // verify token info
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &token_key).unwrap();
         let admin_raw = deps
@@ -5509,8 +5501,6 @@ mod tests {
         assert!(error.contains("Access to all tokens of alice has expired"));
 
         let tok_key = 0u32.to_le_bytes();
-        let tok2_key = 1u32.to_le_bytes();
-        let tok3_key = 2u32.to_le_bytes();
         let alice_raw = deps
             .api
             .canonical_address(&HumanAddr("alice".to_string()))
@@ -5937,7 +5927,6 @@ mod tests {
             .api
             .canonical_address(&HumanAddr("david".to_string()))
             .unwrap();
-        let david_key = david_raw.as_slice();
         let transfer_idx = PermissionType::Transfer.to_usize();
         let view_owner_idx = PermissionType::ViewOwner.to_usize();
         let view_meta_idx = PermissionType::ViewMetadata.to_usize();
@@ -6718,8 +6707,6 @@ mod tests {
         assert!(error.contains("Access to all tokens of alice has expired"));
 
         let tok_key = 0u32.to_le_bytes();
-        let tok2_key = 1u32.to_le_bytes();
-        let tok3_key = 2u32.to_le_bytes();
         let alice_raw = deps
             .api
             .canonical_address(&HumanAddr("alice".to_string()))
@@ -7222,7 +7209,6 @@ mod tests {
             .api
             .canonical_address(&HumanAddr("david".to_string()))
             .unwrap();
-        let david_key = david_raw.as_slice();
         let transfer_idx = PermissionType::Transfer.to_usize();
         let view_owner_idx = PermissionType::ViewOwner.to_usize();
         let view_meta_idx = PermissionType::ViewMetadata.to_usize();
@@ -8850,7 +8836,6 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let global_raw = CanonicalAddr(Binary::from(b"public"));
-        let global_key = global_raw.as_slice();
         let alice_raw = deps
             .api
             .canonical_address(&HumanAddr("alice".to_string()))
@@ -9113,10 +9098,6 @@ mod tests {
             .api
             .canonical_address(&HumanAddr("charlie".to_string()))
             .unwrap();
-        let alice_key = alice_raw.as_slice();
-        let view_owner_idx = PermissionType::ViewOwner.to_usize();
-        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
-        let transfer_idx = PermissionType::Transfer.to_usize();
         let nft1_key = 0u32.to_le_bytes();
         let nft2_key = 1u32.to_le_bytes();
         let handle_msg = HandleMsg::Mint {
@@ -9442,7 +9423,6 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
-        let token2: Token = json_load(&info_store, &nft2_key).unwrap();
         let check_perm = check_permission(
             &deps,
             &block,
