@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Binary, HumanAddr};
+use cosmwasm_std::{Binary, Coin, HumanAddr};
 
 use crate::expiration::Expiration;
 use crate::state::Tx;
@@ -20,13 +20,17 @@ pub struct InitMsg {
     pub entropy: String,
     /// optional privacy configuration for the contract
     pub config: Option<InitConfig>,
+    /// optional callback message to execute after instantiation.  This will
+    /// most often be used to have the token contract provide its address to a
+    /// contract that instantiated it, but it could be used to execute any
+    /// contract
+    pub post_init_callback: Option<PostInitCallback>,
 }
 
 /// This type represents optional configuration values which can be overridden.
 /// All values are optional and have defaults which are more private by default,
 /// but can be overridden if necessary
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
 pub struct InitConfig {
     /// indicates whether the token IDs and the number of tokens controlled by the contract are
     /// public.  If the token supply is private, only minters can view the token IDs and
@@ -74,6 +78,19 @@ impl Default for InitConfig {
             enable_burn: Some(false),
         }
     }
+}
+
+/// info needed to perform a callback message after instantiation
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
+pub struct PostInitCallback {
+    /// the callback message to execute
+    pub msg: Binary,
+    /// address of the contract to execute
+    pub contract_address: HumanAddr,
+    /// code hash of the contract to execute
+    pub code_hash: String,
+    /// list of native Coin to send with the callback message
+    pub send: Vec<Coin>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]

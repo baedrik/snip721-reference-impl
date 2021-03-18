@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use cosmwasm_std::{
     to_binary, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Env, Extern, HandleResponse,
     HandleResult, HumanAddr, InitResponse, InitResult, Querier, QueryResult, ReadonlyStorage,
-    StdError, StdResult, Storage,
+    StdError, StdResult, Storage, WasmMsg,
 };
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 
@@ -80,7 +80,22 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     // TODO remove this after BlockInfo becomes available to queries
     save(&mut deps.storage, BLOCK_KEY, &env.block)?;
 
-    Ok(InitResponse::default())
+    // perform the post init callback if needed
+    let messages: Vec<CosmosMsg> = if let Some(callback) = msg.post_init_callback {
+        let execute = WasmMsg::Execute {
+            msg: callback.msg,
+            contract_addr: callback.contract_address,
+            callback_code_hash: callback.code_hash,
+            send: callback.send,
+        };
+        vec![execute.into()]
+    } else {
+        Vec::new()
+    };
+    Ok(InitResponse {
+        messages,
+        log: vec![],
+    })
 }
 
 ///////////////////////////////////// Handle //////////////////////////////////////

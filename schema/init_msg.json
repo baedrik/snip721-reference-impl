@@ -39,12 +39,42 @@
       "description": "name of token contract",
       "type": "string"
     },
+    "post_init_callback": {
+      "description": "optional callback message to execute after instantiation.  This will most often be used to have the token contract provide its address to a contract that instantiated it, but it could be used to execute any contract",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PostInitCallback"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "symbol": {
       "description": "token contract symbol",
       "type": "string"
     }
   },
   "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      }
+    },
     "HumanAddr": {
       "type": "string"
     },
@@ -102,6 +132,48 @@
           ]
         }
       }
+    },
+    "PostInitCallback": {
+      "description": "info needed to perform a callback message after instantiation",
+      "type": "object",
+      "required": [
+        "code_hash",
+        "contract_address",
+        "msg",
+        "send"
+      ],
+      "properties": {
+        "code_hash": {
+          "description": "code hash of the contract to execute",
+          "type": "string"
+        },
+        "contract_address": {
+          "description": "address of the contract to execute",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        },
+        "msg": {
+          "description": "the callback message to execute",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Binary"
+            }
+          ]
+        },
+        "send": {
+          "description": "list of native Coin to send with the callback message",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Coin"
+          }
+        }
+      }
+    },
+    "Uint128": {
+      "type": "string"
     }
   }
 }

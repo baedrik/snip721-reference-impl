@@ -31,6 +31,7 @@ mod tests {
             admin: Some(HumanAddr("admin".to_string())),
             entropy: "We're going to need a bigger boat".to_string(),
             config: None,
+            post_init_callback: None,
         };
 
         (init(&mut deps, env, init_msg), deps)
@@ -77,6 +78,7 @@ mod tests {
             admin: Some(HumanAddr("admin".to_string())),
             entropy: "We're going to need a bigger boat".to_string(),
             config: Some(init_config),
+            post_init_callback: None,
         };
 
         (init(&mut deps, env, init_msg), deps)
