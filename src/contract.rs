@@ -2668,18 +2668,12 @@ fn check_key<S: ReadonlyStorage>(
 ) -> StdResult<()> {
     // load the address' key
     let read_key = ReadonlyPrefixedStorage::new(PREFIX_VIEW_KEY, storage);
-    let load_key: Option<[u8; VIEWING_KEY_SIZE]> = may_load(&read_key, address.as_slice())?;
+    let load_key: [u8; VIEWING_KEY_SIZE] =
+        may_load(&read_key, address.as_slice())?.unwrap_or_else(|| [0u8; VIEWING_KEY_SIZE]);
     let input_key = ViewingKey(viewing_key);
-    // if a key was set
-    if let Some(expected_key) = load_key {
-        // and it matches
-        if input_key.check_viewing_key(&expected_key) {
-            return Ok(());
-        }
-    } else {
-        // Checking the key will take significant time. We don't want to exit immediately if it isn't set
-        // in a way which will allow to time the command and determine if a viewing key doesn't exist
-        input_key.check_viewing_key(&[0u8; VIEWING_KEY_SIZE]);
+    // if key matches
+    if input_key.check_viewing_key(&load_key) {
+        return Ok(());
     }
     Err(StdError::generic_err(
         "Wrong viewing key for this address or viewing key not set",
