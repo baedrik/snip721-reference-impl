@@ -534,6 +534,25 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "registered_code_hash"
+      ],
+      "properties": {
+        "registered_code_hash": {
+          "type": "object",
+          "properties": {
+            "code_hash": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {

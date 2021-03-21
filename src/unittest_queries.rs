@@ -3055,4 +3055,48 @@ mod tests {
             _ => panic!("unexpected"),
         }
     }
+
+    // test RegisteredCodeHash query
+    #[test]
+    fn test_query_registered_code_hash() {
+        let (init_result, mut deps) =
+            init_helper_with_config(false, true, true, false, true, false, true);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        // test not registered
+        let query_msg = QueryMsg::RegisteredCodeHash {
+            contract: HumanAddr("alice".to_string()),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::RegisteredCodeHash { code_hash } => {
+                assert!(code_hash.is_none());
+            }
+            _ => panic!("unexpected"),
+        }
+
+        let handle_msg = HandleMsg::RegisterReceiveNft {
+            code_hash: "Code Hash".to_string(),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+
+        // sanity check
+        let query_msg = QueryMsg::RegisteredCodeHash {
+            contract: HumanAddr("alice".to_string()),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::RegisteredCodeHash { code_hash } => {
+                assert_eq!(code_hash, Some("Code Hash".to_string()));
+            }
+            _ => panic!("unexpected"),
+        }
+    }
 }

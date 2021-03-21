@@ -1538,6 +1538,7 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
             page,
             page_size,
         } => query_transactions(deps, &address, viewing_key, page, page_size),
+        QueryMsg::RegisteredCodeHash { contract } => query_code_hash(deps, &contract),
     };
     pad_query_result(response, BLOCK_SIZE)
 }
@@ -2335,6 +2336,23 @@ pub fn query_verify_approval<S: Storage, A: Api, Q: Querier>(
     })
 }
 
+/// Returns QueryResult displaying the registered code hash of the specified contract if
+/// it has registered
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `contract` - a reference to the contract's address whose code hash is being requested
+pub fn query_code_hash<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    contract: &HumanAddr,
+) -> QueryResult {
+    let contract_raw = deps.api.canonical_address(contract)?;
+    let store = ReadonlyPrefixedStorage::new(PREFIX_RECEIVERS, &deps.storage);
+    let code_hash: Option<String> = may_load(&store, contract_raw.as_slice())?;
+    to_binary(&QueryAnswer::RegisteredCodeHash { code_hash })
+}
+
 // bundled info when prepping an authenticated token query
 pub struct TokenQueryInfo {
     // querier's address
@@ -2996,10 +3014,10 @@ pub struct AlterAuthTable {
 impl Default for AlterAuthTable {
     fn default() -> Self {
         AlterAuthTable {
-            add: [false, false, false],
-            full: [false, false, false],
-            remove: [false, false, false],
-            clear: [false, false, false],
+            add: [false; 3],
+            full: [false; 3],
+            remove: [false; 3],
+            clear: [false; 3],
             has_update: false,
         }
     }
@@ -3018,8 +3036,8 @@ pub struct AlterPermTable {
 impl Default for AlterPermTable {
     fn default() -> Self {
         AlterPermTable {
-            add: [false, false, false],
-            remove: [false, false, false],
+            add: [false; 3],
+            remove: [false; 3],
             has_update: false,
         }
     }
@@ -3063,18 +3081,14 @@ fn process_accesses<S: Storage>(
 ) -> StdResult<()> {
     let owner_slice = owner.as_slice();
     let expiration = proc_info.expires.unwrap_or_default();
-    let expirations = vec![expiration, expiration, expiration];
+    let expirations = vec![expiration; 3];
     let mut alt_all_perm = AlterPermTable::default();
     let mut alt_tok_perm = AlterPermTable::default();
     let mut alt_load_tok_perm = AlterPermTable::default();
     let mut alt_auth_list = AlterAuthTable::default();
     let mut add_load_list = Vec::new();
     let mut load_all = false;
-    let mut load_all_exp = vec![
-        Expiration::AtHeight(0),
-        Expiration::AtHeight(0),
-        Expiration::AtHeight(0),
-    ];
+    let mut load_all_exp = vec![Expiration::AtHeight(0); 3];
     let mut all_perm = if proc_info.from_oper {
         all_perm_in.ok_or_else(|| StdError::generic_err("Unable to get operator list"))?
     } else {
@@ -3389,7 +3403,7 @@ fn alter_perm_list(
     let mut updated = false;
     let mut new_perm = Permission {
         address: address.clone(),
-        expirations: [None, None, None],
+        expirations: [None; 3],
     };
     let (perm, found, pos) = if let Some(pos) = perms.iter().position(|p| p.address == *address) {
         if let Some(p) = perms.get_mut(pos) {

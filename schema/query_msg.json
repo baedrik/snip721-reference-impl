@@ -520,6 +520,31 @@
           }
         }
       }
+    },
+    {
+      "description": "display the code hash a contract has registered with the token contract.  This can help avoid accidentally sending the wrong token or to the wrong contract which would result in the loss of the token",
+      "type": "object",
+      "required": [
+        "registered_code_hash"
+      ],
+      "properties": {
+        "registered_code_hash": {
+          "type": "object",
+          "required": [
+            "contract"
+          ],
+          "properties": {
+            "contract": {
+              "description": "the contract whose code hash you want to verify",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {

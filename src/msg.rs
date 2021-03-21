@@ -602,6 +602,13 @@ pub enum QueryMsg {
         /// optional number of transactions per page
         page_size: Option<u32>,
     },
+    /// display the code hash a contract has registered with the token contract.  This
+    /// can help avoid accidentally sending the wrong token or to the wrong contract
+    /// which would result in the loss of the token
+    RegisteredCodeHash {
+        /// the contract whose code hash you want to verify
+        contract: HumanAddr,
+    },
 }
 
 /// SNIP721 Approval
@@ -716,6 +723,9 @@ pub enum QueryAnswer {
     },
     TransactionHistory {
         txs: Vec<Tx>,
+    },
+    RegisteredCodeHash {
+        code_hash: Option<String>,
     },
 }
 
