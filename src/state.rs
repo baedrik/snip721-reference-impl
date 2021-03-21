@@ -21,10 +21,12 @@ pub const BLOCK_KEY: &[u8] = b"blockinfo";
 pub const MINTERS_KEY: &[u8] = b"minters";
 /// storage key for prng seed
 pub const PRNG_SEED_KEY: &[u8] = b"prngseed";
-/// storage key for token id map
-pub const IDS_KEY: &[u8] = b"ids";
-/// storage key for token index map
-pub const INDEX_KEY: &[u8] = b"indices";
+/// storage key for list of tokens
+pub const TOKENS_KEY: &[u8] = b"tokens";
+/// prefix for storage that maps ids to indices
+pub const PREFIX_MAP_TO_INDEX: &[u8] = b"map2idx";
+/// prefix for storage that maps indices to ids
+pub const PREFIX_MAP_TO_ID: &[u8] = b"idx2id";
 /// prefix for storage of token infos
 pub const PREFIX_INFOS: &[u8] = b"infos";
 /// prefix for the storage of public metadata
