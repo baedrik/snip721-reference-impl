@@ -1,9 +1,10 @@
+use serde_json_wasm as serde_json;
 /// This contract implements SNIP-721 standard:
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
 use std::collections::HashSet;
 
 use cosmwasm_std::{
-    to_binary, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Env, Extern, HandleResponse,
+    log, to_binary, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Env, Extern, HandleResponse,
     HandleResult, HumanAddr, InitResponse, InitResult, Querier, QueryResult, ReadonlyStorage,
     StdError, StdResult, Storage, WasmMsg,
 };
@@ -14,8 +15,8 @@ use secret_toolkit::utils::{pad_handle_result, pad_query_result};
 use crate::expiration::Expiration;
 use crate::msg::{
     AccessLevel, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse, HandleAnswer,
-    HandleMsg, InitMsg, QueryAnswer, QueryMsg, ResponseStatus::Success, Send, Snip721Approval,
-    Transfer, ViewerInfo,
+    HandleMsg, InitMsg, Mint, QueryAnswer, QueryMsg, ResponseStatus::Success, Send,
+    Snip721Approval, Transfer, ViewerInfo,
 };
 use crate::rand::sha_256;
 use crate::receiver::receive_nft_msg;
@@ -131,6 +132,13 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             public_metadata,
             private_metadata,
             memo,
+        ),
+        HandleMsg::BatchMint { mut mints, .. } => batch_mint(
+            deps,
+            env,
+            &mut config,
+            ContractStatus::Normal.to_u8(),
+            &mut mints,
         ),
         HandleMsg::SetPublicMetadata {
             token_id, metadata, ..
@@ -405,83 +413,59 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
             "Only designated minters are allowed to mint",
         ));
     }
-    let mut tokens: HashSet<String> =
-        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(HashSet::new);
-    let id = token_id.unwrap_or(format!("{}", config.mint_cnt));
-    if tokens.contains(&id) {
-        return Err(StdError::generic_err("Token ID is already in use"));
-    }
-    let recipient = if let Some(o) = owner {
-        deps.api.canonical_address(&o)?
-    } else {
-        sender_raw.clone()
-    };
-
-    // if you are modifying the base contract to include other data fields on-chain in
-    // the Token struct (see token.rs), this is where you may populate those additional
-    // fields.  Conversely, you could also store the additional fields as a struct with
-    // its own storage prefix, similar to how the metadata is handled below
-
-    let token = Token {
-        owner: recipient.clone(),
-        permissions: Vec::new(),
-        unwrapped: !config.sealed_metadata_is_enabled,
-    };
-    //
-    //
-
-    // save new token info
-    let token_key = config.mint_cnt.to_le_bytes();
-    let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
-    json_save(&mut info_store, &token_key, &token)?;
-    // add token to owner's list
-    let owner_slice = recipient.as_slice();
-    let mut owned_store = PrefixedStorage::new(PREFIX_OWNED, &mut deps.storage);
-    let mut owned: HashSet<u32> = may_load(&owned_store, owner_slice)?.unwrap_or_else(HashSet::new);
-    owned.insert(config.mint_cnt);
-    save(&mut owned_store, owner_slice, &owned)?;
-    // add to token list, id and index maps
-    tokens.insert(id.clone());
-    save(&mut deps.storage, TOKENS_KEY, &tokens)?;
-    let mut map2idx = PrefixedStorage::new(PREFIX_MAP_TO_INDEX, &mut deps.storage);
-    save(&mut map2idx, id.as_bytes(), &config.mint_cnt)?;
-    let mut map2id = PrefixedStorage::new(PREFIX_MAP_TO_ID, &mut deps.storage);
-    save(&mut map2id, &token_key, &id)?;
-
-    //
-    // If you wanted to store an additional data struct for each NFT, you would create
-    // a new prefix and store with the `token_key` like below
-    //
-    // save the metadata
-    if let Some(pub_meta) = public_metadata {
-        let mut pub_store = PrefixedStorage::new(PREFIX_PUB_META, &mut deps.storage);
-        save(&mut pub_store, &token_key, &pub_meta)?;
-    }
-    if let Some(priv_meta) = private_metadata {
-        let mut priv_store = PrefixedStorage::new(PREFIX_PRIV_META, &mut deps.storage);
-        save(&mut priv_store, &token_key, &priv_meta)?;
-    }
-    //
-    //
-
-    // store the tx
-    store_mint(
-        &mut deps.storage,
-        config,
-        env.block.height,
-        id,
-        sender_raw,
-        recipient,
+    let mut mints = vec![Mint {
+        token_id,
+        owner,
+        public_metadata,
+        private_metadata,
         memo,
-    )?;
-    // increment index for next mint
-    config.mint_cnt += 1;
-    save(&mut deps.storage, CONFIG_KEY, &config)?;
-
+    }];
+    let mut minted = mint_list(deps, &env.block, config, &sender_raw, &mut mints)?;
+    let minted_str = serde_json::to_string(&minted[0])
+        .map_err(|e| StdError::generic_err(format!("Error serializing minted token id: {}", e)))?;
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![],
-        data: Some(to_binary(&HandleAnswer::Mint { status: Success })?),
+        log: vec![log("minted", minted_str)],
+        data: Some(to_binary(&HandleAnswer::Mint {
+            token_id: minted.pop().unwrap_or_else(String::new),
+        })?),
+    })
+}
+
+/// Returns HandleResult
+///
+/// mints many tokens
+///
+/// # Arguments
+///
+/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
+/// * `env` - Env of contract's environment
+/// * `config` - a mutable reference to the Config
+/// * `priority` - u8 representation of highest ContractStatus level this action is permitted
+/// * `mints` - a mutable reference to the list of mints to perform
+pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    config: &mut Config,
+    priority: u8,
+    mints: &mut Vec<Mint>,
+) -> HandleResult {
+    check_status(config.status, priority)?;
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let minters: Vec<CanonicalAddr> =
+        may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+    if !minters.contains(&sender_raw) {
+        return Err(StdError::generic_err(
+            "Only designated minters are allowed to mint",
+        ));
+    }
+    let minted = mint_list(deps, &env.block, config, &sender_raw, mints)?;
+    let minted_str = serde_json::to_string(&minted)
+        .map_err(|e| StdError::generic_err(format!("Error serializing minted token ids: {}", e)))?;
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![log("minted", minted_str)],
+        data: Some(to_binary(&HandleAnswer::BatchMint { token_ids: minted })?),
     })
 }
 
@@ -3833,4 +3817,134 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
     save(&mut deps.storage, TOKENS_KEY, &tokens)?;
     update_owner_inventory(&mut deps.storage, &inv_updates, num_perm_types)?;
     Ok(())
+}
+
+// an owner and their list of tokens
+pub struct Inventory {
+    // the owner's address
+    pub owner: CanonicalAddr,
+    // the owner's tokens
+    pub tokens: HashSet<u32>,
+}
+
+/// Returns <Vec<String>>
+///
+/// mints a list of new tokens and returns the ids of the tokens minted
+///
+/// # Arguments
+///
+/// * `deps` - a mutable reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the current BlockInfo
+/// * `config` - a mutable reference to the Config
+/// * `sender_raw` - a reference to the message sender address
+/// * `mints` - list of mints to perform
+fn mint_list<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    block: &BlockInfo,
+    config: &mut Config,
+    sender_raw: &CanonicalAddr,
+    mints: &mut Vec<Mint>,
+) -> StdResult<Vec<String>> {
+    let mut tokens: HashSet<String> =
+        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(HashSet::new);
+    let mut inventories: Vec<Inventory> = Vec::new();
+    let mut minted: Vec<String> = Vec::new();
+    for mint in mints.drain(..) {
+        let id = mint.token_id.unwrap_or(format!("{}", config.mint_cnt));
+        if tokens.contains(&id) {
+            return Err(StdError::generic_err(format!(
+                "Token ID {} is already in use",
+                id
+            )));
+        }
+        let recipient = if let Some(o) = mint.owner {
+            deps.api.canonical_address(&o)?
+        } else {
+            sender_raw.clone()
+        };
+
+        // if you are modifying the base contract to include other data fields on-chain in
+        // the Token struct (see token.rs), this is where you may populate those additional
+        // fields.  Conversely, you could also store the additional fields as a struct with
+        // its own storage prefix, similar to how the metadata is handled below
+
+        let token = Token {
+            owner: recipient.clone(),
+            permissions: Vec::new(),
+            unwrapped: !config.sealed_metadata_is_enabled,
+        };
+        //
+        //
+
+        // save new token info
+        let token_key = config.mint_cnt.to_le_bytes();
+        let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
+        json_save(&mut info_store, &token_key, &token)?;
+        // add token to owner's list
+        let mut new_inv = Inventory {
+            owner: token.owner.clone(),
+            tokens: HashSet::new(),
+        };
+        let (inventory, found) =
+            if let Some(inv) = inventories.iter_mut().find(|i| i.owner == new_inv.owner) {
+                (inv, true)
+            } else {
+                let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
+                new_inv.tokens =
+                    may_load(&owned_store, new_inv.owner.as_slice())?.unwrap_or_else(HashSet::new);
+                (&mut new_inv, false)
+            };
+        inventory.tokens.insert(config.mint_cnt);
+        if !found {
+            inventories.push(new_inv);
+        }
+        // add to token list, id and index maps
+        tokens.insert(id.clone());
+        let mut map2idx = PrefixedStorage::new(PREFIX_MAP_TO_INDEX, &mut deps.storage);
+        save(&mut map2idx, id.as_bytes(), &config.mint_cnt)?;
+        let mut map2id = PrefixedStorage::new(PREFIX_MAP_TO_ID, &mut deps.storage);
+        save(&mut map2id, &token_key, &id)?;
+
+        //
+        // If you wanted to store an additional data struct for each NFT, you would create
+        // a new prefix and store with the `token_key` like below
+        //
+        // save the metadata
+        if let Some(pub_meta) = mint.public_metadata {
+            let mut pub_store = PrefixedStorage::new(PREFIX_PUB_META, &mut deps.storage);
+            save(&mut pub_store, &token_key, &pub_meta)?;
+        }
+        if let Some(priv_meta) = mint.private_metadata {
+            let mut priv_store = PrefixedStorage::new(PREFIX_PRIV_META, &mut deps.storage);
+            save(&mut priv_store, &token_key, &priv_meta)?;
+        }
+        //
+        //
+
+        // store the tx
+        store_mint(
+            &mut deps.storage,
+            config,
+            block.height,
+            id.clone(),
+            sender_raw.clone(),
+            recipient,
+            mint.memo,
+        )?;
+        minted.push(id);
+        // increment index for next mint
+        config.mint_cnt += 1;
+    }
+    // save all the updated owners' token lists
+    let mut owned_store = PrefixedStorage::new(PREFIX_OWNED, &mut deps.storage);
+    for inventory in inventories {
+        save(
+            &mut owned_store,
+            inventory.owner.as_slice(),
+            &inventory.tokens,
+        )?;
+    }
+    save(&mut deps.storage, TOKENS_KEY, &tokens)?;
+    save(&mut deps.storage, CONFIG_KEY, &config)?;
+    Ok(minted)
 }

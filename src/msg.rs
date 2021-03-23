@@ -111,6 +111,13 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
+    /// Mint multiple tokens
+    BatchMint {
+        /// list of mints to perform
+        mints: Vec<Mint>,
+        /// optional message length padding
+        padding: Option<String>,
+    },
     /// set the public metadata.  This can be called by either the token owner or a valid minter
     /// if they have been given this power by the appropriate config values
     SetPublicMetadata {
@@ -346,8 +353,23 @@ pub enum AccessLevel {
     None,
 }
 
+/// token mint info used when doing a BatchMint
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
+pub struct Mint {
+    /// optional token id, if omitted, use current token index
+    pub token_id: Option<String>,
+    /// optional owner address, owned by the minter otherwise
+    pub owner: Option<HumanAddr>,
+    /// optional public metadata that can be seen by everyone
+    pub public_metadata: Option<Metadata>,
+    /// optional private metadata that can only be seen by owner and whitelist
+    pub private_metadata: Option<Metadata>,
+    /// optional memo for the tx
+    pub memo: Option<String>,
+}
+
 /// token burn info used when doing a BatchBurnNft
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Burn {
     /// token being burnt
     pub token_id: String,
@@ -356,7 +378,7 @@ pub struct Burn {
 }
 
 /// token transfer info used when doing a BatchTransferNft
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Transfer {
     /// recipient of the transferred token
     pub recipient: HumanAddr,
@@ -367,7 +389,7 @@ pub struct Transfer {
 }
 
 /// send token info used when doing a BatchSendNft
-#[derive(Serialize, Deserialize, JsonSchema)]
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Send {
     /// recipient of the sent token
     pub contract: HumanAddr,
@@ -383,7 +405,10 @@ pub struct Send {
 #[serde(rename_all = "snake_case")]
 pub enum HandleAnswer {
     Mint {
-        status: ResponseStatus,
+        token_id: String,
+    },
+    BatchMint {
+        token_ids: Vec<String>,
     },
     SetPublicMetadata {
         status: ResponseStatus,

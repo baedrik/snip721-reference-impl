@@ -71,6 +71,37 @@
       }
     },
     {
+      "description": "Mint multiple tokens",
+      "type": "object",
+      "required": [
+        "batch_mint"
+      ],
+      "properties": {
+        "batch_mint": {
+          "type": "object",
+          "required": [
+            "mints"
+          ],
+          "properties": {
+            "mints": {
+              "description": "list of mints to perform",
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Mint"
+              }
+            },
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
       "description": "set the public metadata.  This can be called by either the token owner or a valid minter if they have been given this power by the appropriate config values",
       "type": "object",
       "required": [
@@ -1071,6 +1102,59 @@
         },
         "name": {
           "description": "optional indentifier",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "Mint": {
+      "description": "token mint info used when doing a BatchMint",
+      "type": "object",
+      "properties": {
+        "memo": {
+          "description": "optional memo for the tx",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner": {
+          "description": "optional owner address, owned by the minter otherwise",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "private_metadata": {
+          "description": "optional private metadata that can only be seen by owner and whitelist",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Metadata"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "public_metadata": {
+          "description": "optional public metadata that can be seen by everyone",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Metadata"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "token_id": {
+          "description": "optional token id, if omitted, use current token index",
           "type": [
             "string",
             "null"

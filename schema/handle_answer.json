@@ -11,11 +11,33 @@
         "mint": {
           "type": "object",
           "required": [
-            "status"
+            "token_id"
           ],
           "properties": {
-            "status": {
-              "$ref": "#/definitions/ResponseStatus"
+            "token_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "batch_mint"
+      ],
+      "properties": {
+        "batch_mint": {
+          "type": "object",
+          "required": [
+            "token_ids"
+          ],
+          "properties": {
+            "token_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         }

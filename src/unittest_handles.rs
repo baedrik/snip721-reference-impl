@@ -3,7 +3,7 @@ mod tests {
     use crate::contract::{check_permission, handle, init};
     use crate::expiration::Expiration;
     use crate::msg::{
-        AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg,
+        AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg, Mint,
         PostInitCallback, Send, Transfer,
     };
     use crate::receiver::receive_nft_msg;
@@ -18,12 +18,13 @@ mod tests {
     use cosmwasm_std::testing::*;
     use cosmwasm_std::{
         from_binary, to_binary, Api, Binary, BlockInfo, CanonicalAddr, Coin, CosmosMsg, Env,
-        Extern, HumanAddr, InitResponse, MessageInfo, StdError, StdResult, Uint128, WasmMsg,
+        Extern, HandleResponse, HumanAddr, InitResponse, MessageInfo, StdError, StdResult, Uint128,
+        WasmMsg,
     };
     use cosmwasm_storage::ReadonlyPrefixedStorage;
 
     use std::any::Any;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashSet;
 
     // Helper functions
 
@@ -100,6 +101,13 @@ mod tests {
                 StdError::GenericErr { msg, .. } => msg,
                 _ => panic!(format!("Unexpected error result {:?}", err)),
             },
+        }
+    }
+
+    fn extract_log(resp: StdResult<HandleResponse>) -> String {
+        match resp {
+            Ok(response) => response.log[0].value.clone(),
+            Err(_err) => "These are not the logs you are looking for".to_string(),
         }
     }
 
@@ -193,6 +201,176 @@ mod tests {
 
     // Handle tests
 
+    // test batch mint
+    #[test]
+    fn test_batch_mint() {
+        let (init_result, mut deps) = init_helper_default();
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        let alice = HumanAddr("alice".to_string());
+        let alice_raw = deps.api.canonical_address(&alice).unwrap();
+        let admin = HumanAddr("admin".to_string());
+        let admin_raw = deps.api.canonical_address(&admin).unwrap();
+        let pub1 = Metadata {
+            name: Some("NFT1".to_string()),
+            description: Some("pub1".to_string()),
+            image: Some("uri1".to_string()),
+        };
+        let priv2 = Metadata {
+            name: Some("NFT2".to_string()),
+            description: Some("priv2".to_string()),
+            image: Some("uri2".to_string()),
+        };
+        let mints = vec![
+            Mint {
+                token_id: None,
+                owner: Some(alice.clone()),
+                public_metadata: Some(pub1.clone()),
+                private_metadata: None,
+                memo: None,
+            },
+            Mint {
+                token_id: Some("NFT2".to_string()),
+                owner: None,
+                public_metadata: None,
+                private_metadata: Some(priv2.clone()),
+                memo: None,
+            },
+            Mint {
+                token_id: Some("NFT3".to_string()),
+                owner: Some(alice.clone()),
+                public_metadata: None,
+                private_metadata: None,
+                memo: None,
+            },
+            Mint {
+                token_id: None,
+                owner: Some(admin.clone()),
+                public_metadata: None,
+                private_metadata: None,
+                memo: Some("has id 3".to_string()),
+            },
+        ];
+
+        // test minting when status prevents it
+        let handle_msg = HandleMsg::SetContractStatus {
+            level: ContractStatus::StopTransactions,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+
+        let handle_msg = HandleMsg::BatchMint {
+            mints: mints.clone(),
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("The contract admin has temporarily disabled this action"));
+
+        let handle_msg = HandleMsg::SetContractStatus {
+            level: ContractStatus::Normal,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+
+        // test non-minter attempt
+        let handle_msg = HandleMsg::BatchMint {
+            mints: mints.clone(),
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Only designated minters are allowed to mint"));
+
+        // sanity check
+        let handle_msg = HandleMsg::BatchMint {
+            mints: mints.clone(),
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let minted = extract_log(handle_result);
+        assert!(minted.contains(r#"["0","NFT2","NFT3","3"]"#));
+        // verify the tokens are in the id and index maps
+        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        assert_eq!(tokens.len(), 4);
+        assert!(tokens.contains("0"));
+        assert!(tokens.contains("NFT2"));
+        assert!(tokens.contains("NFT3"));
+        assert!(tokens.contains("3"));
+        let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
+        let index1: u32 = load(&map2idx, "0".as_bytes()).unwrap();
+        let token_key1 = index1.to_le_bytes();
+        let index2: u32 = load(&map2idx, "NFT2".as_bytes()).unwrap();
+        let token_key2 = index2.to_le_bytes();
+        let index3: u32 = load(&map2idx, "NFT3".as_bytes()).unwrap();
+        let token_key3 = index3.to_le_bytes();
+        let index4: u32 = load(&map2idx, "3".as_bytes()).unwrap();
+        let token_key4 = index4.to_le_bytes();
+        let map2id = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_ID, &deps.storage);
+        let id1: String = load(&map2id, &token_key1).unwrap();
+        assert_eq!("0".to_string(), id1);
+        let id2: String = load(&map2id, &token_key2).unwrap();
+        assert_eq!("NFT2".to_string(), id2);
+        let id3: String = load(&map2id, &token_key3).unwrap();
+        assert_eq!("NFT3".to_string(), id3);
+        let id4: String = load(&map2id, &token_key4).unwrap();
+        assert_eq!("3".to_string(), id4);
+        // verify all the token info
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token1: Token = json_load(&info_store, &token_key1).unwrap();
+        assert_eq!(token1.owner, alice_raw);
+        assert_eq!(token1.permissions, Vec::new());
+        assert!(token1.unwrapped);
+        let token2: Token = json_load(&info_store, &token_key2).unwrap();
+        assert_eq!(token2.owner, admin_raw);
+        assert_eq!(token2.permissions, Vec::new());
+        assert!(token2.unwrapped);
+        // verify the token metadata
+        let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
+        let pub_meta1: Metadata = load(&pub_store, &token_key1).unwrap();
+        assert_eq!(pub_meta1, pub1);
+        let pub_meta2: Option<Metadata> = may_load(&pub_store, &token_key2).unwrap();
+        assert!(pub_meta2.is_none());
+        let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
+        let priv_meta1: Option<Metadata> = may_load(&priv_store, &token_key1).unwrap();
+        assert!(priv_meta1.is_none());
+        let priv_meta2: Metadata = load(&priv_store, &token_key2).unwrap();
+        assert_eq!(priv_meta2, priv2);
+        // verify owner lists
+        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
+        let owned: HashSet<u32> = load(&owned_store, alice_raw.as_slice()).unwrap();
+        assert!(owned.contains(&0));
+        assert!(owned.contains(&2));
+        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
+        let owned: HashSet<u32> = load(&owned_store, admin_raw.as_slice()).unwrap();
+        assert!(owned.contains(&1));
+        assert!(owned.contains(&3));
+        // verify mint tx was logged
+        let txs = get_txs(&deps.api, &deps.storage, &admin_raw, 0, 4).unwrap();
+        assert_eq!(txs.len(), 4);
+        assert_eq!(txs[0].token_id, "3".to_string());
+        assert_eq!(
+            txs[0].action,
+            TxAction::Mint {
+                minter: admin.clone(),
+                recipient: admin,
+            }
+        );
+        assert_eq!(txs[0].memo, Some("has id 3".to_string()));
+
+        let handle_msg = HandleMsg::BatchMint {
+            mints: mints,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Token ID NFT2 is already in use"));
+    }
+
     // test minting
     #[test]
     fn test_mint() {
@@ -271,7 +449,9 @@ mod tests {
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let minted = extract_log(handle_result);
+        assert!(minted.contains("\"MyNFT\""));
         // verify the token is in the id and index maps
         let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
         assert!(tokens.contains("MyNFT"));
@@ -343,7 +523,7 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let error = extract_error_msg(handle_result);
-        assert!(error.contains("Token ID is already in use"));
+        assert!(error.contains("Token ID MyNFT is already in use"));
 
         // test minting without specifying recipient or id
         let handle_msg = HandleMsg::Mint {
@@ -358,7 +538,9 @@ mod tests {
             memo: Some("Admin wants his own".to_string()),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let minted = extract_log(handle_result);
+        assert!(minted.contains("\"1\""));
         // verify token is in the token list
         let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
         assert!(tokens.contains("1"));
