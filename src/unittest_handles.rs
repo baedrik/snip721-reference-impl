@@ -292,8 +292,21 @@ mod tests {
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let minted = extract_log(handle_result);
-        assert!(minted.contains(r#"["0","NFT2","NFT3","3"]"#));
+        let minted_vec = vec![
+            "0".to_string(),
+            "NFT2".to_string(),
+            "NFT3".to_string(),
+            "3".to_string(),
+        ];
+        let handle_answer: HandleAnswer =
+            from_binary(&handle_result.unwrap().data.unwrap()).unwrap();
+        match handle_answer {
+            HandleAnswer::BatchMint { token_ids } => {
+                assert_eq!(token_ids, minted_vec);
+            }
+            _ => panic!("unexpected"),
+        }
+
         // verify the tokens are in the id and index maps
         let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
         assert_eq!(tokens.len(), 4);
@@ -539,8 +552,16 @@ mod tests {
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let minted = extract_log(handle_result);
-        assert!(minted.contains("\"1\""));
+        let minted_str = "1".to_string();
+        let handle_answer: HandleAnswer =
+            from_binary(&handle_result.unwrap().data.unwrap()).unwrap();
+        match handle_answer {
+            HandleAnswer::Mint { token_id } => {
+                assert_eq!(token_id, minted_str);
+            }
+            _ => panic!("unexpected"),
+        }
+
         // verify token is in the token list
         let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
         assert!(tokens.contains("1"));
