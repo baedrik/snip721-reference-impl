@@ -31,7 +31,7 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 		“minter_may_update_metadata”: true_or_false,
 		“owner_may_update_metadata”: true_or_false,
 		“enable_burn”: true_or_false
-		},
+	},
 	“post_init_callback”: {
 		“msg”: “base64_encoded_JSON_representing_the_msg_to_perform_after_initialization”,
 		“contract_address”: “address_of_the_contract_being_called_after_initialization”,
@@ -39,8 +39,8 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 		“send”: [
 			“denom”: “denom_string_for_native_coin_being_sent_with_this_message”,
 			“amount”: “amount_of_native_coin_being_sent”
-			],
-		}
+		],
+	}
 }
 ```
 | Name               | Type              | Description                                                         | Optional | Value If Omitted   |
