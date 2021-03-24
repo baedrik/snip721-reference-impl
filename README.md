@@ -115,6 +115,7 @@ This mints a single token.
 			"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 		}
 }
+```
 
 | Name             | Type                       | Description                                                                                            | Optional | Value If Omitted     |
 |------------------|----------------------------|--------------------------------------------------------------------------------------------------------|----------|----------------------|
