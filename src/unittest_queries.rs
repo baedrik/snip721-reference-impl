@@ -3074,27 +3074,60 @@ mod tests {
         let query_result = query(&deps, query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
-            QueryAnswer::RegisteredCodeHash { code_hash } => {
+            QueryAnswer::RegisteredCodeHash {
+                code_hash,
+                also_implements_batch_receive_nft,
+            } => {
                 assert!(code_hash.is_none());
+                assert!(!also_implements_batch_receive_nft)
             }
             _ => panic!("unexpected"),
         }
 
         let handle_msg = HandleMsg::RegisterReceiveNft {
             code_hash: "Code Hash".to_string(),
+            also_implements_batch_receive_nft: None,
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
 
-        // sanity check
+        // sanity check with default for implements BatchReceiveNft
         let query_msg = QueryMsg::RegisteredCodeHash {
             contract: HumanAddr("alice".to_string()),
         };
         let query_result = query(&deps, query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
-            QueryAnswer::RegisteredCodeHash { code_hash } => {
+            QueryAnswer::RegisteredCodeHash {
+                code_hash,
+                also_implements_batch_receive_nft,
+            } => {
                 assert_eq!(code_hash, Some("Code Hash".to_string()));
+                assert!(!also_implements_batch_receive_nft)
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // sanity check with implementing BatchRegisterReceive
+        let handle_msg = HandleMsg::RegisterReceiveNft {
+            code_hash: "Code Hash".to_string(),
+            also_implements_batch_receive_nft: Some(true),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+
+        let query_msg = QueryMsg::RegisteredCodeHash {
+            contract: HumanAddr("bob".to_string()),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::RegisteredCodeHash {
+                code_hash,
+                also_implements_batch_receive_nft,
+            } => {
+                assert_eq!(code_hash, Some("Code Hash".to_string()));
+                assert!(also_implements_batch_receive_nft)
             }
             _ => panic!("unexpected"),
         }

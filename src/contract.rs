@@ -19,13 +19,13 @@ use crate::msg::{
     Snip721Approval, Transfer, ViewerInfo,
 };
 use crate::rand::sha_256;
-use crate::receiver::receive_nft_msg;
+use crate::receiver::{batch_receive_nft_msg, receive_nft_msg};
 use crate::state::{
     get_txs, json_may_load, json_save, load, may_load, remove, save, store_burn, store_mint,
-    store_transfer, AuthList, Config, Permission, PermissionType, BLOCK_KEY, CONFIG_KEY,
-    MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_MAP_TO_ID,
-    PREFIX_MAP_TO_INDEX, PREFIX_OWNED, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META,
-    PREFIX_RECEIVERS, PREFIX_VIEW_KEY, PRNG_SEED_KEY, TOKENS_KEY,
+    store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, BLOCK_KEY,
+    CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS,
+    PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_OWNED, PREFIX_OWNER_PRIV, PREFIX_PRIV_META,
+    PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY, PRNG_SEED_KEY, TOKENS_KEY,
 };
 use crate::token::{Metadata, Token};
 use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -306,12 +306,17 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             ContractStatus::Normal.to_u8(),
             sends,
         ),
-        HandleMsg::RegisterReceiveNft { code_hash, .. } => register_receive_nft(
+        HandleMsg::RegisterReceiveNft {
+            code_hash,
+            also_implements_batch_receive_nft,
+            ..
+        } => register_receive_nft(
             deps,
             env,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             code_hash,
+            also_implements_batch_receive_nft,
         ),
         HandleMsg::BurnNft { token_id, memo, .. } => burn_nft(
             deps,
@@ -984,7 +989,10 @@ fn burn_nft<S: Storage, A: Api, Q: Querier>(
         ));
     }
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    let mut burns = vec![Burn { token_id, memo }];
+    let mut burns = vec![Burn {
+        token_ids: vec![token_id],
+        memo,
+    }];
     burn_list(deps, &env.block, config, &sender_raw, &mut burns)?;
     let res = HandleResponse {
         messages: vec![],
@@ -1052,7 +1060,7 @@ pub fn transfer_nft<S: Storage, A: Api, Q: Querier>(
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     let transfers = Some(vec![Transfer {
         recipient,
-        token_id,
+        token_ids: vec![token_id],
         memo,
     }]);
     let _m = send_list(deps, &env, config, &sender_raw, transfers, None)?;
@@ -1126,7 +1134,7 @@ fn send_nft<S: Storage, A: Api, Q: Querier>(
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     let sends = Some(vec![Send {
         contract,
-        token_id,
+        token_ids: vec![token_id],
         msg,
         memo,
     }]);
@@ -1151,17 +1159,23 @@ fn send_nft<S: Storage, A: Api, Q: Querier>(
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `code_hash` - code hash String of the registering contract
-fn register_receive_nft<S: Storage, A: Api, Q: Querier>(
+/// * `impl_batch` - optionally true if the contract also implements BatchReceiveNft
+pub fn register_receive_nft<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     config: &Config,
     priority: u8,
     code_hash: String,
+    impl_batch: Option<bool>,
 ) -> HandleResult {
     check_status(config.status, priority)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let regrec = ReceiveRegistration {
+        code_hash,
+        impl_batch: impl_batch.unwrap_or(false),
+    };
     let mut store = PrefixedStorage::new(PREFIX_RECEIVERS, &mut deps.storage);
-    save(&mut store, sender_raw.as_slice(), &code_hash)?;
+    save(&mut store, sender_raw.as_slice(), &regrec)?;
     let res = HandleResponse {
         messages: vec![],
         log: vec![],
@@ -2321,7 +2335,7 @@ pub fn query_verify_approval<S: Storage, A: Api, Q: Querier>(
 }
 
 /// Returns QueryResult displaying the registered code hash of the specified contract if
-/// it has registered
+/// it has registered and whether the contract implements BatchReceiveNft
 ///
 /// # Arguments
 ///
@@ -2333,8 +2347,17 @@ pub fn query_code_hash<S: Storage, A: Api, Q: Querier>(
 ) -> QueryResult {
     let contract_raw = deps.api.canonical_address(contract)?;
     let store = ReadonlyPrefixedStorage::new(PREFIX_RECEIVERS, &deps.storage);
-    let code_hash: Option<String> = may_load(&store, contract_raw.as_slice())?;
-    to_binary(&QueryAnswer::RegisteredCodeHash { code_hash })
+    let may_reg_rec: Option<ReceiveRegistration> = may_load(&store, contract_raw.as_slice())?;
+    if let Some(reg_rec) = may_reg_rec {
+        return to_binary(&QueryAnswer::RegisteredCodeHash {
+            code_hash: Some(reg_rec.code_hash),
+            also_implements_batch_receive_nft: reg_rec.impl_batch,
+        });
+    }
+    to_binary(&QueryAnswer::RegisteredCodeHash {
+        code_hash: None,
+        also_implements_batch_receive_nft: false,
+    })
 }
 
 // bundled info when prepping an authenticated token query
@@ -3440,61 +3463,86 @@ fn alter_perm_list(
     updated
 }
 
-// a receiver and their code hash
+// a receiver, their code hash, and whether they implement BatchReceiveNft
 pub struct ReceiverInfo {
-    // the contract address slice
+    // the contract address
     pub contract: CanonicalAddr,
-    // its code hash
-    pub code_hash: String,
+    // the contract's registration info
+    pub registration: ReceiveRegistration,
 }
 
-/// Returns a StdResult<Option<CosmosMsg>> used to call a registered contract's ReceiveNft
-/// if it has been registered
+/// Returns a StdResult<Vec<CosmosMsg>> list of ReceiveNft and BatchReceiveNft callacks that
+/// should be done resulting from one Send
 ///
 /// # Arguments
 ///
 /// * `storage` - a reference to this contract's storage
-/// * `contract_human` - the human address of the contract receiving the token
-/// * `contract` - the canonical address of the contract receiving the token
-/// * `token_id` - ID String of the token that was sent
-/// * `msg` - optional msg used to control ReceiveNft logic
-/// * `sender` - the address that is sending the token
-/// * `from` - the address of the former owner of the sent token
-/// * `receivers` - a mutable reference the list of receiver contracts and their code hashes
-#[allow(clippy::too_many_arguments)]
-fn receiver_callback_msg<S: ReadonlyStorage>(
+/// * `contract_human` - a reference to the human address of the contract receiving the tokens
+/// * `contract` - a reference to the canonical address of the contract receiving the tokens
+/// * `send_from_list` - list of SendFroms containing all the owners and their tokens being sent
+/// * `msg` - a reference to the optional msg used to control ReceiveNft logic
+/// * `sender` - a reference to the address that is sending the tokens
+/// * `receivers` - a mutable reference the list of receiver contracts and their registration
+///                 info
+fn receiver_callback_msgs<S: ReadonlyStorage>(
     storage: &S,
-    contract_human: HumanAddr,
-    contract: CanonicalAddr,
-    token_id: String,
-    msg: Option<Binary>,
-    sender: HumanAddr,
-    from: HumanAddr,
+    contract_human: &HumanAddr,
+    contract: &CanonicalAddr,
+    send_from_list: Vec<SendFrom>,
+    msg: &Option<Binary>,
+    sender: &HumanAddr,
     receivers: &mut Vec<ReceiverInfo>,
-) -> StdResult<Option<CosmosMsg>> {
-    let code_hash = if let Some(receiver) = receivers.iter().find(|&r| r.contract == contract) {
-        receiver.code_hash.clone()
-    } else {
-        let store = ReadonlyPrefixedStorage::new(PREFIX_RECEIVERS, storage);
-        let hash: String = may_load(&store, contract.as_slice())?.unwrap_or_else(String::new);
-        let receiver = ReceiverInfo {
-            contract,
-            code_hash: hash.clone(),
+) -> StdResult<Vec<CosmosMsg>> {
+    let (code_hash, impl_batch) =
+        if let Some(receiver) = receivers.iter().find(|&r| r.contract == *contract) {
+            (
+                receiver.registration.code_hash.clone(),
+                receiver.registration.impl_batch,
+            )
+        } else {
+            let store = ReadonlyPrefixedStorage::new(PREFIX_RECEIVERS, storage);
+            let registration: ReceiveRegistration = may_load(&store, contract.as_slice())?
+                .unwrap_or(ReceiveRegistration {
+                    code_hash: String::new(),
+                    impl_batch: false,
+                });
+            let receiver = ReceiverInfo {
+                contract: contract.clone(),
+                registration: registration.clone(),
+            };
+            receivers.push(receiver);
+            (registration.code_hash, registration.impl_batch)
         };
-        receivers.push(receiver);
-        hash
-    };
     if code_hash.is_empty() {
-        return Ok(None);
+        return Ok(Vec::new());
     }
-    Ok(Some(receive_nft_msg(
-        sender,
-        from,
-        token_id,
-        msg,
-        code_hash,
-        contract_human,
-    )?))
+    let mut callbacks: Vec<CosmosMsg> = Vec::new();
+    for send_from in send_from_list.into_iter() {
+        // if BatchReceiveNft is implemented, use it
+        if impl_batch {
+            callbacks.push(batch_receive_nft_msg(
+                sender.clone(),
+                send_from.owner,
+                send_from.token_ids,
+                msg.clone(),
+                code_hash.clone(),
+                contract_human.clone(),
+            )?);
+        //otherwise do a bunch of BatchReceiveNft
+        } else {
+            for token_id in send_from.token_ids.into_iter() {
+                callbacks.push(receive_nft_msg(
+                    sender.clone(),
+                    send_from.owner.clone(),
+                    token_id,
+                    msg.clone(),
+                    code_hash.clone(),
+                    contract_human.clone(),
+                )?);
+            }
+        }
+    }
+    Ok(callbacks)
 }
 
 // information about how an owner's token inventory has changed
@@ -3605,30 +3653,32 @@ fn transfer_impl<S: Storage, A: Api, Q: Querier>(
     json_save(&mut info_store, &idx.to_le_bytes(), &token)?;
     // log the inventory changes
     for addr in update_addrs.into_iter() {
-        let mut new_inv = InventoryUpdate {
-            owner: addr,
-            retain: HashSet::new(),
-            remove: HashSet::new(),
-        };
-        let (update, found) =
-            if let Some(inv) = inv_updates.iter_mut().find(|i| i.owner == new_inv.owner) {
-                (inv, true)
+        if let Some(inv) = inv_updates.iter_mut().find(|i| i.owner == addr) {
+            // if updating the recipient's inventory
+            if inv.owner == recipient {
+                inv.retain.insert(idx);
+            // otherwise updating the old owner's inventory
             } else {
-                let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-                let retain: HashSet<u32> =
-                    may_load(&owned_store, new_inv.owner.as_slice())?.unwrap_or_else(HashSet::new);
-                new_inv.retain = retain;
-                (&mut new_inv, false)
-            };
-        // if updating the recipient's inventory
-        if update.owner == recipient {
-            update.retain.insert(idx);
-        // otherwise updating the old owner's inventory
+                inv.retain.remove(&idx);
+                inv.remove.insert(idx);
+            }
         } else {
-            update.retain.remove(&idx);
-            update.remove.insert(idx);
-        }
-        if !found {
+            let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
+            let retain: HashSet<u32> =
+                may_load(&owned_store, addr.as_slice())?.unwrap_or_else(HashSet::new);
+            let mut new_inv = InventoryUpdate {
+                owner: addr,
+                retain,
+                remove: HashSet::new(),
+            };
+            // if updating the recipient's inventory
+            if new_inv.owner == recipient {
+                new_inv.retain.insert(idx);
+            // otherwise updating the old owner's inventory
+            } else {
+                new_inv.retain.remove(&idx);
+                new_inv.remove.insert(idx);
+            }
             inv_updates.push(new_inv);
         }
     }
@@ -3650,6 +3700,14 @@ fn transfer_impl<S: Storage, A: Api, Q: Querier>(
         memo,
     )?;
     Ok(old_owner)
+}
+
+// list of tokens sent from one previous owner
+pub struct SendFrom {
+    // the owner's address
+    pub owner: HumanAddr,
+    // the tokens that were sent
+    pub token_ids: Vec<String>,
 }
 
 /// Returns StdResult<Vec<CosmosMsg>>
@@ -3679,48 +3737,59 @@ fn send_list<S: Storage, A: Api, Q: Querier>(
     if let Some(mut xfers) = transfers {
         for xfer in xfers.drain(..) {
             let recipient_raw = deps.api.canonical_address(&xfer.recipient)?;
-            let _o = transfer_impl(
-                deps,
-                &env.block,
-                config,
-                sender,
-                xfer.token_id,
-                recipient_raw,
-                &mut oper_for,
-                &mut inv_updates,
-                xfer.memo,
-            )?;
+            for token_id in xfer.token_ids.into_iter() {
+                let _o = transfer_impl(
+                    deps,
+                    &env.block,
+                    config,
+                    sender,
+                    token_id,
+                    recipient_raw.clone(),
+                    &mut oper_for,
+                    &mut inv_updates,
+                    xfer.memo.clone(),
+                )?;
+            }
         }
     } else if let Some(mut snds) = sends {
         let mut receivers = Vec::new();
         for send in snds.drain(..) {
             let contract_raw = deps.api.canonical_address(&send.contract)?;
-            let owner_raw = transfer_impl(
-                deps,
-                &env.block,
-                config,
-                sender,
-                send.token_id.clone(),
-                contract_raw.clone(),
-                &mut oper_for,
-                &mut inv_updates,
-                send.memo,
-            )?;
-            let owner = deps.api.human_address(&owner_raw)?;
-            // perform ReceiveNft callback if the receiving contract registered
-            let may_callback = receiver_callback_msg(
-                &deps.storage,
-                send.contract,
-                contract_raw,
-                send.token_id,
-                send.msg,
-                env.message.sender.clone(),
-                owner,
-                &mut receivers,
-            )?;
-            if let Some(msg) = may_callback {
-                messages.push(msg);
+            let mut send_from_list: Vec<SendFrom> = Vec::new();
+            for token_id in send.token_ids.into_iter() {
+                let owner_raw = transfer_impl(
+                    deps,
+                    &env.block,
+                    config,
+                    sender,
+                    token_id.clone(),
+                    contract_raw.clone(),
+                    &mut oper_for,
+                    &mut inv_updates,
+                    send.memo.clone(),
+                )?;
+                // compile list of all tokens being sent from each owner in this Send
+                let owner = deps.api.human_address(&owner_raw)?;
+                if let Some(sd_fm) = send_from_list.iter_mut().find(|s| s.owner == owner) {
+                    sd_fm.token_ids.push(token_id.clone());
+                } else {
+                    let new_sd_fm = SendFrom {
+                        owner,
+                        token_ids: vec![token_id.clone()],
+                    };
+                    send_from_list.push(new_sd_fm);
+                }
             }
+            // get BatchReceiveNft and ReceiveNft msgs for all the tokens sent in this Send
+            messages.extend(receiver_callback_msgs(
+                &deps.storage,
+                &send.contract,
+                &contract_raw,
+                send_from_list,
+                &send.msg,
+                &env.message.sender,
+                &mut receivers,
+            )?);
         }
     }
     save(&mut deps.storage, CONFIG_KEY, &config)?;
@@ -3752,66 +3821,64 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
     let mut tokens: HashSet<String> =
         may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(HashSet::new);
     for burn in burns.drain(..) {
-        let (token, idx) = get_token_if_permitted(
-            deps,
-            block,
-            &burn.token_id,
-            Some(sender),
-            PermissionType::Transfer,
-            &mut oper_for,
-            &config,
-        )?;
-        // log the inventory change
-        let mut new_inv = InventoryUpdate {
-            owner: token.owner.clone(),
-            retain: HashSet::new(),
-            remove: HashSet::new(),
-        };
-        let (update, found) =
-            if let Some(inv) = inv_updates.iter_mut().find(|i| i.owner == new_inv.owner) {
-                (inv, true)
+        for token_id in burn.token_ids.into_iter() {
+            let (token, idx) = get_token_if_permitted(
+                deps,
+                block,
+                &token_id,
+                Some(sender),
+                PermissionType::Transfer,
+                &mut oper_for,
+                &config,
+            )?;
+            // log the inventory change
+            if let Some(inv) = inv_updates.iter_mut().find(|i| i.owner == token.owner) {
+                inv.retain.remove(&idx);
+                inv.remove.insert(idx);
             } else {
                 let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
                 let retain: HashSet<u32> =
-                    may_load(&owned_store, new_inv.owner.as_slice())?.unwrap_or_else(HashSet::new);
-                new_inv.retain = retain;
-                (&mut new_inv, false)
+                    may_load(&owned_store, token.owner.as_slice())?.unwrap_or_else(HashSet::new);
+                let mut new_inv = InventoryUpdate {
+                    owner: token.owner.clone(),
+                    retain,
+                    remove: HashSet::new(),
+                };
+                new_inv.retain.remove(&idx);
+                new_inv.remove.insert(idx);
+                inv_updates.push(new_inv);
+            }
+            let token_key = idx.to_le_bytes();
+            // remove from token list and maps
+            tokens.remove(&token_id);
+            let mut map2idx = PrefixedStorage::new(PREFIX_MAP_TO_INDEX, &mut deps.storage);
+            remove(&mut map2idx, token_id.as_bytes());
+            let mut map2id = PrefixedStorage::new(PREFIX_MAP_TO_ID, &mut deps.storage);
+            remove(&mut map2id, &token_key);
+            // remove the token info
+            let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
+            remove(&mut info_store, &token_key);
+            // remove metadata if existent
+            let mut pub_store = PrefixedStorage::new(PREFIX_PUB_META, &mut deps.storage);
+            remove(&mut pub_store, &token_key);
+            let mut priv_store = PrefixedStorage::new(PREFIX_PRIV_META, &mut deps.storage);
+            remove(&mut priv_store, &token_key);
+            let brnr = if token.owner == *sender {
+                None
+            } else {
+                Some(sender.clone())
             };
-        let token_key = idx.to_le_bytes();
-        update.retain.remove(&idx);
-        update.remove.insert(idx);
-        if !found {
-            inv_updates.push(new_inv);
+            // store the tx
+            store_burn(
+                &mut deps.storage,
+                config,
+                block.height,
+                token_id,
+                token.owner,
+                brnr,
+                burn.memo.clone(),
+            )?;
         }
-        // remove from token list and maps
-        tokens.remove(&burn.token_id);
-        let mut map2idx = PrefixedStorage::new(PREFIX_MAP_TO_INDEX, &mut deps.storage);
-        remove(&mut map2idx, burn.token_id.as_bytes());
-        let mut map2id = PrefixedStorage::new(PREFIX_MAP_TO_ID, &mut deps.storage);
-        remove(&mut map2id, &token_key);
-        // remove the token info
-        let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
-        remove(&mut info_store, &token_key);
-        // remove metadata if existent
-        let mut pub_store = PrefixedStorage::new(PREFIX_PUB_META, &mut deps.storage);
-        remove(&mut pub_store, &token_key);
-        let mut priv_store = PrefixedStorage::new(PREFIX_PRIV_META, &mut deps.storage);
-        remove(&mut priv_store, &token_key);
-        let brnr = if token.owner == *sender {
-            None
-        } else {
-            Some(sender.clone())
-        };
-        // store the tx
-        store_burn(
-            &mut deps.storage,
-            config,
-            block.height,
-            burn.token_id,
-            token.owner,
-            brnr,
-            burn.memo,
-        )?;
     }
     save(&mut deps.storage, CONFIG_KEY, &config)?;
     save(&mut deps.storage, TOKENS_KEY, &tokens)?;

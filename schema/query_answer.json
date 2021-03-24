@@ -543,7 +543,13 @@
       "properties": {
         "registered_code_hash": {
           "type": "object",
+          "required": [
+            "also_implements_batch_receive_nft"
+          ],
           "properties": {
+            "also_implements_batch_receive_nft": {
+              "type": "boolean"
+            },
             "code_hash": {
               "type": [
                 "string",

@@ -3,6 +3,7 @@
   "title": "HandleAnswer",
   "anyOf": [
     {
+      "description": "Mint will also display the minted token's ID in the log attributes under the key `minted` in case minting was down as a callback message",
       "type": "object",
       "required": [
         "mint"
@@ -22,6 +23,7 @@
       }
     },
     {
+      "description": "Mint will also display the minted tokens' IDs in the log attributes under the key `minted` in case minting was down as a callback message",
       "type": "object",
       "required": [
         "batch_mint"

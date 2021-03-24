@@ -79,7 +79,7 @@
       "type": "string"
     },
     "InitConfig": {
-      "description": "This type represents optional configuration values which can be overridden. All values are optional and have defaults which are more private by default, but can be overridden if necessary",
+      "description": "This type represents optional configuration values. All values are optional and have defaults which are more private by default, but can be overridden if necessary",
       "type": "object",
       "properties": {
         "enable_burn": {
@@ -90,7 +90,7 @@
           ]
         },
         "enable_sealed_metadata": {
-          "description": "indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the private metadata is not viewable by anyone, not even the owner, until the owner calls the Reveal function.  When Reveal is called, the sealed metadata is irreversibly moved to the public metadata (as default).  if unwrapped_metadata_is_private is set to true, it will remain as private metadata, but the owner will now be able to see it.  Anyone will be able to query the token to know that it has been unwrapped.  This simulates buying/selling a wrapped card that non one knows which card it is until it is unwrapped. If sealed metadata is not enabled, all tokens are considered unwrapped default:  False",
+          "description": "indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the private metadata is not viewable by anyone, not even the owner, until the owner calls the Reveal function.  When Reveal is called, the sealed metadata is irreversibly moved to the public metadata (as default).  if unwrapped_metadata_is_private is set to true, it will remain as private metadata, but the owner will now be able to see it.  Anyone will be able to query the token to know that it has been unwrapped.  This simulates buying/selling a wrapped card that no one knows which card it is until it is unwrapped. If sealed metadata is not enabled, all tokens are considered unwrapped default:  False",
           "type": [
             "boolean",
             "null"

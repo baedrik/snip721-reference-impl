@@ -1,17 +1,18 @@
 #[cfg(test)]
 mod tests {
-    use crate::contract::{check_permission, handle, init};
+    use crate::contract::{check_permission, handle, init, query};
     use crate::expiration::Expiration;
     use crate::msg::{
         AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg, Mint,
-        PostInitCallback, Send, Transfer,
+        PostInitCallback, QueryAnswer, QueryMsg, Send, Transfer,
     };
-    use crate::receiver::receive_nft_msg;
+    use crate::receiver::{receive_nft_msg, Snip721ReceiveMsg};
     use crate::state::{
         get_txs, json_load, json_may_load, load, may_load, AuthList, Config, Permission,
-        PermissionType, TxAction, CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
-        PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_OWNED, PREFIX_OWNER_PRIV,
-        PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY, TOKENS_KEY,
+        PermissionType, Tx, TxAction, CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS,
+        PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_OWNED,
+        PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY,
+        TOKENS_KEY,
     };
     use crate::token::{Metadata, Token};
     use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -22,7 +23,7 @@ mod tests {
         WasmMsg,
     };
     use cosmwasm_storage::ReadonlyPrefixedStorage;
-
+    use secret_toolkit::utils::space_pad;
     use std::any::Any;
     use std::collections::HashSet;
 
@@ -4956,23 +4957,19 @@ mod tests {
         // test bob burning a list, but trying to burn the same token twice
         let burns = vec![
             Burn {
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string(), "NFT3".to_string()],
                 memo: None,
             },
             Burn {
-                token_id: "NFT3".to_string(),
+                token_ids: vec!["NFT6".to_string()],
                 memo: None,
             },
             Burn {
-                token_id: "NFT6".to_string(),
+                token_ids: vec!["NFT6".to_string()],
                 memo: None,
             },
             Burn {
-                token_id: "NFT6".to_string(),
-                memo: None,
-            },
-            Burn {
-                token_id: "NFT8".to_string(),
+                token_ids: vec!["NFT8".to_string()],
                 memo: Some("Phew!".to_string()),
             },
         ];
@@ -5180,23 +5177,16 @@ mod tests {
         // test bob burning a list, but one is not authorized
         let burns = vec![
             Burn {
-                token_id: "NFT1".to_string(),
+                token_ids: vec![
+                    "NFT1".to_string(),
+                    "NFT3".to_string(),
+                    "NFT6".to_string(),
+                    "NFT2".to_string(),
+                ],
                 memo: None,
             },
             Burn {
-                token_id: "NFT3".to_string(),
-                memo: None,
-            },
-            Burn {
-                token_id: "NFT6".to_string(),
-                memo: None,
-            },
-            Burn {
-                token_id: "NFT2".to_string(),
-                memo: None,
-            },
-            Burn {
-                token_id: "NFT8".to_string(),
+                token_ids: vec!["NFT8".to_string()],
                 memo: Some("Phew!".to_string()),
             },
         ];
@@ -5404,23 +5394,15 @@ mod tests {
         // and burning NFT7 and NFT8 with ALL permission
         let burns = vec![
             Burn {
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
             Burn {
-                token_id: "NFT3".to_string(),
+                token_ids: vec!["NFT3".to_string()],
                 memo: None,
             },
             Burn {
-                token_id: "NFT6".to_string(),
-                memo: None,
-            },
-            Burn {
-                token_id: "NFT7".to_string(),
-                memo: None,
-            },
-            Burn {
-                token_id: "NFT8".to_string(),
+                token_ids: vec!["NFT6".to_string(), "NFT7".to_string(), "NFT8".to_string()],
                 memo: Some("Phew!".to_string()),
             },
         ];
@@ -5583,8 +5565,8 @@ mod tests {
         let charlie_list: Option<Vec<AuthList>> = may_load(&auth_store, charlie_key).unwrap();
         assert!(charlie_list.is_none());
         // confirm one of the txs
-        let txs = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
-        assert_eq!(txs.len(), 1);
+        let txs = get_txs(&deps.api, &deps.storage, &bob_raw, 0, 3).unwrap();
+        assert_eq!(txs.len(), 3);
         assert_eq!(txs[0].token_id, "NFT8".to_string());
         assert_eq!(
             txs[0].action,
@@ -5594,8 +5576,10 @@ mod tests {
             }
         );
         assert_eq!(txs[0].memo, Some("Phew!".to_string()));
-        let tx2 = get_txs(&deps.api, &deps.storage, &bob_raw, 0, 1).unwrap();
-        assert_eq!(txs, tx2);
+        assert_eq!(txs[1].memo, Some("Phew!".to_string()));
+        assert_eq!(txs[2].memo, Some("Phew!".to_string()));
+        let tx2 = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
+        assert_eq!(txs[0], tx2[0]);
     }
 
     // test transfer
@@ -6177,7 +6161,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let transfers = vec![Transfer {
             recipient: HumanAddr("bob".to_string()),
-            token_id: "MyNFT".to_string(),
+            token_ids: vec!["MyNFT".to_string()],
             memo: None,
         }];
         let handle_msg = HandleMsg::BatchTransferNft {
@@ -6203,7 +6187,7 @@ mod tests {
         );
         let transfers = vec![Transfer {
             recipient: HumanAddr("bob".to_string()),
-            token_id: "MyNFT".to_string(),
+            token_ids: vec!["MyNFT".to_string()],
             memo: None,
         }];
 
@@ -6250,58 +6234,51 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
-            token_id: Some("NFT1".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
-            private_metadata: None,
-            public_metadata: None,
-            memo: None,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-
-        let handle_msg = HandleMsg::Mint {
-            token_id: Some("NFT2".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
-            private_metadata: None,
-            public_metadata: None,
-            memo: None,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
-            token_id: Some("NFT3".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
-            private_metadata: None,
-            public_metadata: None,
-            memo: None,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
-            token_id: Some("NFT4".to_string()),
-            owner: Some(HumanAddr("bob".to_string())),
-            private_metadata: None,
-            public_metadata: None,
-            memo: None,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
-            token_id: Some("NFT5".to_string()),
-            owner: Some(HumanAddr("bob".to_string())),
-            private_metadata: None,
-            public_metadata: None,
-            memo: None,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
-            token_id: Some("NFT6".to_string()),
-            owner: Some(HumanAddr("charlie".to_string())),
-            private_metadata: None,
-            public_metadata: None,
-            memo: None,
+        let handle_msg = HandleMsg::BatchMint {
+            mints: vec![
+                Mint {
+                    token_id: Some("NFT1".to_string()),
+                    owner: Some(HumanAddr("alice".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT2".to_string()),
+                    owner: Some(HumanAddr("alice".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT3".to_string()),
+                    owner: Some(HumanAddr("alice".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT4".to_string()),
+                    owner: Some(HumanAddr("bob".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT5".to_string()),
+                    owner: Some(HumanAddr("bob".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT6".to_string()),
+                    owner: Some(HumanAddr("charlie".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+            ],
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
@@ -6418,22 +6395,22 @@ mod tests {
         let transfers = vec![
             Transfer {
                 recipient: HumanAddr("charlie".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
             Transfer {
                 recipient: HumanAddr("alice".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
             Transfer {
                 recipient: HumanAddr("bob".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
             Transfer {
                 recipient: HumanAddr("david".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
         ];
@@ -6628,17 +6605,17 @@ mod tests {
         let transfers = vec![
             Transfer {
                 recipient: HumanAddr("charlie".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
             Transfer {
                 recipient: HumanAddr("alice".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
             Transfer {
                 recipient: HumanAddr("bob".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
         ];
@@ -6745,17 +6722,17 @@ mod tests {
         let transfers = vec![
             Transfer {
                 recipient: HumanAddr("charlie".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
             Transfer {
                 recipient: HumanAddr("alice".to_string()),
-                token_id: "NFT5".to_string(),
+                token_ids: vec!["NFT5".to_string()],
                 memo: None,
             },
             Transfer {
                 recipient: HumanAddr("bob".to_string()),
-                token_id: "NFT3".to_string(),
+                token_ids: vec!["NFT3".to_string()],
                 memo: None,
             },
         ];
@@ -6816,6 +6793,201 @@ mod tests {
         assert_eq!(bob_auth.tokens[view_meta_idx].len(), 1);
         assert!(bob_auth.tokens[view_meta_idx].contains(&5u32));
         assert!(bob_auth.tokens[transfer_idx].is_empty());
+
+        // set up for batch transfer test
+        let (init_result, mut deps) =
+            init_helper_with_config(false, false, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+        let handle_msg = HandleMsg::BatchMint {
+            mints: vec![
+                Mint {
+                    token_id: Some("NFT1".to_string()),
+                    owner: Some(HumanAddr("alice".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT2".to_string()),
+                    owner: Some(HumanAddr("alice".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT3".to_string()),
+                    owner: Some(HumanAddr("alice".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT4".to_string()),
+                    owner: Some(HumanAddr("bob".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT5".to_string()),
+                    owner: Some(HumanAddr("bob".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT6".to_string()),
+                    owner: Some(HumanAddr("charlie".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+            ],
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: None,
+            transfer: Some(AccessLevel::All),
+            expires: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: None,
+            transfer: Some(AccessLevel::All),
+            expires: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+
+        let handle_msg = HandleMsg::BatchTransferNft {
+            transfers: vec![
+                Transfer {
+                    recipient: HumanAddr("charlie".to_string()),
+                    token_ids: vec!["NFT2".to_string(), "NFT3".to_string(), "NFT4".to_string()],
+                    memo: Some("test memo".to_string()),
+                },
+                Transfer {
+                    recipient: HumanAddr("charlie".to_string()),
+                    token_ids: vec!["NFT1".to_string(), "NFT5".to_string()],
+                    memo: None,
+                },
+            ],
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: "ckey".to_string(),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+        // confirm charlie's tokens
+        let query_msg = QueryMsg::Tokens {
+            owner: HumanAddr("charlie".to_string()),
+            viewer: None,
+            viewing_key: Some("ckey".to_string()),
+            start_after: None,
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TokenList { tokens } => {
+                let expected = vec![
+                    "NFT1".to_string(),
+                    "NFT2".to_string(),
+                    "NFT3".to_string(),
+                    "NFT4".to_string(),
+                    "NFT5".to_string(),
+                    "NFT6".to_string(),
+                ];
+                assert_eq!(tokens, expected);
+            }
+            _ => panic!("unexpected"),
+        }
+        let xfer4 = Tx {
+            tx_id: 8,
+            blockheight: 12345,
+            token_id: "NFT4".to_string(),
+            memo: Some("test memo".to_string()),
+            action: TxAction::Transfer {
+                from: HumanAddr("bob".to_string()),
+                sender: None,
+                recipient: HumanAddr("charlie".to_string()),
+            },
+        };
+        let xfer1 = Tx {
+            tx_id: 9,
+            blockheight: 12345,
+            token_id: "NFT1".to_string(),
+            memo: None,
+            action: TxAction::Transfer {
+                from: HumanAddr("alice".to_string()),
+                sender: Some(HumanAddr("bob".to_string())),
+                recipient: HumanAddr("charlie".to_string()),
+            },
+        };
+        let query_msg = QueryMsg::TransactionHistory {
+            address: HumanAddr("charlie".to_string()),
+            viewing_key: "ckey".to_string(),
+            page: None,
+            page_size: None,
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TransactionHistory { txs } => {
+                assert_eq!(txs[1], xfer1);
+                assert_eq!(txs[2], xfer4);
+            }
+            _ => panic!("unexpected"),
+        }
+        let query_msg = QueryMsg::TransactionHistory {
+            address: HumanAddr("charlie".to_string()),
+            viewing_key: "ckey".to_string(),
+            page: None,
+            page_size: None,
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TransactionHistory { txs } => {
+                assert_eq!(txs[1], xfer1);
+                assert_eq!(txs[2], xfer4);
+            }
+            _ => panic!("unexpected"),
+        }
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: "akey".to_string(),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let query_msg = QueryMsg::Tokens {
+            owner: HumanAddr("alice".to_string()),
+            viewer: None,
+            viewing_key: Some("akey".to_string()),
+            start_after: None,
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TokenList { tokens } => {
+                assert!(tokens.is_empty());
+            }
+            _ => panic!("unexpected"),
+        }
     }
 
     // test send
@@ -7049,6 +7221,7 @@ mod tests {
         // erase the current permissions
         let handle_msg = HandleMsg::RegisterReceiveNft {
             code_hash: "alice code hash".to_string(),
+            also_implements_batch_receive_nft: None,
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
@@ -7172,6 +7345,7 @@ mod tests {
         // register david's ReceiveNft
         let handle_msg = HandleMsg::RegisterReceiveNft {
             code_hash: "david code hash".to_string(),
+            also_implements_batch_receive_nft: None,
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("david", &[]), handle_msg);
@@ -7282,6 +7456,7 @@ mod tests {
         // register charlie's ReceiveNft
         let handle_msg = HandleMsg::RegisterReceiveNft {
             code_hash: "charlie code hash".to_string(),
+            also_implements_batch_receive_nft: None,
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
@@ -7477,7 +7652,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let sends = vec![Send {
             contract: HumanAddr("bob".to_string()),
-            token_id: "MyNFT".to_string(),
+            token_ids: vec!["MyNFT".to_string()],
             msg: None,
             memo: None,
         }];
@@ -7504,7 +7679,7 @@ mod tests {
         );
         let sends = vec![Send {
             contract: HumanAddr("bob".to_string()),
-            token_id: "MyNFT".to_string(),
+            token_ids: vec!["MyNFT".to_string()],
             msg: None,
             memo: None,
         }];
@@ -7719,11 +7894,13 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
         let handle_msg = HandleMsg::RegisterReceiveNft {
             code_hash: "bob code hash".to_string(),
+            also_implements_batch_receive_nft: None,
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
         let handle_msg = HandleMsg::RegisterReceiveNft {
             code_hash: "charlie code hash".to_string(),
+            also_implements_batch_receive_nft: None,
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
@@ -7738,19 +7915,19 @@ mod tests {
         let sends = vec![
             Send {
                 contract: HumanAddr("charlie".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
             Send {
                 contract: HumanAddr("alice".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
             Send {
                 contract: HumanAddr("bob".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
@@ -7881,19 +8058,19 @@ mod tests {
         let sends = vec![
             Send {
                 contract: HumanAddr("charlie".to_string()),
-                token_id: "NFT1".to_string(),
+                token_ids: vec!["NFT1".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
             Send {
                 contract: HumanAddr("alice".to_string()),
-                token_id: "NFT5".to_string(),
+                token_ids: vec!["NFT5".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
             Send {
                 contract: HumanAddr("bob".to_string()),
-                token_id: "NFT3".to_string(),
+                token_ids: vec!["NFT3".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
@@ -7978,6 +8155,279 @@ mod tests {
         assert_eq!(bob_auth.tokens[view_meta_idx].len(), 1);
         assert!(bob_auth.tokens[view_meta_idx].contains(&5u32));
         assert!(bob_auth.tokens[transfer_idx].is_empty());
+
+        // set up for batch send test
+        let (init_result, mut deps) =
+            init_helper_with_config(false, false, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+        let handle_msg = HandleMsg::BatchMint {
+            mints: vec![
+                Mint {
+                    token_id: Some("NFT1".to_string()),
+                    owner: Some(HumanAddr("alice".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT2".to_string()),
+                    owner: Some(HumanAddr("alice".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT3".to_string()),
+                    owner: Some(HumanAddr("alice".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT4".to_string()),
+                    owner: Some(HumanAddr("bob".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT5".to_string()),
+                    owner: Some(HumanAddr("bob".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+                Mint {
+                    token_id: Some("NFT6".to_string()),
+                    owner: Some(HumanAddr("charlie".to_string())),
+                    private_metadata: None,
+                    public_metadata: None,
+                    memo: None,
+                },
+            ],
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: None,
+            transfer: Some(AccessLevel::All),
+            expires: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: None,
+            view_owner: None,
+            view_private_metadata: None,
+            transfer: Some(AccessLevel::All),
+            expires: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+        let handle_msg = HandleMsg::RegisterReceiveNft {
+            code_hash: "alice code hash".to_string(),
+            also_implements_batch_receive_nft: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_msg = HandleMsg::RegisterReceiveNft {
+            code_hash: "charlie code hash".to_string(),
+            also_implements_batch_receive_nft: Some(true),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+        let send_msg = Some(
+            to_binary(&HandleMsg::RevokeAll {
+                operator: HumanAddr("zoe".to_string()),
+                padding: None,
+            })
+            .unwrap(),
+        );
+        let handle_msg = HandleMsg::BatchSendNft {
+            sends: vec![
+                Send {
+                    contract: HumanAddr("charlie".to_string()),
+                    token_ids: vec!["NFT2".to_string(), "NFT3".to_string(), "NFT4".to_string()],
+                    msg: send_msg.clone(),
+                    memo: Some("test memo".to_string()),
+                },
+                Send {
+                    contract: HumanAddr("alice".to_string()),
+                    token_ids: vec!["NFT3".to_string(), "NFT4".to_string(), "NFT6".to_string()],
+                    msg: None,
+                    memo: None,
+                },
+            ],
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let handle_resp = handle_result.unwrap();
+        let messages = handle_resp.messages;
+        let mut msg_fr_al = to_binary(&Snip721ReceiveMsg::BatchReceiveNft {
+            sender: HumanAddr("bob".to_string()),
+            from: HumanAddr("alice".to_string()),
+            token_ids: vec!["NFT2".to_string(), "NFT3".to_string()],
+            msg: send_msg.clone(),
+        })
+        .unwrap();
+        let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
+        let msg_fr_al = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("charlie".to_string()),
+            callback_code_hash: "charlie code hash".to_string(),
+            msg: Binary(msg_fr_al.to_vec()),
+            send: vec![],
+        });
+        let mut msf_fr_b = to_binary(&Snip721ReceiveMsg::BatchReceiveNft {
+            sender: HumanAddr("bob".to_string()),
+            from: HumanAddr("bob".to_string()),
+            token_ids: vec!["NFT4".to_string()],
+            msg: send_msg.clone(),
+        })
+        .unwrap();
+        let msg_fr_b = space_pad(&mut msf_fr_b.0, 256usize);
+        let msg_fr_b = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("charlie".to_string()),
+            callback_code_hash: "charlie code hash".to_string(),
+            msg: Binary(msg_fr_b.to_vec()),
+            send: vec![],
+        });
+        let mut msg_fr_c3 = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("bob".to_string()),
+            from: HumanAddr("charlie".to_string()),
+            token_id: "NFT3".to_string(),
+            msg: None,
+        })
+        .unwrap();
+        let msg_fr_c3 = space_pad(&mut msg_fr_c3.0, 256usize);
+        let msg_fr_c3 = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("alice".to_string()),
+            callback_code_hash: "alice code hash".to_string(),
+            msg: Binary(msg_fr_c3.to_vec()),
+            send: vec![],
+        });
+        let mut msg_fr_c4 = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("bob".to_string()),
+            from: HumanAddr("charlie".to_string()),
+            token_id: "NFT4".to_string(),
+            msg: None,
+        })
+        .unwrap();
+        let msg_fr_c4 = space_pad(&mut msg_fr_c4.0, 256usize);
+        let msg_fr_c4 = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("alice".to_string()),
+            callback_code_hash: "alice code hash".to_string(),
+            msg: Binary(msg_fr_c4.to_vec()),
+            send: vec![],
+        });
+        let mut msg_fr_c6 = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("bob".to_string()),
+            from: HumanAddr("charlie".to_string()),
+            token_id: "NFT6".to_string(),
+            msg: None,
+        })
+        .unwrap();
+        let msg_fr_c6 = space_pad(&mut msg_fr_c6.0, 256usize);
+        let msg_fr_c6 = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("alice".to_string()),
+            callback_code_hash: "alice code hash".to_string(),
+            msg: Binary(msg_fr_c6.to_vec()),
+            send: vec![],
+        });
+        let expected_msgs = vec![msg_fr_al, msg_fr_b, msg_fr_c3, msg_fr_c4, msg_fr_c6];
+        assert_eq!(messages, expected_msgs);
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: "ckey".to_string(),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: "akey".to_string(),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        // confirm alice's tokens
+        let query_msg = QueryMsg::Tokens {
+            owner: HumanAddr("alice".to_string()),
+            viewer: None,
+            viewing_key: Some("akey".to_string()),
+            start_after: None,
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TokenList { tokens } => {
+                let expected = vec![
+                    "NFT1".to_string(),
+                    "NFT3".to_string(),
+                    "NFT4".to_string(),
+                    "NFT6".to_string(),
+                ];
+                assert_eq!(tokens, expected);
+            }
+            _ => panic!("unexpected"),
+        }
+        let xfer6 = Tx {
+            tx_id: 11,
+            blockheight: 12345,
+            token_id: "NFT6".to_string(),
+            memo: None,
+            action: TxAction::Transfer {
+                from: HumanAddr("charlie".to_string()),
+                sender: Some(HumanAddr("bob".to_string())),
+                recipient: HumanAddr("alice".to_string()),
+            },
+        };
+        let xfer3 = Tx {
+            tx_id: 7,
+            blockheight: 12345,
+            token_id: "NFT3".to_string(),
+            memo: Some("test memo".to_string()),
+            action: TxAction::Transfer {
+                from: HumanAddr("alice".to_string()),
+                sender: Some(HumanAddr("bob".to_string())),
+                recipient: HumanAddr("charlie".to_string()),
+            },
+        };
+        let query_msg = QueryMsg::TransactionHistory {
+            address: HumanAddr("alice".to_string()),
+            viewing_key: "akey".to_string(),
+            page: None,
+            page_size: None,
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TransactionHistory { txs } => {
+                assert_eq!(txs[3], xfer3);
+                assert_eq!(txs[0], xfer6);
+            }
+            _ => panic!("unexpected"),
+        }
+        let query_msg = QueryMsg::Tokens {
+            owner: HumanAddr("charlie".to_string()),
+            viewer: None,
+            viewing_key: Some("ckey".to_string()),
+            start_after: None,
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TokenList { tokens } => {
+                let expected = vec!["NFT2".to_string()];
+                assert_eq!(tokens, expected);
+            }
+            _ => panic!("unexpected"),
+        }
     }
 
     // test register receive_nft
@@ -7998,6 +8448,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let handle_msg = HandleMsg::RegisterReceiveNft {
             code_hash: "alice code hash".to_string(),
+            also_implements_batch_receive_nft: None,
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
@@ -8014,6 +8465,7 @@ mod tests {
         // sanity check
         let handle_msg = HandleMsg::RegisterReceiveNft {
             code_hash: "alice code hash".to_string(),
+            also_implements_batch_receive_nft: None,
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);

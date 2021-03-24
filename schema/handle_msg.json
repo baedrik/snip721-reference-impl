@@ -20,7 +20,7 @@
               ]
             },
             "owner": {
-              "description": "optional owner address, owned by the minter otherwise",
+              "description": "optional owner address. if omitted, owned by the minter",
               "anyOf": [
                 {
                   "$ref": "#/definitions/HumanAddr"
@@ -60,7 +60,7 @@
               ]
             },
             "token_id": {
-              "description": "optional token id, if omitted, use current token index",
+              "description": "optional token id. if omitted, use current token index",
               "type": [
                 "string",
                 "null"
@@ -225,7 +225,7 @@
       }
     },
     {
-      "description": "use this to add/remove approval(s) that whitelist everyone (makes public).  I do not include an option to give everyone permission to transfer a token, but the underlying processing would be able to do so if a contract dev wanted to add that PermissionType here",
+      "description": "use this to add/remove approval(s) that whitelist everyone (makes public)",
       "type": "object",
       "required": [
         "set_global_approval"
@@ -286,7 +286,7 @@
       }
     },
     {
-      "description": "add/remove approval(s) for a specific address on the token(s) you own.  Any permissions that are omitted will keep current permission",
+      "description": "add/remove approval(s) for a specific address on the token(s) you own.  Any permissions that are omitted will keep the current permission setting for that whitelist address",
       "type": "object",
       "required": [
         "set_whitelisted_approval"
@@ -604,7 +604,7 @@
       }
     },
     {
-      "description": "send a token and call receiving contract's ReceiveNft",
+      "description": "send a token and call receiving contract's (Batch)ReceiveNft",
       "type": "object",
       "required": [
         "send_nft"
@@ -633,7 +633,7 @@
               ]
             },
             "msg": {
-              "description": "optional message to send with the RecieveNft callback",
+              "description": "optional message to send with the (Batch)RecieveNft callback",
               "anyOf": [
                 {
                   "$ref": "#/definitions/Binary"
@@ -659,7 +659,7 @@
       }
     },
     {
-      "description": "send many tokens and call receiving contracts' ReceiveNft",
+      "description": "send many tokens and call receiving contracts' (Batch)ReceiveNft",
       "type": "object",
       "required": [
         "batch_send_nft"
@@ -756,7 +756,7 @@
       }
     },
     {
-      "description": "register that the contract implements ReceiveNft",
+      "description": "register that the contract implements ReceiveNft and possibly BatchReceiveNft.  If a contract implements BatchReceiveNft, SendNft will always call BatchReceiveNft even if there is only one token transfered (the token_ids Vec will only contain one ID)",
       "type": "object",
       "required": [
         "register_receive_nft"
@@ -768,6 +768,13 @@
             "code_hash"
           ],
           "properties": {
+            "also_implements_batch_receive_nft": {
+              "description": "optionally true if the contract also implements BatchReceiveNft.  Defaults to false if not specified",
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
             "code_hash": {
               "description": "receving contract's code hash",
               "type": "string"
@@ -1016,7 +1023,7 @@
       "description": "token burn info used when doing a BatchBurnNft",
       "type": "object",
       "required": [
-        "token_id"
+        "token_ids"
       ],
       "properties": {
         "memo": {
@@ -1026,9 +1033,12 @@
             "null"
           ]
         },
-        "token_id": {
-          "description": "token being burnt",
-          "type": "string"
+        "token_ids": {
+          "description": "tokens being burnt",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -1167,11 +1177,11 @@
       "type": "object",
       "required": [
         "contract",
-        "token_id"
+        "token_ids"
       ],
       "properties": {
         "contract": {
-          "description": "recipient of the sent token",
+          "description": "recipient of the sent tokens",
           "allOf": [
             {
               "$ref": "#/definitions/HumanAddr"
@@ -1186,7 +1196,7 @@
           ]
         },
         "msg": {
-          "description": "optional message to send with the RecieveNft callback",
+          "description": "optional message to send with the (Batch)RecieveNft callback",
           "anyOf": [
             {
               "$ref": "#/definitions/Binary"
@@ -1196,9 +1206,12 @@
             }
           ]
         },
-        "token_id": {
-          "description": "token being sent",
-          "type": "string"
+        "token_ids": {
+          "description": "tokens being sent",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -1207,7 +1220,7 @@
       "type": "object",
       "required": [
         "recipient",
-        "token_id"
+        "token_ids"
       ],
       "properties": {
         "memo": {
@@ -1218,16 +1231,19 @@
           ]
         },
         "recipient": {
-          "description": "recipient of the transferred token",
+          "description": "recipient of the transferred tokens",
           "allOf": [
             {
               "$ref": "#/definitions/HumanAddr"
             }
           ]
         },
-        "token_id": {
-          "description": "token being transferred",
-          "type": "string"
+        "token_ids": {
+          "description": "tokens being transferred",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     }

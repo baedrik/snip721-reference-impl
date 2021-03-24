@@ -27,7 +27,7 @@ pub struct InitMsg {
     pub post_init_callback: Option<PostInitCallback>,
 }
 
-/// This type represents optional configuration values which can be overridden.
+/// This type represents optional configuration values.
 /// All values are optional and have defaults which are more private by default,
 /// but can be overridden if necessary
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
@@ -47,7 +47,7 @@ pub struct InitConfig {
     /// public metadata (as default).  if unwrapped_metadata_is_private is set to true, it will
     /// remain as private metadata, but the owner will now be able to see it.  Anyone will be able
     /// to query the token to know that it has been unwrapped.  This simulates buying/selling a
-    /// wrapped card that non one knows which card it is until it is unwrapped. If sealed metadata
+    /// wrapped card that no one knows which card it is until it is unwrapped. If sealed metadata
     /// is not enabled, all tokens are considered unwrapped
     /// default:  False
     pub enable_sealed_metadata: Option<bool>,
@@ -98,9 +98,9 @@ pub struct PostInitCallback {
 pub enum HandleMsg {
     /// mint new token
     Mint {
-        /// optional token id, if omitted, use current token index
+        /// optional token id. if omitted, use current token index
         token_id: Option<String>,
-        /// optional owner address, owned by the minter otherwise
+        /// optional owner address. if omitted, owned by the minter
         owner: Option<HumanAddr>,
         /// optional public metadata that can be seen by everyone
         public_metadata: Option<Metadata>,
@@ -152,10 +152,7 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// use this to add/remove approval(s) that whitelist everyone (makes public).  I do
-    /// not include an option to give everyone permission to transfer a token, but the
-    /// underlying processing would be able to do so if a contract dev wanted to add that
-    /// PermissionType here
+    /// use this to add/remove approval(s) that whitelist everyone (makes public)
     SetGlobalApproval {
         /// optional token id to apply approval to
         token_id: Option<String>,
@@ -168,7 +165,8 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// add/remove approval(s) for a specific address on the token(s) you own.  Any permissions that are omitted will keep current permission
+    /// add/remove approval(s) for a specific address on the token(s) you own.  Any permissions
+    /// that are omitted will keep the current permission setting for that whitelist address
     SetWhitelistedApproval {
         /// address being granted permission
         address: HumanAddr,
@@ -185,8 +183,9 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// gives the spender permission to transfer the specified token.  If you are the owner of the token, you
-    /// can use SetWhitelistedApproval to accomplish the same thing.  If you are an operator, you can only use Approve
+    /// gives the spender permission to transfer the specified token.  If you are the owner
+    /// of the token, you can use SetWhitelistedApproval to accomplish the same thing.  If
+    /// you are an operator, you can only use Approve
     Approve {
         /// address being granted the permission
         spender: HumanAddr,
@@ -197,9 +196,10 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// revokes the spender's permission to transfer the specified token.  If you are the owner of the token, you
-    /// can use SetWhitelistedApproval to accomplish the same thing.  If you are an operator, you can only use Revoke, but
-    /// you can not revoke the transfer permission of another operator
+    /// revokes the spender's permission to transfer the specified token.  If you are the owner
+    /// of the token, you can use SetWhitelistedApproval to accomplish the same thing.  If you
+    /// are an operator, you can only use Revoke, but you can not revoke the transfer permission
+    /// of another operator
     Revoke {
         /// address whose permission is revoked
         spender: HumanAddr,
@@ -244,20 +244,20 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// send a token and call receiving contract's ReceiveNft
+    /// send a token and call receiving contract's (Batch)ReceiveNft
     SendNft {
         /// contract to send the token to
         contract: HumanAddr,
         /// id of the token to send
         token_id: String,
-        /// optional message to send with the RecieveNft callback
+        /// optional message to send with the (Batch)RecieveNft callback
         msg: Option<Binary>,
         /// optional memo for the tx
         memo: Option<String>,
         /// optional message length padding
         padding: Option<String>,
     },
-    /// send many tokens and call receiving contracts' ReceiveNft
+    /// send many tokens and call receiving contracts' (Batch)ReceiveNft
     BatchSendNft {
         /// list of sends to perform
         sends: Vec<Send>,
@@ -280,10 +280,15 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// register that the contract implements ReceiveNft
+    /// register that the contract implements ReceiveNft and possibly BatchReceiveNft.  If
+    /// a contract implements BatchReceiveNft, SendNft will always call BatchReceiveNft even
+    /// if there is only one token transfered (the token_ids Vec will only contain one ID)
     RegisterReceiveNft {
         /// receving contract's code hash
         code_hash: String,
+        /// optionally true if the contract also implements BatchReceiveNft.  Defaults
+        /// to false if not specified
+        also_implements_batch_receive_nft: Option<bool>,
         /// optional message length padding
         padding: Option<String>,
     },
@@ -371,8 +376,8 @@ pub struct Mint {
 /// token burn info used when doing a BatchBurnNft
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Burn {
-    /// token being burnt
-    pub token_id: String,
+    /// tokens being burnt
+    pub token_ids: Vec<String>,
     /// optional memo for the tx
     pub memo: Option<String>,
 }
@@ -380,10 +385,10 @@ pub struct Burn {
 /// token transfer info used when doing a BatchTransferNft
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Transfer {
-    /// recipient of the transferred token
+    /// recipient of the transferred tokens
     pub recipient: HumanAddr,
-    /// token being transferred
-    pub token_id: String,
+    /// tokens being transferred
+    pub token_ids: Vec<String>,
     /// optional memo for the tx
     pub memo: Option<String>,
 }
@@ -391,11 +396,11 @@ pub struct Transfer {
 /// send token info used when doing a BatchSendNft
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Send {
-    /// recipient of the sent token
+    /// recipient of the sent tokens
     pub contract: HumanAddr,
-    /// token being sent
-    pub token_id: String,
-    /// optional message to send with the RecieveNft callback
+    /// tokens being sent
+    pub token_ids: Vec<String>,
+    /// optional message to send with the (Batch)RecieveNft callback
     pub msg: Option<Binary>,
     /// optional memo for the tx
     pub memo: Option<String>,
@@ -404,9 +409,13 @@ pub struct Send {
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleAnswer {
+    /// Mint will also display the minted token's ID in the log attributes under the
+    /// key `minted` in case minting was down as a callback message
     Mint {
         token_id: String,
     },
+    /// Mint will also display the minted tokens' IDs in the log attributes under the
+    /// key `minted` in case minting was down as a callback message
     BatchMint {
         token_ids: Vec<String>,
     },
@@ -485,9 +494,9 @@ pub enum HandleAnswer {
 /// the address and viewing key making an authenticated query request
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ViewerInfo {
-    // querying address
+    /// querying address
     pub address: HumanAddr,
-    // authentication key string
+    /// authentication key string
     pub viewing_key: String,
 }
 
@@ -558,8 +567,8 @@ pub enum QueryMsg {
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
     },
-    /// allows only the token owner to list all the approvals in place for a specified
-    /// token
+    /// list all the approvals in place for a specified token if given the owner's viewing
+    /// key
     TokenApprovals {
         token_id: String,
         /// the token owner's viewing key
@@ -568,7 +577,8 @@ pub enum QueryMsg {
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
     },
-    // lists all the inventory-wide approvals in place for the specified address
+    /// list all the inventory-wide approvals in place for the specified address if given the
+    /// the correct viewing key for the address
     InventoryApprovals {
         address: HumanAddr,
         /// the viewing key
@@ -609,7 +619,7 @@ pub enum QueryMsg {
     IsUnwrapped { token_id: String },
     /// verify that the specified address has approval to transfer every listed token
     VerifyTransferApproval {
-        /// list of tokens to very approval for
+        /// list of tokens to verify approval for
         tokens: Vec<String>,
         /// address that has approval
         address: HumanAddr,
@@ -627,11 +637,10 @@ pub enum QueryMsg {
         /// optional number of transactions per page
         page_size: Option<u32>,
     },
-    /// display the code hash a contract has registered with the token contract.  This
-    /// can help avoid accidentally sending the wrong token or to the wrong contract
-    /// which would result in the loss of the token
+    /// display the code hash a contract has registered with the token contract and whether
+    /// the contract implements BatchReceivenft
     RegisteredCodeHash {
-        /// the contract whose code hash you want to verify
+        /// the contract whose receive registration info you want to view
         contract: HumanAddr,
     },
 }
@@ -751,6 +760,7 @@ pub enum QueryAnswer {
     },
     RegisteredCodeHash {
         code_hash: Option<String>,
+        also_implements_batch_receive_nft: bool,
     },
 }
 

@@ -270,7 +270,7 @@
       }
     },
     {
-      "description": "allows only the token owner to list all the approvals in place for a specified token",
+      "description": "list all the approvals in place for a specified token if given the owner's viewing key",
       "type": "object",
       "required": [
         "token_approvals"
@@ -302,6 +302,7 @@
       }
     },
     {
+      "description": "list all the inventory-wide approvals in place for the specified address if given the the correct viewing key for the address",
       "type": "object",
       "required": [
         "inventory_approvals"
@@ -464,7 +465,7 @@
               ]
             },
             "tokens": {
-              "description": "list of tokens to very approval for",
+              "description": "list of tokens to verify approval for",
               "type": "array",
               "items": {
                 "type": "string"
@@ -522,7 +523,7 @@
       }
     },
     {
-      "description": "display the code hash a contract has registered with the token contract.  This can help avoid accidentally sending the wrong token or to the wrong contract which would result in the loss of the token",
+      "description": "display the code hash a contract has registered with the token contract and whether the contract implements BatchReceivenft",
       "type": "object",
       "required": [
         "registered_code_hash"
@@ -535,7 +536,7 @@
           ],
           "properties": {
             "contract": {
-              "description": "the contract whose code hash you want to verify",
+              "description": "the contract whose receive registration info you want to view",
               "allOf": [
                 {
                   "$ref": "#/definitions/HumanAddr"
@@ -560,9 +561,15 @@
       ],
       "properties": {
         "address": {
-          "$ref": "#/definitions/HumanAddr"
+          "description": "querying address",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
         },
         "viewing_key": {
+          "description": "authentication key string",
           "type": "string"
         }
       }

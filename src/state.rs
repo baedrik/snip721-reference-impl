@@ -475,6 +475,15 @@ pub struct AuthList {
     pub tokens: [Vec<u32>; 3],
 }
 
+/// a contract's code hash and whether they implement BatchReceiveNft
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReceiveRegistration {
+    /// code hash of the contract
+    pub code_hash: String,
+    /// true if the contract implements BatchReceiveNft
+    pub impl_batch: bool,
+}
+
 /// Returns StdResult<()> resulting from saving an item to storage
 ///
 /// # Arguments
