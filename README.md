@@ -13,34 +13,34 @@ Users may want to enforce constant length messages to avoid leaking data. To sup
 Requests should be sent as base64 encoded JSON. Future versions of Secret Network may add support for other formats as well, but at this time we recommend usage of JSON only. For this reason the parameter descriptions specify the JSON type which must be used. In addition, request parameters will include in parentheses a CosmWasm (or other) underlying type that this value must conform to. E.g. a recipient address is sent as a string, but must also be parsed to a bech32 address.
 
 ### Responses
-Message responses will be JSON encoded in the `data` field of the Cosmos response, rather than in the `logs`, except in the case of Mint and BatchMint messages, where the token ID(s) will be returned in both the `data` and `logs` fields.  That is because minting may frequently be done by a contract, and `data` fields of responses from callback messages do not get forwarded to the sender of the initial message.
+Message responses will be JSON encoded in the `data` field of the Cosmos response, rather than in the `logs`, except in the case of Mint and BatchMint messages, where the token ID(s) will be returned in both the `data` and `logs` fields.  This is because minting may frequently be done by a contract, and `data` fields of responses from callback messages do not get forwarded to the sender of the initial message.
 
 # Instantiating The Token Contract
 ##### Request
-```json
+```
 {
-	“name”:  “name_of_the_token”,
-	“symbol”: “token_symbol”,
+    “name”: “name_of_the_token”,
+    “symbol”: “token_symbol”,
 	“admin”: “optional_admin_address”,
 	“entropy”: “string_used_as_entropy_when_generating_random_viewing_keys”,
 	“config”: {
-			“public_token_supply”: true_or_false,
-			“public_owner”: true_or_false,
-			“enable_sealed_metadata”: true_or_false,
-			“unwrapped_metadata_is_private”: true_or_false,
-			“minter_may_update_metadata”: true_or_false,
-			“owner_may_update_metadata”: true_or_false,
-			“enable_burn”: true_or_false
+		“public_token_supply”: true_or_false,
+		“public_owner”: true_or_false,
+		“enable_sealed_metadata”: true_or_false,
+		“unwrapped_metadata_is_private”: true_or_false,
+		“minter_may_update_metadata”: true_or_false,
+		“owner_may_update_metadata”: true_or_false,
+		“enable_burn”: true_or_false
 		},
 	“post_init_callback”: {
-				“msg”: “base64_encoded_JSON_representing_the_msg_to_perform_after_initialization”,
-				“contract_address”: “address_of_the_contract_being_called_after_initialization”,
-				“code_hash”: “code_hash_of_the_contract_being_called_after_initialization”,
-				“send”: [
-						“denom”: “denom_string_for_native_coin_being_sent_with_this_message”,
-						“amount”: “amount_of_native_coin_being_sent”
-					],
-				}
+		“msg”: “base64_encoded_JSON_representing_the_msg_to_perform_after_initialization”,
+		“contract_address”: “address_of_the_contract_being_called_after_initialization”,
+		“code_hash”: “code_hash_of_the_contract_being_called_after_initialization”,
+		“send”: [
+			“denom”: “denom_string_for_native_coin_being_sent_with_this_message”,
+			“amount”: “amount_of_native_coin_being_sent”
+			],
+		}
 }
 ```
 | Name               | Type              | Description                                                         | Optional | Value If Omitted   |
@@ -73,13 +73,12 @@ This is the privacy configuration for the contract.
 * enable_burn - This config value indicates whether burn functionality is enabled (default: False)
 
 #### Post Init Callback (Optional)
-| Name             | Type                       | Description                                                       | Optional | Value If Omitted |
-|------------------|----------------------------|-------------------------------------------------------------------|----------|------------------|
-| msg              | string (base64 encoded)    | Base64 encoded JSON representation of the callback message to     | no       |                  |
-|                  |                            | perform after contract initialization                             |          |                  |
-| contract_address | string (HumanAddr)         | Address of the contract to call after initialization              | no       |                  |
-| code_hash        | string                     | Code hash of the contract to call after initialization            | no       |                  |
-| send             | array (of Coin, see below) | List of native Coin amounts to send with the callback message     | no       |                  |
+| Name             | Type                       | Description                                                                                         | Optional | Value If Omitted |
+|------------------|----------------------------|-----------------------------------------------------------------------------------------------------|----------|------------------|
+| msg              | string (base64 encoded)    | Base64 encoded JSON representation of the callback message to perform after contract initialization | no       |                  |
+| contract_address | string (HumanAddr)         | Address of the contract to call after initialization                                                | no       |                  |
+| code_hash        | string                     | Code hash of the contract to call after initialization                                              | no       |                  |
+| send             | array (of Coin, see below) | List of native Coin amounts to send with the callback message                                       | no       |                  |
 
 This is the optional callback message to execute after the token contract has initialized.  This can be useful if another contract is instantiating this token contract and needs the token contract to inform the creating contract of the address it has been given
 
