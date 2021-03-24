@@ -3,13 +3,13 @@
   "title": "HandleAnswer",
   "anyOf": [
     {
-      "description": "Mint will also display the minted token's ID in the log attributes under the key `minted` in case minting was down as a callback message",
+      "description": "MintNft will also display the minted token's ID in the log attributes under the key `minted` in case minting was done as a callback message",
       "type": "object",
       "required": [
-        "mint"
+        "mint_nft"
       ],
       "properties": {
-        "mint": {
+        "mint_nft": {
           "type": "object",
           "required": [
             "token_id"
@@ -23,13 +23,13 @@
       }
     },
     {
-      "description": "Mint will also display the minted tokens' IDs in the log attributes under the key `minted` in case minting was down as a callback message",
+      "description": "BatchMintNft will also display the minted tokens' IDs in the log attributes under the key `minted` in case minting was done as a callback message",
       "type": "object",
       "required": [
-        "batch_mint"
+        "batch_mint_nft"
       ],
       "properties": {
-        "batch_mint": {
+        "batch_mint_nft": {
           "type": "object",
           "required": [
             "token_ids"

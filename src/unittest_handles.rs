@@ -264,7 +264,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::BatchMint {
+        let handle_msg = HandleMsg::BatchMintNft {
             mints: mints.clone(),
             padding: None,
         };
@@ -279,7 +279,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         // test non-minter attempt
-        let handle_msg = HandleMsg::BatchMint {
+        let handle_msg = HandleMsg::BatchMintNft {
             mints: mints.clone(),
             padding: None,
         };
@@ -288,7 +288,7 @@ mod tests {
         assert!(error.contains("Only designated minters are allowed to mint"));
 
         // sanity check
-        let handle_msg = HandleMsg::BatchMint {
+        let handle_msg = HandleMsg::BatchMintNft {
             mints: mints.clone(),
             padding: None,
         };
@@ -302,7 +302,7 @@ mod tests {
         let handle_answer: HandleAnswer =
             from_binary(&handle_result.unwrap().data.unwrap()).unwrap();
         match handle_answer {
-            HandleAnswer::BatchMint { token_ids } => {
+            HandleAnswer::BatchMintNft { token_ids } => {
                 assert_eq!(token_ids, minted_vec);
             }
             _ => panic!("unexpected"),
@@ -376,7 +376,7 @@ mod tests {
         );
         assert_eq!(txs[0].memo, Some("has id 3".to_string()));
 
-        let handle_msg = HandleMsg::BatchMint {
+        let handle_msg = HandleMsg::BatchMintNft {
             mints: mints,
             padding: None,
         };
@@ -401,7 +401,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -424,7 +424,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         // test non-minter attempt
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -447,7 +447,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -519,7 +519,7 @@ mod tests {
         let tx2 = get_txs(&deps.api, &deps.storage, &admin_raw, 0, 1).unwrap();
         assert_eq!(txs, tx2);
         // test minting with an existing token id
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -540,7 +540,7 @@ mod tests {
         assert!(error.contains("Token ID MyNFT is already in use"));
 
         // test minting without specifying recipient or id
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: None,
             owner: None,
             public_metadata: Some(Metadata {
@@ -557,7 +557,7 @@ mod tests {
         let handle_answer: HandleAnswer =
             from_binary(&handle_result.unwrap().data.unwrap()).unwrap();
         match handle_answer {
-            HandleAnswer::Mint { token_id } => {
+            HandleAnswer::MintNft { token_id } => {
                 assert_eq!(token_id, minted_str);
             }
             _ => panic!("unexpected"),
@@ -689,7 +689,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -739,7 +739,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -772,7 +772,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -840,7 +840,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -863,7 +863,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -990,7 +990,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -1079,7 +1079,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -1125,7 +1125,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -1189,7 +1189,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -1267,7 +1267,7 @@ mod tests {
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You do not own token NFT1"));
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -1280,7 +1280,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -1293,7 +1293,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -1306,7 +1306,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT4".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -3240,7 +3240,7 @@ mod tests {
             error.contains("Not authorized to grant/revoke transfer permission for token MyNFT")
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -3547,7 +3547,7 @@ mod tests {
 
         // used to test auto-setting individual token permissions when only one token
         // of many is approved with a different expiration than an operator's expiration
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -3560,7 +3560,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -3732,7 +3732,7 @@ mod tests {
             error.contains("Not authorized to grant/revoke transfer permission for token MyNFT")
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -4110,7 +4110,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -4123,7 +4123,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -4254,7 +4254,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -4335,7 +4335,7 @@ mod tests {
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You are not authorized to perform this action on token MyNFT"));
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -4527,7 +4527,7 @@ mod tests {
         let transfer_idx = PermissionType::Transfer.to_usize();
 
         // sanity check: address with token permission burns it
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -4544,7 +4544,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -4722,7 +4722,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -4771,7 +4771,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -4781,7 +4781,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -4790,7 +4790,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -4807,7 +4807,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT4".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -4816,7 +4816,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT5".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -4825,7 +4825,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT6".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -4834,7 +4834,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT7".to_string()),
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
@@ -4843,7 +4843,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT8".to_string()),
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
@@ -4991,7 +4991,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -5001,7 +5001,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -5010,7 +5010,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -5027,7 +5027,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT4".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -5036,7 +5036,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT5".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -5045,7 +5045,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT6".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -5054,7 +5054,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT7".to_string()),
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
@@ -5063,7 +5063,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT8".to_string()),
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
@@ -5206,7 +5206,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -5216,7 +5216,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -5225,7 +5225,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -5242,7 +5242,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT4".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -5251,7 +5251,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT5".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -5260,7 +5260,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT6".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -5269,7 +5269,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT7".to_string()),
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
@@ -5278,7 +5278,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT8".to_string()),
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
@@ -5593,7 +5593,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -5667,7 +5667,7 @@ mod tests {
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You are not authorized to perform this action on token MyNFT"));
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -6139,7 +6139,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -6234,7 +6234,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::BatchMint {
+        let handle_msg = HandleMsg::BatchMintNft {
             mints: vec![
                 Mint {
                     token_id: Some("NFT1".to_string()),
@@ -6437,7 +6437,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -6447,7 +6447,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -6456,7 +6456,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -6465,7 +6465,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT4".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -6474,7 +6474,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT5".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -6483,7 +6483,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT6".to_string()),
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
@@ -6802,7 +6802,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::BatchMint {
+        let handle_msg = HandleMsg::BatchMintNft {
             mints: vec![
                 Mint {
                     token_id: Some("NFT1".to_string()),
@@ -7001,7 +7001,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -7078,7 +7078,7 @@ mod tests {
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You are not authorized to perform this action on token MyNFT"));
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -7630,7 +7630,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: Some(Metadata {
@@ -7727,7 +7727,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -7737,7 +7737,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -7746,7 +7746,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
@@ -7755,7 +7755,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT4".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -7764,7 +7764,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT5".to_string()),
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
@@ -7773,7 +7773,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT6".to_string()),
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
@@ -8164,7 +8164,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::BatchMint {
+        let handle_msg = HandleMsg::BatchMintNft {
             mints: vec![
                 Mint {
                     token_id: Some("NFT1".to_string()),
@@ -8996,7 +8996,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
@@ -9005,7 +9005,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
@@ -9014,7 +9014,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
@@ -9205,7 +9205,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
@@ -9214,7 +9214,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
@@ -9223,7 +9223,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
@@ -9536,7 +9536,7 @@ mod tests {
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You do not own token NFT1"));
 
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -9887,7 +9887,7 @@ mod tests {
             .unwrap();
         let nft1_key = 0u32.to_le_bytes();
         let nft2_key = 1u32.to_le_bytes();
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -9900,7 +9900,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -9939,7 +9939,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -9952,7 +9952,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -10262,7 +10262,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -10275,7 +10275,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -10451,7 +10451,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
@@ -10464,7 +10464,7 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::Mint {
+        let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {

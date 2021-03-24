@@ -97,7 +97,7 @@ pub struct PostInitCallback {
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
     /// mint new token
-    Mint {
+    MintNft {
         /// optional token id. if omitted, use current token index
         token_id: Option<String>,
         /// optional owner address. if omitted, owned by the minter
@@ -112,7 +112,7 @@ pub enum HandleMsg {
         padding: Option<String>,
     },
     /// Mint multiple tokens
-    BatchMint {
+    BatchMintNft {
         /// list of mints to perform
         mints: Vec<Mint>,
         /// optional message length padding
@@ -409,14 +409,14 @@ pub struct Send {
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleAnswer {
-    /// Mint will also display the minted token's ID in the log attributes under the
-    /// key `minted` in case minting was down as a callback message
-    Mint {
+    /// MintNft will also display the minted token's ID in the log attributes under the
+    /// key `minted` in case minting was done as a callback message
+    MintNft {
         token_id: String,
     },
-    /// Mint will also display the minted tokens' IDs in the log attributes under the
-    /// key `minted` in case minting was down as a callback message
-    BatchMint {
+    /// BatchMintNft will also display the minted tokens' IDs in the log attributes under the
+    /// key `minted` in case minting was done as a callback message
+    BatchMintNft {
         token_ids: Vec<String>,
     },
     SetPublicMetadata {

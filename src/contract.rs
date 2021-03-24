@@ -115,7 +115,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     let mut config: Config = load(&deps.storage, CONFIG_KEY)?;
 
     let response = match msg {
-        HandleMsg::Mint {
+        HandleMsg::MintNft {
             token_id,
             owner,
             public_metadata,
@@ -133,7 +133,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             private_metadata,
             memo,
         ),
-        HandleMsg::BatchMint { mut mints, .. } => batch_mint(
+        HandleMsg::BatchMintNft { mut mints, .. } => batch_mint(
             deps,
             env,
             &mut config,
@@ -431,7 +431,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     Ok(HandleResponse {
         messages: vec![],
         log: vec![log("minted", minted_str)],
-        data: Some(to_binary(&HandleAnswer::Mint {
+        data: Some(to_binary(&HandleAnswer::MintNft {
             token_id: minted.pop().unwrap_or_else(String::new),
         })?),
     })
@@ -470,7 +470,9 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
     Ok(HandleResponse {
         messages: vec![],
         log: vec![log("minted", minted_str)],
-        data: Some(to_binary(&HandleAnswer::BatchMint { token_ids: minted })?),
+        data: Some(to_binary(&HandleAnswer::BatchMintNft {
+            token_ids: minted,
+        })?),
     })
 }
 

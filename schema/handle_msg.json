@@ -6,10 +6,10 @@
       "description": "mint new token",
       "type": "object",
       "required": [
-        "mint"
+        "mint_nft"
       ],
       "properties": {
-        "mint": {
+        "mint_nft": {
           "type": "object",
           "properties": {
             "memo": {
@@ -74,10 +74,10 @@
       "description": "Mint multiple tokens",
       "type": "object",
       "required": [
-        "batch_mint"
+        "batch_mint_nft"
       ],
       "properties": {
-        "batch_mint": {
+        "batch_mint_nft": {
           "type": "object",
           "required": [
             "mints"
