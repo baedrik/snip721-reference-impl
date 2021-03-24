@@ -99,21 +99,21 @@ This mints a single token.
 ```
 {
 	"mint_nft": {
-			"token_id": "optional_ID_of_new_token",
-			"owner": "optional_address_the_new_token_will_be_minted_to",
-			"public_metadata": {
-						"name": "optional_public_name",
-						"description": "optional_public_text_description",
-						"image": "optional_public_uri_pointing_to_an_image_or_additional_off-chain_metadata"
-					},
-			"private_metadata": {
-						"name": "optional_private_name",
-						"description": "optional_private_text_description",
-						"image": "optional_private_uri_pointing_to_an_image_or_additional_off-chain_metadata"
-					},
-			"memo": "optional_memo_for_the_mint_tx",
-			"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
-		}
+		"token_id": "optional_ID_of_new_token",
+		"owner": "optional_address_the_new_token_will_be_minted_to",
+		"public_metadata": {
+			"name": "optional_public_name",
+			"description": "optional_public_text_description",
+			"image": "optional_public_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+		},
+		"private_metadata": {
+			"name": "optional_private_name",
+			"description": "optional_private_text_description",
+			"image": "optional_private_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+		},
+		"memo": "optional_memo_for_the_mint_tx",
+		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
+	}
 }
 ```
 
@@ -134,4 +134,3 @@ Metadata for a token that follows CW-721 metadata specification, which is based 
 | name        | string | String that can be used to identify an asset's name                   | yes      | None                 |
 | description | string | String that can be used to describe an asset                          | yes      | None                 |
 | image       | string | String that can hold a link to additional off-chain metadata or image | yes      | None                 |
-               |
