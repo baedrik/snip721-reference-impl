@@ -52,7 +52,7 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 | config             | defined below     | Privacy configuration for the contract                              | yes      | defined below      |
 | post_init_callback | defined below     | Information used to perform a callback message after initialization | yes      | nothing            |
 
-#### Config (Optional)
+### Config (Optional)
 Config is the privacy configuration for the contract.
 * public_token_supply - This config value indicates whether the token IDs and the number of tokens controlled by the contract are public.  If the token supply is private, only minters can view the token IDs and number of tokens controlled by the contract (default: False)
 * public_owner - This config value indicates whether token ownership is public or private by default.  Regardless of this setting a user has the ability to change whether the ownership of their tokens is public or private (default: False)
@@ -72,7 +72,7 @@ Config is the privacy configuration for the contract.
 | owner_may_update_metadata     | bool | yes      | false            |
 | enable_burn                   | bool | yes      | false            |
 
-#### Post Init Callback (Optional)
+### Post Init Callback (Optional)
 Post)init_callback is the optional callback message to execute after the token contract has initialized.  This can be useful if another contract is instantiating this token contract and needs the token contract to inform the creating contract of the address it has been given
 
 | Name             | Type                       | Description                                                                                         | Optional | Value If Omitted |
@@ -125,7 +125,7 @@ MintNft mints a single token.
 | memo             | string                     | A memo for the mint transaction that is only viewable by addresses involved in the mint (minter/owner) | yes      | nothing              |
 | padding          | string                     | An Ignored string that can be used to maintain constant message length                                 | yes      | nothing              |
 
-#### Metadata
+### Metadata
 Metadata for a token that follows CW-721 metadata specification, which is based on ERC721 Metadata JSON Schema.
 
 | Name        | Type   | Description                                                           | Optional | Value If Omitted     |
@@ -175,7 +175,7 @@ BatchMintNft mints a list of tokens.
 | mints   | array of Mint (see below) | A list of all the mint operations to perform                           | no       |                  |
 | padding | string                    | An Ignored string that can be used to maintain constant message length | yes      | nothing          |
 
-#### Mint
+### Mint
 Mint defines the data necessary to perform one minting operation
 
 | Name             | Type                       | Description                                                                                            | Optional | Value If Omitted     |
@@ -277,7 +277,7 @@ MakeOwnershipPrivate is used when the token contract was instantiated with the `
 | padding  | string               | An Ignored string that can be used to maintain constant message length | yes      | nothing          |
 
 ## SetGlobalApproval
-SetGlobalApproval can be used to make ownership and/or private metadata viewable by everyone.  This can be set for a single token or for an owner's entire inventory of tokens by choosing the appropriate AccessLevel.  SetGlobalApproval can also be used to revoke any global approval previously granted.
+The owner of a token can use SetGlobalApproval to make ownership and/or private metadata viewable by everyone.  This can be set for a single token or for an owner's entire inventory of tokens by choosing the appropriate AccessLevel.  SetGlobalApproval can also be used to revoke any global approval previously granted.
 
 ##### Request
 ```
@@ -299,7 +299,7 @@ SetGlobalApproval can be used to make ownership and/or private metadata viewable
 | expires               | Expiration (see below)  | The expiration of any approval granted in this message.  Can be set to a blockheight, time, or never | yes      | "never"          |
 | padding               | string                  | An Ignored string that can be used to maintain constant message length                               | yes      | nothing          |
 
-#### AccessLevel
+### AccessLevel
 AccessLevel determines the type of access being granted or revoked to the specified address in a SetWhitelistedApproval message or to everyone in a SetGlobalApproval message.  The levels are mutually exclusive for any address (or for everyone if it is a global approval).  The levels are:
 * `"approve_token"` - grant approval only on the token specified in the message
 * `"revoke_token"` - revoke a previous approval on the specified token
@@ -308,8 +308,94 @@ AccessLevel determines the type of access being granted or revoked to the specif
 
 If the message signer grants an address (or everyone in the case of SetGlobalApproval) `all` (inventory-wide) approval, it will remove any individual token approvals previously granted to that address (or granted to everyone in the case of SetGlobalApproval), and grant that address `all` (inventory-wide) approval.  If an address (or everyone in the case of SetGlobalApproval) already has `all` approval, and the message signer grants it `approve_token` approval, if the expiration of the new `approve_token` approval is the same as the expiration of the previous `all` approval, it will just leave the `all` approval in place.  If the expirations are different, it will grant `approve_token` approval with the specified expiration for the input token, and all other tokens will be changed to `approve_token` approvals with the expiration of the previous `all` approval, and the `all` (inventory-wide) approval will be removed.  If the message signer applies `revoke_token` access to an address that currently has inventory-wide approval, it will remove the inventory-wide approval, and create `approve_token` approvals for that address on every token in the signer's inventory EXCEPT the token specified with the `revoke_token` message.  In other words, it will only revoke the approval on that single token.
 
-#### Expiration
-Expiration is used to set an expiration for any approvals granted in the message.  Expiration can be set to a specified blockheight, a time in seconds since epoch 01/01/1970, or "never".  If no expiration is given, it will default to "never".
+### Expiration
+Expiration is used to set an expiration for any approvals granted in the message.  Expiration can be set to a specified blockheight, a time in seconds since epoch 01/01/1970, or "never".  Values for blockheight and time are specified as a u64.  If no expiration is given, it will default to "never".
 * `"never"` - the approval will never expire
-* `{"at_time": 1700000000}` - the approval will expire 1700000000 seconds after 01/01/1970
-* `{"at_height": 3000000}` - the approval will expire at block height 3000000
+* `{"at_time": 1700000000}` - the approval will expire 1700000000 seconds after 01/01/1970 (time value is u64)
+* `{"at_height": 3000000}` - the approval will expire at block height 3000000 (height value is u64)
+
+## SetWhitelistedApproval
+The owner of a token can use SetWhitelistedApproval to grant an address permission to view ownership, view private metadata, and/or to transfer a single token or every token in the owner's inventory.  SetWhitelistedApproval can also be used to revoke any approval previously granted to the address.
+
+##### Request
+```
+{
+	"set_whitelisted_approval": {
+		"address": "address_being_granted_or_revoked_approval",
+		"token_id": "optional_ID_of_the_token_to_grant_or_revoke_approval_on",
+		"view_owner": "approve_token"|"all"|"revoke_token"|"none",
+		"view_private_metadata": "approve_token"|"all"|"revoke_token"|"none",
+		"transfer": "approve_token"|"all"|"revoke_token"|"none",
+		"expires": "never"|{"at_height": 999999}|{"at_time":999999},
+ 		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
+	}
+}
+```
+| Name                  | Type                    | Description                                                                                          | Optional | Value If Omitted |
+|-----------------------|-------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
+| address               | string (HumanAddr)      | Address to grant or revoke approval to/from                                                          | no       |                  |
+| token_id              | string                  | If supplying either `approve_token` or `revoke_token` access, the token whose privacy is being set   | yes      | nothing          |
+| view_owner            | AccessLevel (see above) | Grant or revoke the address' permission to view the ownership of a token/inventory                   | yes      | nothing          |
+| view_private_metadata | AccessLevel (see above) | Grant or revoke the address' permission to view the private metadata of a token/inventory            | yes      | nothing          |
+| transfer              | AccessLevel (see above) | Grant or revoke the address' permission to transfer a token/inventory                                | yes      | nothing          |
+| expires               | Expiration (see above)  | The expiration of any approval granted in this message.  Can be set to a blockheight, time, or never | yes      | "never"          |
+| padding               | string                  | An Ignored string that can be used to maintain constant message length                               | yes      | nothing          |
+
+## Approve
+Approve is used to grant an address permission to transfer a single token.  Approve is provided to maintain compliance with CW-721, but the owner can use SetWhitelistedApproval to accomplish the same thing if specifying a `token_id` and `approve_token` AccessLevel for `transfer`.  Also, in compliance with CW-721, an address that has inventory-wide approval to transfer an owner's tokens, may use Approve to grant transfer approval of a single token to another address.
+
+##### Request
+```
+{
+	"approve": {
+		"spender": "address_being_granted_approval_to_transfer_the_specified_token",
+		"token_id": "ID_of_the_token_that_can_now_be_transferred_by_the_spender",
+		"expires": "never"|{"at_height": 999999}|{"at_time":999999},
+ 		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
+	}
+}
+```
+| Name                  | Type                    | Description                                                                                          | Optional | Value If Omitted |
+|-----------------------|-------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
+| spender               | string (HumanAddr)      | Address being granted approval to transfer the token                                                 | no       |                  |
+| token_id              | string                  | ID of the token that the spender can now transfer                                                    | no       |                  |
+| expires               | Expiration (see above)  | The expiration of this token transfer approval                                                       | yes      | "never"          |
+| padding               | string                  | An Ignored string that can be used to maintain constant message length                               | yes      | nothing          |
+
+## Revoke
+Revoke is used to revoke from an address the permission to transfer a single token.  Revoke is provided to maintain compliance with CW-721, but the owner can use SetWhitelistedApproval to accomplish the same thing if specifying a `token_id` and `revoke_token` AccessLevel for `transfer`.  Also, in compliance with CW-721, an address that has inventory-wide approval to transfer an owner's tokens (referred to as an operator later), may use Revoke to revoke transfer approval of a single token from another address.  However, one operator may not revoke transfer permission of even one single token away from another operator.
+
+##### Request
+```
+{
+	"revoke": {
+		"spender": "address_being_revoked_approval_to_transfer_the_specified_token",
+		"token_id": "ID_of_the_token_that_can_no_longer_be_transferred_by_the_spender",
+ 		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
+	}
+}
+```
+| Name                  | Type                    | Description                                                                                          | Optional | Value If Omitted |
+|-----------------------|-------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
+| spender               | string (HumanAddr)      | Address no longer permitted to transfer the token                                                    | no       |                  |
+| token_id              | string                  | ID of the token that the spender can no longer transfer                                              | no       |                  |
+| padding               | string                  | An Ignored string that can be used to maintain constant message length                               | yes      | nothing          |
+
+## ApproveAll
+ApproveAll is used to grant an address permission to transfer all the tokens in the message sender's inventory.  This will include the ability to transfer any tokens the sender acquires after granting this inventory-wide approval.  This also gives the address the ability to grant another address the approval to transfer a single token.  ApproveAll is provided to maintain compliance with CW-721, but the owner can use SetWhitelistedApproval to accomplish the same thing by using `all` AccessLevel for `transfer`.
+
+##### Request
+```
+{
+	"approve_all": {
+		"operator": "address_being_granted_inventory-wide_approval_to_transfer_tokens",
+		"expires": "never"|{"at_height": 999999}|{"at_time":999999},
+ 		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
+	}
+}
+```
+| Name                  | Type                    | Description                                                                                          | Optional | Value If Omitted |
+|-----------------------|-------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
+| operator              | string (HumanAddr)      | Address being granted approval to transfer all of the message sender's tokens                        | no       |                  |
+| expires               | Expiration (see above)  | The expiration of this inventory-wide transfer approval                                              | yes      | "never"          |
+| padding               | string                  | An Ignored string that can be used to maintain constant message length                               | yes      | nothing          |
