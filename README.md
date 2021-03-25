@@ -301,15 +301,15 @@ SetGlobalApproval can be used to make ownership and/or private metadata viewable
 
 #### AccessLevel
 AccessLevel determines the type of access being granted or revoked to the specified address in a SetWhitelistedApproval message or to everyone in a SetGlobalApproval message.  The levels are mutually exclusive for any address (or for everyone if it is a global approval).  The levels are:
-* "approve_token" - grant approval only on the token specified in the message
-* "revoke_token" - revoke a previous approval on the specified token
-* "all" - grant approval for all tokens in the message signer's inventory.  This approval will also apply to any tokens the signer acquires after granting `all` approval
-* "none" - revoke any approval (both token and inventory-wide) previously granted to the specified address (or for everyone if using SetGlobalApproval)
+* `"approve_token"` - grant approval only on the token specified in the message
+* `"revoke_token"` - revoke a previous approval on the specified token
+* `"all"` - grant approval for all tokens in the message signer's inventory.  This approval will also apply to any tokens the signer acquires after granting `all` approval
+* `"none"` - revoke any approval (both token and inventory-wide) previously granted to the specified address (or for everyone if using SetGlobalApproval)
 
 If the message signer grants an address (or everyone in the case of SetGlobalApproval) `all` (inventory-wide) approval, it will remove any individual token approvals previously granted to that address (or granted to everyone in the case of SetGlobalApproval), and grant that address `all` (inventory-wide) approval.  If an address (or everyone in the case of SetGlobalApproval) already has `all` approval, and the message signer grants it `approve_token` approval, if the expiration of the new `approve_token` approval is the same as the expiration of the previous `all` approval, it will just leave the `all` approval in place.  If the expirations are different, it will grant `approve_token` approval with the specified expiration for the input token, and all other tokens will be changed to `approve_token` approvals with the expiration of the previous `all` approval, and the `all` (inventory-wide) approval will be removed.  If the message signer applies `revoke_token` access to an address that currently has inventory-wide approval, it will remove the inventory-wide approval, and create `approve_token` approvals for that address on every token in the signer's inventory EXCEPT the token specified with the `revoke_token` message.  In other words, it will only revoke the approval on that single token.
 
 #### Expiration
 Expiration is used to set an expiration for any approvals granted in the message.  Expiration can be set to a specified blockheight, a time in seconds since epoch 01/01/1970, or "never".  If no expiration is given, it will default to "never".
-* `"never" - the approval will never expire
-* `{"at_time": 1700000000} - the approval will expire 1700000000 seconds after 01/01/1970
-* `{"at_height": 3000000} - the approval will expire at block height 3000000
+* `"never"` - the approval will never expire
+* `{"at_time": 1700000000}` - the approval will expire 1700000000 seconds after 01/01/1970
+* `{"at_height": 3000000}` - the approval will expire at block height 3000000
