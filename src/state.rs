@@ -1,6 +1,6 @@
 use std::any::type_name;
 
-use cosmwasm_std::{Api, CanonicalAddr, HumanAddr, ReadonlyStorage, StdError, StdResult, Storage};
+use cosmwasm_std::{Api, CanonicalAddr, ReadonlyStorage, StdError, StdResult, Storage};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 
 use secret_toolkit::{
@@ -8,10 +8,10 @@ use secret_toolkit::{
     storage::{AppendStore, AppendStoreMut},
 };
 
-use schemars::JsonSchema;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::expiration::Expiration;
+use crate::msg::{Tx, TxAction};
 
 /// storage key for config
 pub const CONFIG_KEY: &[u8] = b"config";
@@ -79,54 +79,6 @@ pub struct Config {
     pub owner_may_update_metadata: bool,
     /// is burn enabled
     pub burn_is_enabled: bool,
-}
-
-/// tx type and specifics
-#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug)]
-#[serde(rename_all = "snake_case")]
-pub enum TxAction {
-    /// transferred token ownership
-    Transfer {
-        /// previous owner
-        from: HumanAddr,
-        /// optional sender if not owner
-        #[serde(skip_serializing_if = "Option::is_none")]
-        sender: Option<HumanAddr>,
-        /// new owner
-        recipient: HumanAddr,
-    },
-    /// minted new token
-    Mint {
-        /// minter's address
-        minter: HumanAddr,
-        /// token's first owner
-        recipient: HumanAddr,
-    },
-    /// burned a token
-    Burn {
-        /// previous owner
-        owner: HumanAddr,
-        /// burner's address if not owner
-        #[serde(skip_serializing_if = "Option::is_none")]
-        burner: Option<HumanAddr>,
-    },
-}
-
-/// tx for display
-#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug)]
-#[serde(rename_all = "snake_case")]
-pub struct Tx {
-    /// tx id
-    pub tx_id: u64,
-    /// the block containing this tx
-    pub blockheight: u64,
-    /// token id
-    pub token_id: String,
-    /// tx type and specifics
-    pub action: TxAction,
-    /// optional memo
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub memo: Option<String>,
 }
 
 /// tx type and specifics

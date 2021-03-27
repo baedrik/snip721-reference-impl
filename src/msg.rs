@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Binary, Coin, HumanAddr};
 
 use crate::expiration::Expiration;
-use crate::state::Tx;
 use crate::token::Metadata;
 
 /// Instantiation message
@@ -498,6 +497,54 @@ pub struct ViewerInfo {
     pub address: HumanAddr,
     /// authentication key string
     pub viewing_key: String,
+}
+
+/// tx type and specifics
+#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum TxAction {
+    /// transferred token ownership
+    Transfer {
+        /// previous owner
+        from: HumanAddr,
+        /// optional sender if not owner
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sender: Option<HumanAddr>,
+        /// new owner
+        recipient: HumanAddr,
+    },
+    /// minted new token
+    Mint {
+        /// minter's address
+        minter: HumanAddr,
+        /// token's first owner
+        recipient: HumanAddr,
+    },
+    /// burned a token
+    Burn {
+        /// previous owner
+        owner: HumanAddr,
+        /// burner's address if not owner
+        #[serde(skip_serializing_if = "Option::is_none")]
+        burner: Option<HumanAddr>,
+    },
+}
+
+/// tx for display
+#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct Tx {
+    /// tx id
+    pub tx_id: u64,
+    /// the block containing this tx
+    pub blockheight: u64,
+    /// token id
+    pub token_id: String,
+    /// tx type and specifics
+    pub action: TxAction,
+    /// optional memo
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memo: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

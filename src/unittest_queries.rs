@@ -4,9 +4,8 @@ mod tests {
     use crate::expiration::Expiration;
     use crate::msg::{
         AccessLevel, Cw721Approval, HandleMsg, InitConfig, InitMsg, QueryAnswer, QueryMsg,
-        Snip721Approval, ViewerInfo,
+        Snip721Approval, Tx, TxAction, ViewerInfo,
     };
-    use crate::state::{Tx, TxAction};
     use crate::token::Metadata;
     use cosmwasm_std::testing::*;
     use cosmwasm_std::{
