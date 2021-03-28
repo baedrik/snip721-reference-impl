@@ -3534,7 +3534,6 @@ fn receiver_callback_msgs<S: ReadonlyStorage>(
         } else {
             for token_id in send_from.token_ids.into_iter() {
                 callbacks.push(receive_nft_msg(
-                    sender.clone(),
                     send_from.owner.clone(),
                     token_id,
                     msg.clone(),

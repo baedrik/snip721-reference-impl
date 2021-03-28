@@ -6,7 +6,7 @@ mod tests {
         AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg, Mint,
         PostInitCallback, QueryAnswer, QueryMsg, Send, Transfer, Tx, TxAction,
     };
-    use crate::receiver::{receive_nft_msg, Snip721ReceiveMsg};
+    use crate::receiver::Snip721ReceiveMsg;
     use crate::state::{
         get_txs, json_load, json_may_load, load, may_load, AuthList, Config, Permission,
         PermissionType, CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
@@ -7252,16 +7252,22 @@ mod tests {
             handle_msg,
         );
         // confirm that the ReceiveNft msg was created
-        let alice_receive = receive_nft_msg(
-            HumanAddr("bob".to_string()),
-            HumanAddr("alice".to_string()),
-            "MyNFT".to_string(),
-            None,
-            "alice code hash".to_string(),
-            HumanAddr("alice".to_string()),
-        )
+        let handle_resp = handle_result.unwrap();
+        let messages = handle_resp.messages;
+        let mut msg_fr_al = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("alice".to_string()),
+            token_id: "MyNFT".to_string(),
+            msg: None,
+        })
         .unwrap();
-        assert_eq!(handle_result.unwrap().messages[0], alice_receive);
+        let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
+        let msg_fr_al = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("alice".to_string()),
+            callback_code_hash: "alice code hash".to_string(),
+            msg: Binary(msg_fr_al.to_vec()),
+            send: vec![],
+        });
+        assert_eq!(messages[0], msg_fr_al);
 
         // confirm token was not removed from the maps
         let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
@@ -7376,16 +7382,22 @@ mod tests {
             handle_msg,
         );
         // confirm the receive nft msg was created
-        let receive = receive_nft_msg(
-            HumanAddr("bob".to_string()),
-            HumanAddr("alice".to_string()),
-            "MyNFT".to_string(),
-            send_msg.clone(),
-            "david code hash".to_string(),
-            HumanAddr("david".to_string()),
-        )
+        let handle_resp = handle_result.unwrap();
+        let messages = handle_resp.messages;
+        let mut msg_fr_al = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("alice".to_string()),
+            token_id: "MyNFT".to_string(),
+            msg: send_msg.clone(),
+        })
         .unwrap();
-        assert_eq!(handle_result.unwrap().messages[0], receive);
+        let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
+        let msg_fr_al = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("david".to_string()),
+            callback_code_hash: "david code hash".to_string(),
+            msg: Binary(msg_fr_al.to_vec()),
+            send: vec![],
+        });
+        assert_eq!(messages[0], msg_fr_al);
         // confirm token was not removed from the maps
         let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
         assert!(tokens.contains("MyNFT"));
@@ -7487,16 +7499,22 @@ mod tests {
             handle_msg,
         );
         // confirm the receive nft msg was created
-        let receive = receive_nft_msg(
-            HumanAddr("charlie".to_string()),
-            HumanAddr("david".to_string()),
-            "MyNFT".to_string(),
-            send_msg.clone(),
-            "charlie code hash".to_string(),
-            HumanAddr("charlie".to_string()),
-        )
+        let handle_resp = handle_result.unwrap();
+        let messages = handle_resp.messages;
+        let mut msg_fr_dv = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("david".to_string()),
+            token_id: "MyNFT".to_string(),
+            msg: send_msg.clone(),
+        })
         .unwrap();
-        assert_eq!(handle_result.unwrap().messages[0], receive);
+        let msg_fr_dv = space_pad(&mut msg_fr_dv.0, 256usize);
+        let msg_fr_dv = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("charlie".to_string()),
+            callback_code_hash: "charlie code hash".to_string(),
+            msg: Binary(msg_fr_dv.to_vec()),
+            send: vec![],
+        });
+        assert_eq!(messages[0], msg_fr_dv);
         // confirm token was not removed from the list
         let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
         assert!(tokens.contains("MyNFT"));
@@ -7563,16 +7581,22 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
         // confirm the receive nft msg was created
-        let receive = receive_nft_msg(
-            HumanAddr("charlie".to_string()),
-            HumanAddr("charlie".to_string()),
-            "MyNFT".to_string(),
-            send_msg.clone(),
-            "alice code hash".to_string(),
-            HumanAddr("alice".to_string()),
-        )
+        let handle_resp = handle_result.unwrap();
+        let messages = handle_resp.messages;
+        let mut msg_fr_ch = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("charlie".to_string()),
+            token_id: "MyNFT".to_string(),
+            msg: send_msg.clone(),
+        })
         .unwrap();
-        assert_eq!(handle_result.unwrap().messages[0], receive);
+        let msg_fr_ch = space_pad(&mut msg_fr_ch.0, 256usize);
+        let msg_fr_ch = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("alice".to_string()),
+            callback_code_hash: "alice code hash".to_string(),
+            msg: Binary(msg_fr_ch.to_vec()),
+            send: vec![],
+        });
+        assert_eq!(messages[0], msg_fr_ch);
         // confirm token was not removed from the maps
         let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
         assert!(tokens.contains("MyNFT"));
@@ -7939,29 +7963,38 @@ mod tests {
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("david", &[]), handle_msg);
-        let resp = handle_result.unwrap();
         // confirm the receive nft msgs were created
-        assert_eq!(resp.messages.len(), 2);
-        let receive = receive_nft_msg(
-            HumanAddr("david".to_string()),
-            HumanAddr("alice".to_string()),
-            "NFT1".to_string(),
-            send_msg.clone(),
-            "charlie code hash".to_string(),
-            HumanAddr("charlie".to_string()),
-        )
+        let handle_resp = handle_result.unwrap();
+        let messages = handle_resp.messages;
+        let mut msg_fr_al = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("alice".to_string()),
+            token_id: "NFT1".to_string(),
+            msg: send_msg.clone(),
+        })
         .unwrap();
-        assert_eq!(resp.messages[0], receive);
-        let receive = receive_nft_msg(
-            HumanAddr("david".to_string()),
-            HumanAddr("alice".to_string()),
-            "NFT1".to_string(),
-            send_msg.clone(),
-            "bob code hash".to_string(),
-            HumanAddr("bob".to_string()),
-        )
+        let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
+        let msg_fr_al = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("charlie".to_string()),
+            callback_code_hash: "charlie code hash".to_string(),
+            msg: Binary(msg_fr_al.to_vec()),
+            send: vec![],
+        });
+        assert_eq!(messages[0], msg_fr_al);
+        assert_eq!(messages.len(), 2);
+        let mut msg_fr_al = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("alice".to_string()),
+            token_id: "NFT1".to_string(),
+            msg: send_msg.clone(),
+        })
         .unwrap();
-        assert_eq!(resp.messages[1], receive);
+        let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
+        let msg_fr_al = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("bob".to_string()),
+            callback_code_hash: "bob code hash".to_string(),
+            msg: Binary(msg_fr_al.to_vec()),
+            send: vec![],
+        });
+        assert_eq!(messages[1], msg_fr_al);
         // confirm token was not removed from the maps
         let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
         assert!(tokens.contains("NFT1"));
@@ -8081,29 +8114,38 @@ mod tests {
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let resp = handle_result.unwrap();
         // confirm the receive nft msgs were created
-        assert_eq!(resp.messages.len(), 2);
-        let receive = receive_nft_msg(
-            HumanAddr("bob".to_string()),
-            HumanAddr("bob".to_string()),
-            "NFT1".to_string(),
-            send_msg.clone(),
-            "charlie code hash".to_string(),
-            HumanAddr("charlie".to_string()),
-        )
+        let handle_resp = handle_result.unwrap();
+        let messages = handle_resp.messages;
+        let mut msg_fr_b = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("bob".to_string()),
+            token_id: "NFT1".to_string(),
+            msg: send_msg.clone(),
+        })
         .unwrap();
-        assert_eq!(resp.messages[0], receive);
-        let receive = receive_nft_msg(
-            HumanAddr("bob".to_string()),
-            HumanAddr("alice".to_string()),
-            "NFT3".to_string(),
-            send_msg.clone(),
-            "bob code hash".to_string(),
-            HumanAddr("bob".to_string()),
-        )
+        let msg_fr_b = space_pad(&mut msg_fr_b.0, 256usize);
+        let msg_fr_b = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("charlie".to_string()),
+            callback_code_hash: "charlie code hash".to_string(),
+            msg: Binary(msg_fr_b.to_vec()),
+            send: vec![],
+        });
+        assert_eq!(messages[0], msg_fr_b);
+        assert_eq!(messages.len(), 2);
+        let mut msg_fr_al = to_binary(&Snip721ReceiveMsg::ReceiveNft {
+            sender: HumanAddr("alice".to_string()),
+            token_id: "NFT3".to_string(),
+            msg: send_msg.clone(),
+        })
         .unwrap();
-        assert_eq!(resp.messages[1], receive);
+        let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
+        let msg_fr_al = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: HumanAddr("bob".to_string()),
+            callback_code_hash: "bob code hash".to_string(),
+            msg: Binary(msg_fr_al.to_vec()),
+            send: vec![],
+        });
+        assert_eq!(messages[1], msg_fr_al);
         // confirm tokens have the correct owner and the permissions were cleared
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
@@ -8299,8 +8341,7 @@ mod tests {
             send: vec![],
         });
         let mut msg_fr_c3 = to_binary(&Snip721ReceiveMsg::ReceiveNft {
-            sender: HumanAddr("bob".to_string()),
-            from: HumanAddr("charlie".to_string()),
+            sender: HumanAddr("charlie".to_string()),
             token_id: "NFT3".to_string(),
             msg: None,
         })
@@ -8313,8 +8354,7 @@ mod tests {
             send: vec![],
         });
         let mut msg_fr_c4 = to_binary(&Snip721ReceiveMsg::ReceiveNft {
-            sender: HumanAddr("bob".to_string()),
-            from: HumanAddr("charlie".to_string()),
+            sender: HumanAddr("charlie".to_string()),
             token_id: "NFT4".to_string(),
             msg: None,
         })
@@ -8327,8 +8367,7 @@ mod tests {
             send: vec![],
         });
         let mut msg_fr_c6 = to_binary(&Snip721ReceiveMsg::ReceiveNft {
-            sender: HumanAddr("bob".to_string()),
-            from: HumanAddr("charlie".to_string()),
+            sender: HumanAddr("charlie".to_string()),
             token_id: "NFT6".to_string(),
             msg: None,
         })

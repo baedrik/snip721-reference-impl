@@ -33,7 +33,7 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 		“enable_burn”: true|false
 	},
 	“post_init_callback”: {
-		“msg”: “base64_encoded_JSON_representing_the_msg_to_perform_after_initialization”,
+		“msg”: “base64_encoded_Binary_representing_the_msg_to_perform_after_initialization”,
 		“contract_address”: “address_of_the_contract_being_called_after_initialization”,
 		“code_hash”: “code_hash_of_the_contract_being_called_after_initialization”,
 		“send”: [
@@ -91,7 +91,7 @@ Config is the privacy configuration for the contract.
 Post)init_callback is the optional callback message to execute after the token contract has initialized.  This can be useful if another contract is instantiating this token contract and needs the token contract to inform the creating contract of the address it has been given
 ```
 {
-	“msg”: “base64_encoded_JSON_representing_the_msg_to_perform_after_initialization”,
+	“msg”: “base64_encoded_Binary_representing_the_msg_to_perform_after_initialization”,
 	“contract_address”: “address_of_the_contract_being_called_after_initialization”,
 	“code_hash”: “code_hash_of_the_contract_being_called_after_initialization”,
 	“send”: [
@@ -105,12 +105,12 @@ Post)init_callback is the optional callback message to execute after the token c
 	]
 }
 ```
-| Name             | Type                                  | Description                                                                                         | Optional | Value If Omitted |
-|------------------|---------------------------------------|-----------------------------------------------------------------------------------------------------|----------|------------------|
-| msg              | string (base64 encoded)               | Base64 encoded JSON representation of the callback message to perform after contract initialization | no       |                  |
-| contract_address | string (HumanAddr)                    | Address of the contract to call after initialization                                                | no       |                  |
-| code_hash        | string                                | Code hash of the contract to call after initialization                                              | no       |                  |
-| send             | array of [Coin (see below)](#coin)    | List of native Coin amounts to send with the callback message                                        | no       |                  |
+| Name             | Type                                  | Description                                                                                           | Optional | Value If Omitted |
+|------------------|---------------------------------------|-------------------------------------------------------------------------------------------------------|----------|------------------|
+| msg              | string (base64 encoded Binary)        | Base64 encoded Binary representation of the callback message to perform after contract initialization | no       |                  |
+| contract_address | string (HumanAddr)                    | Address of the contract to call after initialization                                                  | no       |                  |
+| code_hash        | string                                | Code hash of the contract to call after initialization                                                | no       |                  |
+| send             | array of [Coin (see below)](#coin)    | List of native Coin amounts to send with the callback message                                         | no       |                  |
 
 #### <a name="coin"></a>Coin
 Coin is the payment to send with the post-init callback message.  Although `send` is not an optional field of the Post Init Callback, because it is an array, you can just use `[]` to not send any payment with the callback message
@@ -652,8 +652,8 @@ The Transfer object provides a list of tokens to transfer to one recipient addre
 | token_ids | array of string    | List of token IDs to transfer to the recipient                                                                                    | no       |                  |
 | memo      | string             | Memo for the transfer transactions that is only viewable by addresses involved in the transfer (recipient, sender, previous owner)| yes      | nothing          |
 
-## SendNft
-SendNft is used to transfer ownership of the token to the `contract` address, and then call the recipient's ReceiveNft (or BatchReceiveNft, [see below](#receiver)) if the recipient contract has registered its receive functionality with the NFT contract.  If the recipient contract registered that it implements BatchReceiveNft, a BatchReceiveNft callback will be performed with only the single token ID in the `token_ids` array.  This requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the recipient address is the same as the current owner, no transfer will be done (transaction history will not include a transfer that does not change ownership), but the ReceiveNft (or BatchReceiveNft) callback will be performed if registered.  If the token is transferred to a new owner, its single-token approvals will be cleared.  If the ReceiveNft (or BatchReceiveNft) callback fails, the entire transaction will be reverted (even the transfer will not take place).
+## <a name="send"></a>SendNft
+SendNft is used to transfer ownership of the token to the `contract` address, and then call the recipient's BatchReceiveNft (or ReceiveNft, [see below](#receiver)) if the recipient contract has registered its receiver interface with the NFT contract.  If the recipient contract registered that it implements BatchReceiveNft, a BatchReceiveNft callback will be performed with only the single token ID in the `token_ids` array.  This requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the recipient address is the same as the current owner, no transfer will be done (transaction history will not include a transfer that does not change ownership), but the BatchReceiveNft (or ReceiveNft) callback will be performed if registered.  If the token is transferred to a new owner, its single-token approvals will be cleared.  If the BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction will be reverted (even the transfer will not take place).
 
 ##### Request
 ```
@@ -661,19 +661,19 @@ SendNft is used to transfer ownership of the token to the `contract` address, an
 	"send_nft": {
 		"contract": "address_receiving_the_token",
 		"token_id": "ID_of_the_token_being_transferred",
-		"msg": "optional_base64_encoded_message_string_sent_with_the_ReceiveNft_callback",
+		"msg": "optional_base64_encoded_Binary_message_sent_with_the_BatchReceiveNft_callback",
 		"memo": "optional_memo_for_the_transfer_tx",
  		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
 }
 ```
-| Name     | Type                     | Description                                                                                                                   | Optional | Value If Omitted |
-|----------|--------------------------|-------------------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| contract | string (HumanAddr)       | Address receiving the token                                                                                                   | no       |                  |
-| token_id | string                   | Identifier of the token to be transferred                                                                                     | no       |                  |
-| msg      | string (base64 encoded)  | Msg included when calling the recipient contract's ReceiveNft (or BatchReceiveNft)                                            | yes      | nothing          |
-| memo     | string                   | Memo for the transfer tx that is only viewable by addresses involved in the transfer (recipient, sender, previous owner)      | yes      | nothing          |
-| padding  | string                   | An Ignored string that can be used to maintain constant message length                                                        | yes      | nothing          |
+| Name     | Type                           | Description                                                                                                                | Optional | Value If Omitted |
+|----------|--------------------------------|----------------------------------------------------------------------------------------------------------------------------|----------|------------------|
+| contract | string (HumanAddr)             | Address receiving the token                                                                                                | no       |                  |
+| token_id | string                         | Identifier of the token to be transferred                                                                                  | no       |                  |
+| msg      | string (base64 encoded Binary) | Msg included when calling the recipient contract's BatchReceiveNft (or ReceiveNft)                                         | yes      | nothing          |
+| memo     | string                         | Memo for the transfer tx that is only viewable by addresses involved in the transfer (recipient, sender, previous owner)   | yes      | nothing          |
+| padding  | string                         | An Ignored string that can be used to maintain constant message length                                                     | yes      | nothing          |
 
 ##### Response
 ```
@@ -684,12 +684,11 @@ SendNft is used to transfer ownership of the token to the `contract` address, an
 }
 ```
 
-## BatchSendNft
-BatchSendNft is used to perform multiple token transfers, and then call the recipient contracts' BatchReceiveNft (or ReceiveNft [see below](#receiver)) if they have registered their receive functionality with the NFT contract.  The message sender may specify a list of tokens to send to one recipient address in each `Send` object, and any `memo` or `msg` provided will be applied to every token transferred in that one `Send` object.  If the list of transferred tokens belonged to multiple previous owners, a separate BatchReceiveNft callback will be performed for each of the previous owners.  If the contract only implements ReceiveNft, one ReceiveNft will be performed for every sent token.  Therefore it is highly recommended to implement BatchReceiveNft if there is the possibility of being sent multiple tokens at one time.  This will reduce gas costs by around 80k per token sent.  
+## <a name="batchsend"></a>BatchSendNft
+BatchSendNft is used to perform multiple token transfers, and then call the recipient contracts' BatchReceiveNft (or ReceiveNft [see below](#receiver)) if they have registered their receiver interface with the NFT contract.  The message sender may specify a list of tokens to send to one recipient address in each `Send` object, and any `memo` or `msg` provided will be applied to every token transferred in that one `Send` object.  If the list of transferred tokens belonged to multiple previous owners, a separate BatchReceiveNft callback will be performed for each of the previous owners.  If the contract only implements ReceiveNft, one ReceiveNft will be performed for every sent token.  Therefore it is highly recommended to implement BatchReceiveNft if there is the possibility of being sent multiple tokens at one time.  This will reduce gas costs by around 80k per token sent.  
 
-The message sender may provide multiple `Send` objects to perform sends to multiple addresses, providing a different `memo` and `msg` for each address if desired.  Each individual transfer of a token will show separately in transaction histories.  The message sender must have permission to transfer all the tokens listed (either by being the owner or being granted transfer approval) and every token ID must be valid.  A contract may use the VerifyTransferApproval query to verify that it has permission to transfer all the tokens.  If the message sender does not have permission to transfer any one of the listed tokens, the entire message will fail (no tokens will be transferred) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.  If any token transfer involves a recipient address that is the same as its current owner, that transfer will not be done (transaction history will not include a transfer that does not change ownership), but all the other transfers will proceed.  Any token that is transferred to a new owner will have its single-token approvals cleared.
+The message sender may provide multiple `Send` objects to perform sends to multiple addresses, providing a different `memo` and `msg` for each address if desired.  Each individual transfer of a token will show separately in transaction histories.  The message sender must have permission to transfer all the tokens listed (either by being the owner or being granted transfer approval) and every token ID must be valid.  A contract may use the [VerifyTransferApproval](#verifyapproval) query to verify that it has permission to transfer all the tokens.  If the message sender does not have permission to transfer any one of the listed tokens, the entire message will fail (no tokens will be transferred) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.  If any token transfer involves a recipient address that is the same as its current owner, that transfer will not be done (transaction history will not include a transfer that does not change ownership), but all the other transfers will proceed.  Any token that is transferred to a new owner will have its single-token approvals cleared.
 If any BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction will be reverted (even the transfers will not take place).
-See the bottom of this document for the definitions of BatchReceiveNft and ReceiveNft messages.
 
 ##### Request
 ```
@@ -699,9 +698,9 @@ See the bottom of this document for the definitions of BatchReceiveNft and Recei
 			{
 				"contract": "address_receiving_the_tokens",
 				"token_ids": [
-					"list", "of", "token", "IDs", "to", "transfer"
+					"list", "of", "token", "IDs", "to", "transfer", "..."
 				],
-				"msg": "optional_base64_encoded_message_string_sent_with_every_BatchReceiveNft_callback_made_for_this_one_Send_object",
+				"msg": "optional_base64_encoded_Binary_message_sent_with_every_BatchReceiveNft_callback_made_for_this_one_Send_object",
 				"memo": "optional_memo_applied_to_the_transfer_tx_for_every_token_listed_in_this_Send_object"
 			},
 			{
@@ -734,16 +733,16 @@ The Send object provides a list of tokens to transfer to one recipient address, 
 	"token_ids": [
 		"list", "of", "token", "IDs", "to", "transfer", "..."
 	],
-	"msg": "optional_base64_encoded_message_string_sent_with_every_BatchReceiveNft_callback_made_for_this_one_Send_object",
+	"msg": "optional_base64_encoded_Binary_message_sent_with_every_BatchReceiveNft_callback_made_for_this_one_Send_object",
 	"memo": "optional_memo_applied_to_the_transfer_tx_for_every_token_listed_in_this_Send_object"
 }
 ```
-| Name      | Type                    | Description                                                                                                                  | Optional | Value If Omitted |
-|-----------|-------------------------|------------------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| contract  | string (HumanAddr)      | Address receiving the listed tokens                                                                                          | no       |                  |
-| token_ids | array of string         | List of token IDs to send to the recipient                                                                                   | no       |                  |
-| msg       | string (base64 encoded) | Msg included with every BatchReceiveNft (or ReceiveNft) callback performed for this `Send` object                            | yes      | nothing          |
-| memo      | string                  | Memo for the transfer txs that is only viewable by addresses involved in the transfer (recipient, sender, previous owner)    | yes      | nothing          |
+| Name      | Type                           | Description                                                                                                               | Optional | Value If Omitted |
+|-----------|--------------------------------|---------------------------------------------------------------------------------------------------------------------------|----------|------------------|
+| contract  | string (HumanAddr)             | Address receiving the listed tokens                                                                                       | no       |                  |
+| token_ids | array of string                | List of token IDs to send to the recipient                                                                                | no       |                  |
+| msg       | string (base64 encoded Binary) | Msg included with every BatchReceiveNft (or ReceiveNft) callback performed for this `Send` object                         | yes      | nothing          |
+| memo      | string                         | Memo for the transfer txs that is only viewable by addresses involved in the transfer (recipient, sender, previous owner) | yes      | nothing          |
 
 ## BurnNft
 BurnNft is used to burn a single token, providing an optional memo to include in the burn's transaction history if desired.  If the contract has not enabled burn functionality using the init configuration `enable_burn`, BurnNft will result in an error.  The token owner and anyone else with valid transfer approval may use BurnNft.
@@ -1017,7 +1016,7 @@ ChangeAdmin will allow the current admin to transfer admin privileges to another
 }
 ```
 
-## RegisterReceiveNft
+## <a name="registerreceive"></a>RegisterReceiveNft
 A contract will use RegisterReceiveNft to notify the NFT contract that it implements ReceiveNft and possibly also BatchReceiveNft [(see below)](#receiver).  This enables the NFT contract to call the registered contract whenever it is Sent a token (or tokens).  ReceiveNft only informs the recipient contract that it has been sent a single token; while, BatchReceiveNft can be used to inform a contract that it was sent multiple tokens.  This is particularly useful if a contract needs to be sent a deck of "cards", as it will save around 80k in gas for every token that was sent.  If a contract implements BatchReceiveNft, the NFT contract will always call BatchReceiveNft even if there is only one token being sent, in which case the `token_ids` array will only have one element.
 
 ##### Request
@@ -1729,7 +1728,7 @@ Tokens displays an optionally paginated list of all the token IDs that belong to
 |---------|-----------------|----------------------------------------------------------------------|----------|
 | tokens  | array of string | A list of token IDs owned by the specified `owner`                   | no       |
 
-## VerifyTransferApproval
+## <a name="verifyapproval"></a> VerifyTransferApproval
 VerifyTransferApproval will verify that the specified address has approval to transfer the entire provided list of tokens.  As explained [above](#queryblockinfo), queries may experience a delay in revealing expired permissions, so it is possible that a transfer attempt will still fail even after being verified by VerifyTransferApproval.  If the address does not have transfer approval on all the tokens, the response will indicate the first token encountered that can not be transferred by the address.
 
 ##### Request
@@ -1902,3 +1901,44 @@ The TxAction object defines the type of transaction and holds the information sp
 | burner    | string (HumanAddr) | The address that burned the token if different than the previous owner         | yes      |
 
 # <a name="receiver"></a>Receiver Interface
+When the token contract executes [SendNft](#send) and [BatchSendNft](#batchsend) messages, it will perform a callback to the receiving contract's receiver interface if the recipient had registered its code hash using [RegisterReceiveNft](#registerreceive).  BatchReceiveNft is preferred over ReceiveNft, because ReceiveNft does not allow the recipient to know who sent the token, only its previous owner, and ReceiveNft can only process one token.  So it is inefficient when sending multiple tokens to the same contract (a deck of game cards for instance).  ReceiveNft primarily exists just to maintain CW-721 compliance, and if the receiving contract registered that it implements BatchReceiveNft, BatchReceiveNft will be called, even when there is only one token_id in the message.
+<a name="cwsender"></a>
+Also, it should be noted that the CW-721 `sender` field is inaccurately named, because it is used to hold the address the token came from, not the address that sent it (which is not always the same).  The name is reluctantly kept in ReceiveNft to maintain CW-721 compliance, but BatchReceiveNft uses `sender` to hold the sending address (which matches both its true role and its SNIP-20 Receive counterpart).  Any contract that is implementing both Receiver Interfaces must be sure that the ReceiveNft `sender` field is actually processed like a BatchReceiveNft `from` field.  Again, apologies for any confusion caused by propagating inaccuracies, but because InterNFT is planning on using CW-721 standards, compliance with CW-721 might be necessary.
+
+## ReceiveNft
+ReceiveNft may be a HandleMsg variant of any contract that wants to implement a receiver interface.  BatchReceiveNft, which is more informative and more efficient, is preferred over ReceiveNft.  
+```
+{
+	"receive_nft": {
+		"sender": "address_of_the_previous_owner_of_the_token",
+		"token_id": "ID_of_the_sent_token",
+		"msg": "optional_base64_encoded_Binary_message_used_to_control_receiving_logic"
+	}
+}
+```
+| Name     | Type                           | Description                                                                                            | Optional | Value If Omitted |
+|----------|--------------------------------|--------------------------------------------------------------------------------------------------------|----------|------------------|
+| sender   | string (HumanAddr)             | Address of the token's previous owner ([see above](#cwsender) about this inaccurate naming convention) | no       |                  |
+| token_id | string                         | ID of the sent token                                                                                   | no       |                  |
+| msg      | string (base64 encoded Binary) | Msg used to control receiving logic                                                                    | yes      | nothing          |
+
+## BatchReceiveNft
+BatchReceiveNft may be a HandleMsg variant of any contract that wants to implement a receiver interface.  BatchReceiveNft, which is more informative and more efficient, is preferred over ReceiveNft.
+```
+{
+	"batch_receive_nft": {
+		"sender": "address_that_sent_the_tokens",
+		"from": "address_of_the_previous_owner_of_the_tokens",
+		"token_ids": [
+			"list", "of", "tokens", "sent", "..."
+		],
+		"msg": "optional_base64_encoded_Binary_message_used_to_control_receiving_logic"
+	}
+}
+```
+| Name      | Type                           | Description                                                                                                              | Optional | Value If Omitted |
+|-----------|--------------------------------|--------------------------------------------------------------------------------------------------------------------------|----------|------------------|
+| sender    | string (HumanAddr)             | Address that sent the tokens (this field has no ReceiveNft equivalent, [see above](#cwsender))                           | no       |                  |
+| from      | string (HumanAddr)             | Address of the tokens' previous owner (this field is equivalent to the ReceiveNft `sender` field, [see above](#cwsender))| no       |                  |
+| token_ids | array of string                | List of the tokens sent                                                                                                  | no       |                  |
+| msg       | string (base64 encoded Binary) | Msg used to control receiving logic                                                                                      | yes      | nothing          |
