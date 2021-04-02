@@ -508,7 +508,6 @@ pub enum TxAction {
         /// previous owner
         from: HumanAddr,
         /// optional sender if not owner
-        #[serde(skip_serializing_if = "Option::is_none")]
         sender: Option<HumanAddr>,
         /// new owner
         recipient: HumanAddr,
@@ -525,7 +524,6 @@ pub enum TxAction {
         /// previous owner
         owner: HumanAddr,
         /// burner's address if not owner
-        #[serde(skip_serializing_if = "Option::is_none")]
         burner: Option<HumanAddr>,
     },
 }
@@ -543,7 +541,6 @@ pub struct Tx {
     /// tx type and specifics
     pub action: TxAction,
     /// optional memo
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub memo: Option<String>,
 }
 

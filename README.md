@@ -88,7 +88,7 @@ Config is the privacy configuration for the contract.
 | enable_burn                   | bool | yes      | false            |
 
 ### <a name="postinitcallback"></a>Post Init Callback
-Post)init_callback is the optional callback message to execute after the token contract has initialized.  This can be useful if another contract is instantiating this token contract and needs the token contract to inform the creating contract of the address it has been given
+PostInitCallback is the optional callback message to execute after the token contract has initialized.  This can be useful if another contract is instantiating this token contract and needs the token contract to inform the creating contract of the address it has been given
 ```
 {
 	“msg”: “base64_encoded_Binary_representing_the_msg_to_perform_after_initialization”,
@@ -109,7 +109,7 @@ Post)init_callback is the optional callback message to execute after the token c
 |------------------|---------------------------------------|-------------------------------------------------------------------------------------------------------|----------|------------------|
 | msg              | string (base64 encoded Binary)        | Base64 encoded Binary representation of the callback message to perform after contract initialization | no       |                  |
 | contract_address | string (HumanAddr)                    | Address of the contract to call after initialization                                                  | no       |                  |
-| code_hash        | string                                | Code hash of the contract to call after initialization                                                | no       |                  |
+| code_hash        | string                                | A 32-byte hex encoded string, with the code hash of the contract to call after initialization         | no       |                  |
 | send             | array of [Coin (see below)](#coin)    | List of native Coin amounts to send with the callback message                                         | no       |                  |
 
 #### <a name="coin"></a>Coin
@@ -157,7 +157,7 @@ MintNft mints a single token.
 | public_metadata  | [Metadata (see below)](#metadata)      | The metadata that is publicly viewable                                                        | yes      | nothing              |
 | private_metadata | [Metadata (see below)](#metadata)      | The metadata that is viewable only by the token owner and addresses the owner has whitelisted | yes      | nothing              |
 | memo             | string                                 | A memo for the mint tx that is only viewable by addresses involved in the mint (minter/owner) | yes      | nothing              |
-| padding          | string                                 | An Ignored string that can be used to maintain constant message length                        | yes      | nothing              |
+| padding          | string                                 | An ignored string that can be used to maintain constant message length                        | yes      | nothing              |
 
 ##### Response
 ```
@@ -218,7 +218,7 @@ BatchMintNft mints a list of tokens.
 | Name    | Type                                  | Description                                                            | Optional | Value If Omitted |
 |---------|---------------------------------------|------------------------------------------------------------------------|----------|------------------|
 | mints   | array of [Mint (see below)](#mint)    | A list of all the mint operations to perform                           | no       |                  |
-| padding | string                                | An Ignored string that can be used to maintain constant message length | yes      | nothing          |
+| padding | string                                | An ignored string that can be used to maintain constant message length | yes      | nothing          |
 
 ##### Response
 ```
@@ -259,7 +259,7 @@ Mint defines the data necessary to perform one minting operation
 | private_metadata | [Metadata (see above)](#metadata)    | The metadata that is viewable only by the token owner and addresses the owner has whitelisted      | yes      | nothing              |
 | memo             | string                               | A memo for the mint tx that is only viewable by addresses involved in the mint (minter/owner)      | yes      | nothing              |
 
-## SetPublicMetadata
+## <a name="setpublic"></a>SetPublicMetadata
 SetPublicMetadata will set the public metadata to the input metadata if the message sender is either the token owner or an approved minter and they have been given this power by the configuration value chosen during instantiation
 
 ##### Request
@@ -280,7 +280,7 @@ SetPublicMetadata will set the public metadata to the input metadata if the mess
 |----------|--------------------------------------|------------------------------------------------------------------------|----------|------------------|
 | token_id | string                               | ID of the token whose metadata should be updated                       | no       |                  |
 | metadata | [Metadata (see above)](#metadata)    | The new public metadata for the token                                  | no       |                  |
-| padding  | string                               | An Ignored string that can be used to maintain constant message length | yes      | nothing          |
+| padding  | string                               | An ignored string that can be used to maintain constant message length | yes      | nothing          |
 
 ##### Response
 ```
@@ -291,7 +291,7 @@ SetPublicMetadata will set the public metadata to the input metadata if the mess
 }
 ```
 
-## SetPrivateMetadata
+## <a name="setprivate"></a>SetPrivateMetadata
 SetPrivateMetadata will set the private metadata to the input metadata if the message sender is either the token owner or an approved minter and they have been given this power by the configuration value chosen during instantiation.  The private metadata of a sealed token may not be altered until after it has been unwrapped.
 
 ##### Request
@@ -312,7 +312,7 @@ SetPrivateMetadata will set the private metadata to the input metadata if the me
 |----------|--------------------------------------|------------------------------------------------------------------------|----------|------------------|
 | token_id | string                               | ID of the token whose metadata should be updated                       | no       |                  |
 | metadata | [Metadata (see above)](#metadata)    | The new private metadata for the token                                 | no       |                  |
-| padding  | string                               | An Ignored string that can be used to maintain constant message length | yes      | nothing          |
+| padding  | string                               | An ignored string that can be used to maintain constant message length | yes      | nothing          |
 
 ##### Response
 ```
@@ -338,7 +338,7 @@ Reveal unwraps the sealed metadata, irreversibly marking the token as unwrapped.
 | Name     | Type                 | Description                                                            | Optional | Value If Omitted |
 |----------|----------------------|------------------------------------------------------------------------|----------|------------------|
 | token_id | string               | ID of the token to unwrap                                              | no       |                  |
-| padding  | string               | An Ignored string that can be used to maintain constant message length | yes      | nothing          |
+| padding  | string               | An ignored string that can be used to maintain constant message length | yes      | nothing          |
 
 ##### Response
 ```
@@ -350,7 +350,7 @@ Reveal unwraps the sealed metadata, irreversibly marking the token as unwrapped.
 ```
 
 ## MakeOwnershipPrivate
-MakeOwnershipPrivate is used when the token contract was instantiated with the `public_owner` configuration value set to true.  It allows an address to make all of its tokens have private ownership by default.  The owner may still use SetGlobalApproval or SetWhitelistedApproval to make ownership public as desired.
+MakeOwnershipPrivate is used when the token contract was instantiated with the `public_owner` configuration value set to true.  It allows an address to make all of its tokens have private ownership by default.  The owner may still use [SetGlobalApproval](#setglobal) or [SetWhitelistedApproval](#setwhitelisted) to make ownership public as desired.
 
 ##### Request
 ```
@@ -362,7 +362,7 @@ MakeOwnershipPrivate is used when the token contract was instantiated with the `
 ```
 | Name     | Type                 | Description                                                            | Optional | Value If Omitted |
 |----------|----------------------|------------------------------------------------------------------------|----------|------------------|
-| padding  | string               | An Ignored string that can be used to maintain constant message length | yes      | nothing          |
+| padding  | string               | An ignored string that can be used to maintain constant message length | yes      | nothing          |
 
 ##### Response
 ```
@@ -373,8 +373,8 @@ MakeOwnershipPrivate is used when the token contract was instantiated with the `
 }
 ```
 
-## SetGlobalApproval
-The owner of a token can use SetGlobalApproval to make ownership and/or private metadata viewable by everyone.  This can be set for a single token or for an owner's entire inventory of tokens by choosing the appropriate AccessLevel.  SetGlobalApproval can also be used to revoke any global approval previously granted.
+## <a name="setglobal"></a>SetGlobalApproval
+The owner of a token can use SetGlobalApproval to make ownership and/or private metadata viewable by everyone.  This can be set for a single token or for an owner's entire inventory of tokens by choosing the appropriate [AccessLevel](#accesslevel).  SetGlobalApproval can also be used to revoke any global approval previously granted.
 
 ##### Request
 ```
@@ -394,7 +394,7 @@ The owner of a token can use SetGlobalApproval to make ownership and/or private 
 | view_owner            | [AccessLevel (see below)](#accesslevel)    | Grant or revoke everyone's permission to view the ownership of a token/inventory                   | yes      | nothing          |
 | view_private_metadata | [AccessLevel (see below)](#accesslevel)    | Grant or revoke everyone's permission to view the private metadata of a token/inventory            | yes      | nothing          |
 | expires               | [Expiration (see below)](#expiration)      | Expiration of any approval granted in this message.  Can be a blockheight, time, or never          | yes      | "never"          |
-| padding               | string                                     | An Ignored string that can be used to maintain constant message length                             | yes      | nothing          |
+| padding               | string                                     | An ignored string that can be used to maintain constant message length                             | yes      | nothing          |
 
 ##### Response
 ```
@@ -405,7 +405,7 @@ The owner of a token can use SetGlobalApproval to make ownership and/or private 
 }
 ```
 ### <a name="accesslevel"></a>AccessLevel
-AccessLevel determines the type of access being granted or revoked to the specified address in a SetWhitelistedApproval message or to everyone in a SetGlobalApproval message.  The levels are mutually exclusive for any address (or for everyone if it is a global approval).  The levels are:
+AccessLevel determines the type of access being granted or revoked to the specified address in a [SetWhitelistedApproval](#setwhitelisted) message or to everyone in a [SetGlobalApproval](#setglobal) message.  Inventory-wide approval and token-specific approval are mutually exclusive levels of access.  The levels are:
 * `"approve_token"` - grant approval only on the token specified in the message
 * `"revoke_token"` - revoke a previous approval on the specified token
 * `"all"` - grant approval for all tokens in the message signer's inventory.  This approval will also apply to any tokens the signer acquires after granting `all` approval
@@ -416,13 +416,13 @@ If the message signer grants an address (or everyone in the case of SetGlobalApp
 ### <a name="expiration"></a>Expiration
 Expiration is used to set an expiration for any approvals granted in the message.  Expiration can be set to a specified blockheight, a time in seconds since epoch 01/01/1970, or "never".  Values for blockheight and time are specified as a u64.  If no expiration is given, it will default to "never".
 
-One should be aware that the current blockheight and time is not available to a query on Secret Network at this moment, but there are plans to make the BlockInfo available to queries in a future hardfork.  To get around this limitation, the contract saves the BlockInfo every time a message is executed, and uses the blockheight and time of the last message execution to check viewing permission expiration during a query.  Therefore it is possible that a whitelisted address may be able to view the owner or metadata of a token passed its permission expiration if no one executed any contract message since before the expiration.  However, because transferring/burning a token is executing a message, it does have the current blockheight and time available and can not occur if transfer permission has expired.
+One should be aware that the current blockheight and time is not available to a query on Secret Network at this moment, but there are plans to make the BlockInfo available to queries in a future hardfork.  To get around this limitation, the contract saves the BlockInfo every time a message is executed, and uses the blockheight and time of the last message execution to check viewing permission expiration during a query.  Therefore it is possible that a whitelisted address may be able to view the owner or metadata of a token past its permission expiration if no one executed any contract message since before the expiration.  However, because transferring/burning a token is executing a message, it does have the current blockheight and time available and can not occur if transfer permission has expired.
 
 * `"never"` - the approval will never expire
 * `{"at_time": 1700000000}` - the approval will expire 1700000000 seconds after 01/01/1970 (time value is u64)
 * `{"at_height": 3000000}` - the approval will expire at block height 3000000 (height value is u64)
 
-## SetWhitelistedApproval
+## <a name="setwhitelisted"></a>SetWhitelistedApproval
 The owner of a token can use SetWhitelistedApproval to grant an address permission to view ownership, view private metadata, and/or to transfer a single token or every token in the owner's inventory.  SetWhitelistedApproval can also be used to revoke any approval previously granted to the address.
 
 ##### Request
@@ -447,7 +447,7 @@ The owner of a token can use SetWhitelistedApproval to grant an address permissi
 | view_private_metadata | [AccessLevel (see above)](#accesslevel)    | Grant or revoke the address' permission to view the private metadata of a token/inventory          | yes      | nothing          |
 | transfer              | [AccessLevel (see above)](#accesslevel)    | Grant or revoke the address' permission to transfer a token/inventory                              | yes      | nothing          |
 | expires               | [Expiration (see above)](#expiration)      | The expiration of any approval granted in this message.  Can be a blockheight, time, or never      | yes      | "never"          |
-| padding               | string                                     | An Ignored string that can be used to maintain constant message length                             | yes      | nothing          |
+| padding               | string                                     | An ignored string that can be used to maintain constant message length                             | yes      | nothing          |
 
 ##### Response
 ```
@@ -459,7 +459,8 @@ The owner of a token can use SetWhitelistedApproval to grant an address permissi
 ```
 
 ## Approve
-Approve is used to grant an address permission to transfer a single token.  This can only be performed by the token's owner or, in compliance with CW-721, an address that has inventory-wide approval to transfer the owner's tokens.  Approve is provided to maintain compliance with CW-721, but the owner can use SetWhitelistedApproval to accomplish the same thing if specifying a `token_id` and `approve_token` AccessLevel for `transfer`.
+Approve is used to grant an address permission to transfer a single token.  This can only be performed by the token's owner or, in compliance with CW-721, an address that has inventory-wide approval to transfer the owner's tokens.  Approve is provided to maintain compliance with CW-721, but the owner can use [SetWhitelistedApproval](#setwhitelisted) to accomplish the same thing if specifying a `token_id` and `approve_token` [AccessLevel](#accesslevel) for `transfer`.
+
 ##### Request
 ```
 {
@@ -476,7 +477,7 @@ Approve is used to grant an address permission to transfer a single token.  This
 | spender               | string (HumanAddr)                       | Address being granted approval to transfer the token                                                 | no       |                  |
 | token_id              | string                                   | ID of the token that the spender can now transfer                                                    | no       |                  |
 | expires               | [Expiration (see above)](#expiration)    | The expiration of this token transfer approval.  Can be a blockheight, time, or never                | yes      | "never"          |
-| padding               | string                                   | An Ignored string that can be used to maintain constant message length                               | yes      | nothing          |
+| padding               | string                                   | An ignored string that can be used to maintain constant message length                               | yes      | nothing          |
 
 ##### Response
 ```
@@ -488,7 +489,8 @@ Approve is used to grant an address permission to transfer a single token.  This
 ```
 
 ## Revoke
-Revoke is used to revoke from an address the permission to transfer this single token.  This can only be performed by the token's owner or, in compliance with CW-721, an address that has inventory-wide approval to transfer the owner's tokens (referred to as an operator later). However, one operator may not revoke transfer permission of even one single token away from another operator.  Revoke is provided to maintain compliance with CW-721, but the owner can use SetWhitelistedApproval to accomplish the same thing if specifying a `token_id` and `revoke_token` AccessLevel for `transfer`.
+Revoke is used to revoke from an address the permission to transfer this single token.  This can only be performed by the token's owner or, in compliance with CW-721, an address that has inventory-wide approval to transfer the owner's tokens (referred to as an operator later). However, one operator may not revoke transfer permission of even one single token away from another operator.  Revoke is provided to maintain compliance with CW-721, but the owner can use [SetWhitelistedApproval](#setwhitelisted) to accomplish the same thing if specifying a `token_id` and `revoke_token` [AccessLevel](#accesslevel) for `transfer`.
+
 ##### Request
 ```
 {
@@ -503,7 +505,7 @@ Revoke is used to revoke from an address the permission to transfer this single 
 |-----------------------|-------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
 | spender               | string (HumanAddr)      | Address no longer permitted to transfer the token                                                    | no       |                  |
 | token_id              | string                  | ID of the token that the spender can no longer transfer                                              | no       |                  |
-| padding               | string                  | An Ignored string that can be used to maintain constant message length                               | yes      | nothing          |
+| padding               | string                  | An ignored string that can be used to maintain constant message length                               | yes      | nothing          |
 
 ##### Response
 ```
@@ -515,7 +517,7 @@ Revoke is used to revoke from an address the permission to transfer this single 
 ```
 
 ## ApproveAll
-ApproveAll is used to grant an address permission to transfer all the tokens in the message sender's inventory.  This will include the ability to transfer any tokens the sender acquires after granting this inventory-wide approval.  This also gives the address the ability to grant another address the approval to transfer a single token.  ApproveAll is provided to maintain compliance with CW-721, but the message sender can use SetWhitelistedApproval to accomplish the same thing by using `all` AccessLevel for `transfer`.
+ApproveAll is used to grant an address permission to transfer all the tokens in the message sender's inventory.  This will include the ability to transfer any tokens the sender acquires after granting this inventory-wide approval.  This also gives the address the ability to grant another address the approval to transfer a single token.  ApproveAll is provided to maintain compliance with CW-721, but the message sender can use [SetWhitelistedApproval](#setwhitelisted) to accomplish the same thing by using `all` [AccessLevel](#accesslevel) for `transfer`.
 
 ##### Request
 ```
@@ -531,7 +533,7 @@ ApproveAll is used to grant an address permission to transfer all the tokens in 
 |-----------------------|------------------------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
 | operator              | string (HumanAddr)                       | Address being granted approval to transfer all of the message sender's tokens                        | no       |                  |
 | expires               | [Expiration (see above)](#expiration)    | The expiration of this inventory-wide transfer approval.  Can be a blockheight, time, or never       | yes      | "never"          |
-| padding               | string                                   | An Ignored string that can be used to maintain constant message length                               | yes      | nothing          |
+| padding               | string                                   | An ignored string that can be used to maintain constant message length                               | yes      | nothing          |
 
 ##### Response
 ```
@@ -543,21 +545,21 @@ ApproveAll is used to grant an address permission to transfer all the tokens in 
 ```
 
 ## RevokeAll
-RevokeAll is used to revoke an inventory-wide transfer approval granted to an address.  RevokeAll is provided to maintain compliance with CW-721, but the message sender can use SetWhitelistedApproval to accomplish the same thing by using `none` AccessLevel for `transfer`.
+RevokeAll is used to revoke all transfer approvals granted to an address.  RevokeAll is provided to maintain compliance with CW-721, but the message sender can use [SetWhitelistedApproval](#setwhitelisted) to accomplish the same thing by using `none` [AccessLevel](#accesslevel) for `transfer`.
 
 ##### Request
 ```
 {
 	"revoke_all": {
-		"operator": "address_being_revoked_a_previous_inventory-wide_approval_to_transfer_tokens",
+		"operator": "address_being_revoked_all_approvals_to_transfer_tokens",
  		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
 }
 ```
 | Name                  | Type                    | Description                                                                                          | Optional | Value If Omitted |
 |-----------------------|-------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
-| operator              | string (HumanAddr)      | Address being revoked a previous approval to transfer all of the message sender's tokens             | no       |                  |
-| padding               | string                  | An Ignored string that can be used to maintain constant message length                               | yes      | nothing          |
+| operator              | string (HumanAddr)      | Address being revoked all approvals to transfer the message sender's tokens                          | no       |                  |
+| padding               | string                  | An ignored string that can be used to maintain constant message length                               | yes      | nothing          |
 
 ##### Response
 ```
@@ -587,7 +589,7 @@ TransferNft is used to transfer ownership of the token to the recipient address.
 | recipient | string (HumanAddr) | Address receiving the token                                                                                                       | no       |                  |
 | token_id  | string             | Identifier of the token to be transferred                                                                                         | no       |                  |
 | memo      | string             | Memo for the transfer transaction that is only viewable by addresses involved in the transfer (recipient, sender, previous owner) | yes      | nothing          |
-| padding   | string             | An Ignored string that can be used to maintain constant message length                                                            | yes      | nothing          |
+| padding   | string             | An ignored string that can be used to maintain constant message length                                                            | yes      | nothing          |
 
 ##### Response
 ```
@@ -624,7 +626,7 @@ BatchTransferNft is used to perform multiple token transfers.  The message sende
 | Name      | Type                                          | Description                                                                                          | Optional | Value If Omitted |
 |-----------|-----------------------------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
 | transfers | array of [Transfer (see below)](#transfer)    | List of `Transfer` objects to process                                                                | no       |                  |
-| padding   | string                                        | An Ignored string that can be used to maintain constant message length                               | yes      | nothing          |
+| padding   | string                                        | An ignored string that can be used to maintain constant message length                               | yes      | nothing          |
 
 ##### Response
 ```
@@ -653,7 +655,9 @@ The Transfer object provides a list of tokens to transfer to one recipient addre
 | memo      | string             | Memo for the transfer transactions that is only viewable by addresses involved in the transfer (recipient, sender, previous owner)| yes      | nothing          |
 
 ## <a name="send"></a>SendNft
-SendNft is used to transfer ownership of the token to the `contract` address, and then call the recipient's BatchReceiveNft (or ReceiveNft, [see below](#receiver)) if the recipient contract has registered its receiver interface with the NFT contract.  If the recipient contract registered that it implements BatchReceiveNft, a BatchReceiveNft callback will be performed with only the single token ID in the `token_ids` array.  This requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the recipient address is the same as the current owner, no transfer will be done (transaction history will not include a transfer that does not change ownership), but the BatchReceiveNft (or ReceiveNft) callback will be performed if registered.  If the token is transferred to a new owner, its single-token approvals will be cleared.  If the BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction will be reverted (even the transfer will not take place).
+SendNft is used to transfer ownership of the token to the `contract` address, and then call the recipient's BatchReceiveNft (or ReceiveNft, [see below](#receiver)) if the recipient contract has registered its receiver interface with the NFT contract.  If the recipient contract registered that it implements BatchReceiveNft, a BatchReceiveNft callback will be performed with only the single token ID in the `token_ids` array.  While SendNft keeps the `contract` field name in order to maintain CW-721 compliance, Secret Network does not have the same limitations as Cosmos, and it is possible to use SendNft to transfer token ownership to a personal address (not a contract) or to a contract that does not implement any Receiver Interface.
+
+SendNft requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the recipient address is the same as the current owner, no transfer will be done (transaction history will not include a transfer that does not change ownership), but the BatchReceiveNft (or ReceiveNft) callback will be performed if registered.  If the token is transferred to a new owner, its single-token approvals will be cleared.  If the BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction will be reverted (even the transfer will not take place).
 
 ##### Request
 ```
@@ -673,7 +677,7 @@ SendNft is used to transfer ownership of the token to the `contract` address, an
 | token_id | string                         | Identifier of the token to be transferred                                                                                  | no       |                  |
 | msg      | string (base64 encoded Binary) | Msg included when calling the recipient contract's BatchReceiveNft (or ReceiveNft)                                         | yes      | nothing          |
 | memo     | string                         | Memo for the transfer tx that is only viewable by addresses involved in the transfer (recipient, sender, previous owner)   | yes      | nothing          |
-| padding  | string                         | An Ignored string that can be used to maintain constant message length                                                     | yes      | nothing          |
+| padding  | string                         | An ignored string that can be used to maintain constant message length                                                     | yes      | nothing          |
 
 ##### Response
 ```
@@ -685,7 +689,7 @@ SendNft is used to transfer ownership of the token to the `contract` address, an
 ```
 
 ## <a name="batchsend"></a>BatchSendNft
-BatchSendNft is used to perform multiple token transfers, and then call the recipient contracts' BatchReceiveNft (or ReceiveNft [see below](#receiver)) if they have registered their receiver interface with the NFT contract.  The message sender may specify a list of tokens to send to one recipient address in each `Send` object, and any `memo` or `msg` provided will be applied to every token transferred in that one `Send` object.  If the list of transferred tokens belonged to multiple previous owners, a separate BatchReceiveNft callback will be performed for each of the previous owners.  If the contract only implements ReceiveNft, one ReceiveNft will be performed for every sent token.  Therefore it is highly recommended to implement BatchReceiveNft if there is the possibility of being sent multiple tokens at one time.  This will reduce gas costs by around 80k per token sent.  
+BatchSendNft is used to perform multiple token transfers, and then call the recipient contracts' BatchReceiveNft (or ReceiveNft [see below](#receiver)) if they have registered their receiver interface with the NFT contract.  The message sender may specify a list of tokens to send to one recipient address in each `Send` object, and any `memo` or `msg` provided will be applied to every token transferred in that one `Send` object.  If the list of transferred tokens belonged to multiple previous owners, a separate BatchReceiveNft callback will be performed for each of the previous owners.  If the contract only implements ReceiveNft, one ReceiveNft will be performed for every sent token.  Therefore it is highly recommended to implement BatchReceiveNft if there is the possibility of being sent multiple tokens at one time.  This will significantly reduce gas costs.  
 
 The message sender may provide multiple `Send` objects to perform sends to multiple addresses, providing a different `memo` and `msg` for each address if desired.  Each individual transfer of a token will show separately in transaction histories.  The message sender must have permission to transfer all the tokens listed (either by being the owner or being granted transfer approval) and every token ID must be valid.  A contract may use the [VerifyTransferApproval](#verifyapproval) query to verify that it has permission to transfer all the tokens.  If the message sender does not have permission to transfer any one of the listed tokens, the entire message will fail (no tokens will be transferred) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.  If any token transfer involves a recipient address that is the same as its current owner, that transfer will not be done (transaction history will not include a transfer that does not change ownership), but all the other transfers will proceed.  Any token that is transferred to a new owner will have its single-token approvals cleared.
 If any BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction will be reverted (even the transfers will not take place).
@@ -714,7 +718,7 @@ If any BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction wi
 | Name      | Type                                  | Description                                                                                                        | Optional | Value If Omitted |
 |-----------|---------------------------------------|--------------------------------------------------------------------------------------------------------------------|----------|------------------|
 | sends     | array of [Send (see below)](#send)    | List of `Send` objects to process                                                                                  | no       |                  |
-| padding   | string                                | An Ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
+| padding   | string                                | An ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
 
 ##### Response
 ```
@@ -726,7 +730,7 @@ If any BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction wi
 ```
 
 ### <a name="send"></a>Send
-The Send object provides a list of tokens to transfer to one recipient address, as well as an optional memo that would be included with every logged token transfer, and an optional msg that would be included with every BatchReceiveNft or ReceiveNft ([see below](#receiver)) callback made as a result of this Send object.
+The Send object provides a list of tokens to transfer to one recipient address, as well as an optional memo that would be included with every logged token transfer, and an optional msg that would be included with every BatchReceiveNft or ReceiveNft ([see below](#receiver)) callback made as a result of this Send object.  While Send keeps the `contract` field name in order be consistent with CW-721 specification, Secret Network does not have the same limitations as Cosmos, and it is possible to use BatchSendNft to transfer token ownership to a personal address (not a contract) or to a contract that does not implement any Receiver Interface.
 ```
 {
 	"contract": "address_receiving_the_tokens",
@@ -745,7 +749,7 @@ The Send object provides a list of tokens to transfer to one recipient address, 
 | memo      | string                         | Memo for the transfer txs that is only viewable by addresses involved in the transfer (recipient, sender, previous owner) | yes      | nothing          |
 
 ## BurnNft
-BurnNft is used to burn a single token, providing an optional memo to include in the burn's transaction history if desired.  If the contract has not enabled burn functionality using the init configuration `enable_burn`, BurnNft will result in an error.  The token owner and anyone else with valid transfer approval may use BurnNft.
+BurnNft is used to burn a single token, providing an optional memo to include in the burn's transaction history if desired.  If the contract has not enabled burn functionality using the init configuration `enable_burn`, BurnNft will result in an error.  Only the token owner and anyone else with valid transfer approval may burn this token.
 
 ##### Request
 ```
@@ -761,7 +765,7 @@ BurnNft is used to burn a single token, providing an optional memo to include in
 |-----------|--------------------|-----------------------------------------------------------------------------------------------------------------------------------|----------|------------------|
 | token_id  | string             | Identifier of the token to burn                                                                                                   | no       |                  |
 | memo      | string             | Memo for the burn tx that is only viewable by addresses involved in the burn (message sender and previous owner if different)     | yes      | nothing          |
-| padding   | string             | An Ignored string that can be used to maintain constant message length                                                            | yes      | nothing          |
+| padding   | string             | An ignored string that can be used to maintain constant message length                                                            | yes      | nothing          |
 
 ##### Response
 ```
@@ -797,7 +801,7 @@ BatchBurnNft is used to burn multiple tokens.  The message sender may specify a 
 | Name      | Type                                  | Description                                                                                                        | Optional | Value If Omitted |
 |-----------|---------------------------------------|--------------------------------------------------------------------------------------------------------------------|----------|------------------|
 | burns     | array of [Burn (see below)](#burn)    | List of `Burn` objects to process                                                                                  | no       |                  |
-| padding   | string                                | An Ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
+| padding   | string                                | An ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
 
 ##### Response
 ```
@@ -838,7 +842,7 @@ CreateViewingKey is used to generate a random viewing key to be used to authenti
 | Name      | Type   | Description                                                                                                        | Optional | Value If Omitted |
 |-----------|--------|--------------------------------------------------------------------------------------------------------------------|----------|------------------|
 | entropy   | string | String used as part of the entropy supplied to the rng that generates the random viewing key                       | no       |                  |
-| padding   | string | An Ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
+| padding   | string | An ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
 
 ##### Response
 ```
@@ -864,7 +868,7 @@ SetViewingKey is used to set the viewing key to a predefined string.  It will re
 | Name      | Type   | Description                                                                                                        | Optional | Value If Omitted |
 |-----------|--------|--------------------------------------------------------------------------------------------------------------------|----------|------------------|
 | key       | string | The new viewing key for the message sender                                                                         | no       |                  |
-| padding   | string | An Ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
+| padding   | string | An ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
 
 ##### Response
 ```
@@ -892,7 +896,7 @@ AddMinters will add the provided addresses to the list of authorized minters.  T
 | Name    | Type                        | Description                                                                                                        | Optional | Value If Omitted |
 |---------|-----------------------------|--------------------------------------------------------------------------------------------------------------------|----------|------------------|
 | minters | array of string (HumanAddr) | The list of addresses to add to the list of authorized minters                                                     | no       |                  |
-| padding | string                      | An Ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
+| padding | string                      | An ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
 
 ##### Response
 ```
@@ -920,7 +924,7 @@ RemoveMinters will remove the provided addresses from the list of authorized min
 | Name    | Type                        | Description                                                                                                        | Optional | Value If Omitted |
 |---------|-----------------------------|--------------------------------------------------------------------------------------------------------------------|----------|------------------|
 | minters | array of string (HumanAddr) | The list of addresses to remove from the list of authorized minters                                                | no       |                  |
-| padding | string                      | An Ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
+| padding | string                      | An ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
 
 ##### Response
 ```
@@ -948,7 +952,7 @@ SetMinters will precisely define the list of authorized minters.  This can only 
 | Name    | Type                        | Description                                                                                 | Optional | Value If Omitted |
 |---------|-----------------------------|---------------------------------------------------------------------------------------------|----------|------------------|
 | minters | array of string (HumanAddr) | The list of addresses to are allowed to mint                                                | no       |                  |
-| padding | string                      | An Ignored string that can be used to maintain constant message length                      | yes      | nothing          |
+| padding | string                      | An ignored string that can be used to maintain constant message length                      | yes      | nothing          |
 
 ##### Response
 ```
@@ -974,7 +978,7 @@ SetContractStatus allows the contract admin to define which messages the contrac
 | Name    | Type                                             | Description                                                                                 | Optional | Value If Omitted |
 |---------|--------------------------------------------------|---------------------------------------------------------------------------------------------|----------|------------------|
 | level   | [ContractStatus (see below)](#contractstatus)    | The level that defines which messages the contract will execute                             | no       |                  |
-| padding | string                                           | An Ignored string that can be used to maintain constant message length                      | yes      | nothing          |
+| padding | string                                           | An ignored string that can be used to maintain constant message length                      | yes      | nothing          |
 
 ##### Response
 ```
@@ -1005,7 +1009,7 @@ ChangeAdmin will allow the current admin to transfer admin privileges to another
 | Name    | Type               | Description                                                                                 | Optional | Value If Omitted |
 |---------|--------------------|---------------------------------------------------------------------------------------------|----------|------------------|
 | address | string (HumanAddr) | Address of the new contract admin                                                           | no       |                  |
-| padding | string             | An Ignored string that can be used to maintain constant message length                      | yes      | nothing          |
+| padding | string             | An ignored string that can be used to maintain constant message length                      | yes      | nothing          |
 
 ##### Response
 ```
@@ -1017,7 +1021,7 @@ ChangeAdmin will allow the current admin to transfer admin privileges to another
 ```
 
 ## <a name="registerreceive"></a>RegisterReceiveNft
-A contract will use RegisterReceiveNft to notify the NFT contract that it implements ReceiveNft and possibly also BatchReceiveNft [(see below)](#receiver).  This enables the NFT contract to call the registered contract whenever it is Sent a token (or tokens).  ReceiveNft only informs the recipient contract that it has been sent a single token; while, BatchReceiveNft can be used to inform a contract that it was sent multiple tokens.  This is particularly useful if a contract needs to be sent a deck of "cards", as it will save around 80k in gas for every token that was sent.  If a contract implements BatchReceiveNft, the NFT contract will always call BatchReceiveNft even if there is only one token being sent, in which case the `token_ids` array will only have one element.
+A contract will use RegisterReceiveNft to notify the NFT contract that it implements ReceiveNft and possibly also BatchReceiveNft [(see below)](#receiver).  This enables the NFT contract to call the registered contract whenever it is Sent a token (or tokens).  In order to comply with CW-721, ReceiveNft only informs the recipient contract that it has been sent a single token, and it only informs the recipient contract who the token's previous owner was, not who sent the token (which may be different addresses) despite calling the previous owner `sender` ([see below](#cwsender)).  BatchReceiveNft, on the other hand, can be used to inform a contract that it was sent multiple tokens, and notifies the recipient of both, the token's previous owner and the sender.  If a contract implements BatchReceiveNft, the NFT contract will always call BatchReceiveNft even if there is only one token being sent, in which case the `token_ids` array will only have one element.
 
 ##### Request
 ```
@@ -1031,9 +1035,9 @@ A contract will use RegisterReceiveNft to notify the NFT contract that it implem
 ```
 | Name                              | Type   | Description                                                                                                                | Optional | Value If Omitted |
 |-----------------------------------|--------|----------------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| code_hash                         | string | Code hash of the message sender, which is a contract that implements a receiver interface                                  | no       |                  |
+| code_hash                         | string | A 32-byte hex encoded string, with the code hash of the message sender, which is a contract that implements a receiver     | no       |                  |
 | also_implements_batch_receive_nft | bool   | true if the message sender contract also implements BatchReceiveNft so it can be informed that it was sent a list of tokens| yes      | false            |
-| padding                           | string | An Ignored string that can be used to maintain constant message length                                                     | yes      | nothing          |
+| padding                           | string | An ignored string that can be used to maintain constant message length                                                     | yes      | nothing          |
 
 ##### Response
 ```
@@ -1049,7 +1053,7 @@ Queries are off-chain requests, that are not cryptographically validated; theref
 
 Any query that inquires about a specific token will return an error if the input token ID does not exist.  If the token supply is public, the error will indicate that the token does not exist.  If the token supply is private, the query will return the same error response whether the token does not exist or the querier does not have permission to view the requested information.
 
-<a name="queryblockinfo"></a>One should be aware that the current blockheight and time is not available to a query on Secret Network at this moment, but there are plans to make the BlockInfo available to queries in a future hardfork.  To get around this limitation, the contract saves the BlockInfo every time a message is executed, and uses the blockheight and time of the last message execution to check viewing permission expiration during a query.  Therefore it is possible that a whitelisted address may be able to view the owner or metadata of a token past its permission expiration if no one executed any contract message since before the expiration.  However, because transferring/burning a token is executing a message, it does have the current blockheight and time available and can not occur if transfer permission has expired.
+<a name="queryblockinfo"></a>One should be aware that the current blockheight and time is not available to a query on Secret Network at this moment, but there are plans to make the BlockInfo available to queries in a future hardfork.  To get around this limitation, the contract saves the BlockInfo every time a message is executed, and uses the blockheight and time of the last message execution to check viewing permission expiration during a query.  Therefore it is possible that a whitelisted address may be able to view the owner or metadata of a token past its permission expiration if no one executed any contract message since before the expiration.  However, because transferring/burning a token is executing a message, it does have the current blockheight and time available and can enforce exact expiration.
 
 ## ContractInfo
 ContractInfo returns the contract's name and symbol.  This query is not authenticated.
@@ -1150,10 +1154,10 @@ RegisteredCodeHash will display the code hash of the specified contract if it ha
 	}
 }
 ```
-| Name                               | Type   | Description                                                     | Optional | 
-|------------------------------------|--------|-----------------------------------------------------------------|----------|
-| code_hash                          | string | The code hash of the registered contract                        | yes      |
-| also_implements_batch_receive_nft  | bool   | True if the registered contract also implements BatchReceiveNft | no       |
+| Name                               | Type   | Description                                                                  | Optional | 
+|------------------------------------|--------|------------------------------------------------------------------------------|----------|
+| code_hash                          | string | A 32-byte hex encoded string, with the code hash of the registered contract  | yes      |
+| also_implements_batch_receive_nft  | bool   | True if the registered contract also implements BatchReceiveNft              | no       |
 
 ## NumTokens
 NumTokens returns the number of tokens controlled by the contract.  If the contract's token supply is private, only an authenticated minter's address will be allowed to perform this query.
@@ -1262,7 +1266,7 @@ IsUnwrapped indicates whether the token has been unwrapped.  If sealed metadata 
 | token_is_unwrapped  | bool | True if the token is unwrapped (or sealed metadata is not enabled)   | no       |
 
 ## <a name="ownerof"></a>OwnerOf
-OwnerOf returns the owner of the specified token if the querier is the owner or has been granted permission to view it.  If the querier is the owner, OwnerOf will also display all the addresses that have been given transfer permission.  The transfer approval list is provided as part of CW-721 compliance; however, the token owner is advised to use [NftDossier (see below)](#nftdossier) for a more complete list that includes view_owner and view_private_metadata approvals (which CW-721 is not capable of screening).  If no [viewer](#viewerinfo) is provided, OwnerOf will only display the owner if ownership is public for this token.
+OwnerOf returns the owner of the specified token if the querier is the owner or has been granted permission to view the owner.  If the querier is the owner, OwnerOf will also display all the addresses that have been given transfer permission.  The transfer approval list is provided as part of CW-721 compliance; however, the token owner is advised to use [NftDossier (see below)](#nftdossier) for a more complete list that includes view_owner and view_private_metadata approvals (which CW-721 is not capable of keeping private).  If no [viewer](#viewerinfo) is provided, OwnerOf will only display the owner if ownership is public for this token.
 
 ##### Request
 ```
@@ -1458,7 +1462,7 @@ PrivateMetadata returns the private metadata of a token if the querier is permit
 | image       | string | Private uri to an image or additional metadata                   | yes      |
 
 ## <a name="nftdossier"></a>NftDossier
-NftDossier returns all the information about a token that the viewer is permitted to view.  If no `viewer` is provided, NftDossier will only display the information that has been made public.  The response may include the owner, the public metadata, the private metadata, the reason the private metadata is not viewable, whether ownership is public, whether the private metadata is public, and if the querier is the owner, the approvals for this token as well as the inventory-wide approvals for the owner.
+NftDossier returns all the information about a token that the viewer is permitted to view.  If no `viewer` is provided, NftDossier will only display the information that has been made public.  The response may include the owner, the public metadata, the private metadata, the reason the private metadata is not viewable, whether ownership is public, whether the private metadata is public, and (if the querier is the owner,) the approvals for this token as well as the inventory-wide approvals for the owner.
 
 ##### Request
 ```
