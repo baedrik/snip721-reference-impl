@@ -24,13 +24,13 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 	“admin”: “optional_admin_address”,
 	“entropy”: “string_used_as_entropy_when_generating_random_viewing_keys”,
 	“config”: {
-		“public_token_supply”: true|false,
-		“public_owner”: true|false,
-		“enable_sealed_metadata”: true|false,
-		“unwrapped_metadata_is_private”: true|false,
-		“minter_may_update_metadata”: true|false,
-		“owner_may_update_metadata”: true|false,
-		“enable_burn”: true|false
+		“public_token_supply”: true | false,
+		“public_owner”: true | false,
+		“enable_sealed_metadata”: true | false,
+		“unwrapped_metadata_is_private”: true | false,
+		“minter_may_update_metadata”: true | false,
+		“owner_may_update_metadata”: true | false,
+		“enable_burn”: true | false
 	},
 	“post_init_callback”: {
 		“msg”: “base64_encoded_Binary_representing_the_msg_to_perform_after_initialization”,
@@ -68,13 +68,13 @@ Config is the privacy configuration for the contract.
 * enable_burn - This config value indicates whether burn functionality is enabled (default: False)
 ```
 {
-	“public_token_supply”: true|false,
-	“public_owner”: true|false,
-	“enable_sealed_metadata”: true|false,
-	“unwrapped_metadata_is_private”: true|false,
-	“minter_may_update_metadata”: true|false,
-	“owner_may_update_metadata”: true|false,
-	“enable_burn”: true|false
+	“public_token_supply”: true | false,
+	“public_owner”: true | false,
+	“enable_sealed_metadata”: true | false,
+	“unwrapped_metadata_is_private”: true | false,
+	“minter_may_update_metadata”: true | false,
+	“owner_may_update_metadata”: true | false,
+	“enable_burn”: true | false
 }
 ```
 | Name                          | Type | Optional | Value If Omitted |
@@ -381,9 +381,9 @@ The owner of a token can use SetGlobalApproval to make ownership and/or private 
 {
 	"set_global_approval": {
 		"token_id": "optional_ID_of_the_token_to_grant_or_revoke_approval_on",
-		"view_owner": "approve_token"|"all"|"revoke_token"|"none",
-		"view_private_metadata": "approve_token"|"all"|"revoke_token"|"none",
-		"expires": "never"|{"at_height": 999999}|{"at_time":999999},
+		"view_owner": "approve_token" | "all" | "revoke_token" | "none",
+		"view_private_metadata": "approve_token" | "all" | "revoke_token" | "none",
+		"expires": "never" | {"at_height": 999999} | {"at_time":999999},
  		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
 }
@@ -431,10 +431,10 @@ The owner of a token can use SetWhitelistedApproval to grant an address permissi
 	"set_whitelisted_approval": {
 		"address": "address_being_granted_or_revoked_approval",
 		"token_id": "optional_ID_of_the_token_to_grant_or_revoke_approval_on",
-		"view_owner": "approve_token"|"all"|"revoke_token"|"none",
-		"view_private_metadata": "approve_token"|"all"|"revoke_token"|"none",
-		"transfer": "approve_token"|"all"|"revoke_token"|"none",
-		"expires": "never"|{"at_height": 999999}|{"at_time":999999},
+		"view_owner": "approve_token" | "all" | "revoke_token" | "none",
+		"view_private_metadata": "approve_token" | "all" | "revoke_token" | "none",
+		"transfer": "approve_token" | "all" | "revoke_token" | "none",
+		"expires": "never" | {"at_height": 999999} | {"at_time":999999},
  		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
 }
@@ -467,7 +467,7 @@ Approve is used to grant an address permission to transfer a single token.  This
 	"approve": {
 		"spender": "address_being_granted_approval_to_transfer_the_specified_token",
 		"token_id": "ID_of_the_token_that_can_now_be_transferred_by_the_spender",
-		"expires": "never"|{"at_height": 999999}|{"at_time":999999},
+		"expires": "never" | {"at_height": 999999} | {"at_time":999999},
  		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
 }
@@ -524,7 +524,7 @@ ApproveAll is used to grant an address permission to transfer all the tokens in 
 {
 	"approve_all": {
 		"operator": "address_being_granted_inventory-wide_approval_to_transfer_tokens",
-		"expires": "never"|{"at_height": 999999}|{"at_time":999999},
+		"expires": "never" | {"at_height": 999999} | {"at_time":999999},
  		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
 }
@@ -970,7 +970,7 @@ SetContractStatus allows the contract admin to define which messages the contrac
 ```
 {
 	"set_contract_status": {
-		"level": "normal"|"stop_transactions"|"stop_all",
+		"level": "normal" | "stop_transactions" | "stop_all",
  		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
 }
@@ -1028,7 +1028,7 @@ A contract will use RegisterReceiveNft to notify the NFT contract that it implem
 {
 	"register_receive_nft": {
 		"code_hash": "code_hash_of_the_contract_implementing_a_receiver_interface",
-		"also_implements_batch_receive_nft": true|false,
+		"also_implements_batch_receive_nft": true | false,
  		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
 }
@@ -1087,13 +1087,13 @@ ContractConfig returns the configuration values that were selected when the cont
 ```
 {
 	"contract_config": {
-		“token_supply_is_public”: true|false,
-		“owner_is_public”: true|false,
-		“sealed_metadata_is_enabled”: true|false,
-		“unwrapped_metadata_is_private”: true|false,
-		“minter_may_update_metadata”: true|false,
-		“owner_may_update_metadata”: true|false,
-		“burn_is_enabled”: true|false
+		“token_supply_is_public”: true | false,
+		“owner_is_public”: true | false,
+		“sealed_metadata_is_enabled”: true | false,
+		“unwrapped_metadata_is_private”: true | false,
+		“minter_may_update_metadata”: true | false,
+		“owner_may_update_metadata”: true | false,
+		“burn_is_enabled”: true | false
 	}
 }
 ```
@@ -1150,7 +1150,7 @@ RegisteredCodeHash will display the code hash of the specified contract if it ha
 {
 	"registered_code_hash": {
 		"code_hash": "code_hash_of_the_registered_contract",
-		"also_implements_batch_receive_nft": true|false
+		"also_implements_batch_receive_nft": true | false
 	}
 }
 ```
@@ -1257,7 +1257,7 @@ IsUnwrapped indicates whether the token has been unwrapped.  If sealed metadata 
 ```
 {
 	"is_unwrapped": {
-		"token_is_unwrapped": true|false
+		"token_is_unwrapped": true | false
 	}
 }
 ```
@@ -1277,7 +1277,7 @@ OwnerOf returns the owner of the specified token if the querier is the owner or 
 			"address": "address_of_the_querier_if_supplying_optional_ViewerInfo",
 			"viewing_key": "viewer's_key_if_supplying_optional_ViewerInfo"
 		},
-		"include_expired": true|false
+		"include_expired": true | false
 	}
 }
 ```
@@ -1295,7 +1295,7 @@ OwnerOf returns the owner of the specified token if the querier is the owner or 
 		"approvals": [
 			{
 				"spender": "address_with_transfer_approval",
-				"expires": "never"|{"at_height": 999999}|{"at_time":999999}
+				"expires": "never" | {"at_height": 999999} | {"at_time":999999}
 			},
 			{
 				"...": "..."
@@ -1314,7 +1314,7 @@ The Cw721Approval object is used to display CW-721-style approvals which are lim
 ```
 {
 	"spender": "address_with_transfer_approval",
-	"expires": "never"|{"at_height": 999999}|{"at_time":999999}
+	"expires": "never" | {"at_height": 999999} | {"at_time":999999}
 }
 ```
 | Name    | Type                                  | Description                                                                     | Optional | 
@@ -1365,7 +1365,7 @@ AllNftInfo displays the result of both [OwnerOf](#ownerof) and [NftInfo](#nftinf
 			"address": "address_of_the_querier_if_supplying_optional_ViewerInfo",
 			"viewing_key": "viewer's_key_if_supplying_optional_ViewerInfo"
 		},
-		"include_expired": true|false
+		"include_expired": true | false
 	}
 }
 ```
@@ -1384,7 +1384,7 @@ AllNftInfo displays the result of both [OwnerOf](#ownerof) and [NftInfo](#nftinf
 			"approvals": [
 				{
 					"spender": "address_with_transfer_approval",
-					"expires": "never"|{"at_height": 999999}|{"at_time":999999}
+					"expires": "never" | {"at_height": 999999} | {"at_time":999999}
 				},
 				{
 					"...": "..."
@@ -1412,7 +1412,7 @@ The Cw721OwnerOfResponse object is used to display a token's owner if the querie
 	"approvals": [
 		{
 			"spender": "address_with_transfer_approval",
-			"expires": "never"|{"at_height": 999999}|{"at_time":999999}
+			"expires": "never" | {"at_height": 999999} | {"at_time":999999}
 		},
 		{
 			"...": "..."
@@ -1473,7 +1473,7 @@ NftDossier returns all the information about a token that the viewer is permitte
 			"address": "address_of_the_querier_if_supplying_optional_ViewerInfo",
 			"viewing_key": "viewer's_key_if_supplying_optional_ViewerInfo"
 		},
-		"include_expired": true|false
+		"include_expired": true | false
 	}
 }
 ```
@@ -1499,16 +1499,16 @@ NftDossier returns all the information about a token that the viewer is permitte
 			"image": "optional_private_uri_containing_an_image_or_additional_metadata"
 		},
 		"display_private_metadata_error": "optional_error_describing_why_private_metadata_is_not_viewable_if_applicable",
-		"owner_is_public": true|false,
-		"public_ownership_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-		"private_metadata_is_public": true|false,
-		"private_metadata_is_public_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
+		"owner_is_public": true | false,
+		"public_ownership_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+		"private_metadata_is_public": true | false,
+		"private_metadata_is_public_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
 		"token_approvals": [
 			{
 				"address": "whitelisted_address",
-				"view_owner_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-				"view_private_metadata_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-				"transfer_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
+				"view_owner_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+				"view_private_metadata_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+				"transfer_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
 			},
 			{
 				"...": "..."
@@ -1517,9 +1517,9 @@ NftDossier returns all the information about a token that the viewer is permitte
 		"inventory_approvals": [
 			{
 				"address": "whitelisted_address",
-				"view_owner_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-				"view_private_metadata_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-				"transfer_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
+				"view_owner_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+				"view_private_metadata_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+				"transfer_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
 			},
 			{
 				"...": "..."
@@ -1546,9 +1546,9 @@ The Snip721Approval object is used to display all the approvals (and their expir
 ```
 {
 	"address": "whitelisted_address",
-	"view_owner_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-	"view_private_metadata_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-	"transfer_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
+	"view_owner_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+	"view_private_metadata_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+	"transfer_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
 }
 ```
 | Name                             | Type                                  | Description                                                                                 | Optional | 
@@ -1567,7 +1567,7 @@ TokenApprovals returns whether the owner and private metadata of a token is publ
 	"token_approvals": {
 		"token_id": "ID_of_the_token_being_queried",
 		"viewing_key": "the_token_owner's_viewing_key",
-		"include_expired": true|false
+		"include_expired": true | false
 	}
 }
 ```
@@ -1581,16 +1581,16 @@ TokenApprovals returns whether the owner and private metadata of a token is publ
 ```
 {
 	"token_approvals": {
-		"owner_is_public": true|false,
-		"public_ownership_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-		"private_metadata_is_public": true|false,
-		"private_metadata_is_public_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
+		"owner_is_public": true | false,
+		"public_ownership_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+		"private_metadata_is_public": true | false,
+		"private_metadata_is_public_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
 		"token_approvals": [
 			{
 				"address": "whitelisted_address",
-				"view_owner_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-				"view_private_metadata_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-				"transfer_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
+				"view_owner_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+				"view_private_metadata_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+				"transfer_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
 			},
 			{
 				"...": "..."
@@ -1616,7 +1616,7 @@ ApprovedForAll displays all the addresses that have approval to transfer all of 
 	"approved_for_all": {
 		"owner": "address_whose_approvals_are_being_queried",
 		"viewing_key": "owner's_viewing_key"
-		"include_expired": true|false
+		"include_expired": true | false
 	}
 }
 ```
@@ -1633,7 +1633,7 @@ ApprovedForAll displays all the addresses that have approval to transfer all of 
 		"operators": [
 				{
 					"spender": "address_with_transfer_approval",
-					"expires": "never"|{"at_height": 999999}|{"at_time":999999}
+					"expires": "never" | {"at_height": 999999} | {"at_time":999999}
 				},
 				{
 					"...": "..."
@@ -1655,7 +1655,7 @@ InventoryApprovals returns whether all the address' tokens have public ownership
 	"inventory_approvals": {
 		"address": "address_whose_approvals_are_being_queried",
 		"viewing_key": "the_viewing_key_associated_with_this_address",
-		"include_expired": true|false
+		"include_expired": true | false
 	}
 }
 ```
@@ -1669,16 +1669,16 @@ InventoryApprovals returns whether all the address' tokens have public ownership
 ```
 {
 	"inventory_approvals": {
-		"owner_is_public": true|false,
-		"public_ownership_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-		"private_metadata_is_public": true|false,
-		"private_metadata_is_public_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
+		"owner_is_public": true | false,
+		"public_ownership_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+		"private_metadata_is_public": true | false,
+		"private_metadata_is_public_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
 		"inventory_approvals": [
 			{
 				"address": "whitelisted_address",
-				"view_owner_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-				"view_private_metadata_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
-				"transfer_expiration": "never"|{"at_height": 999999}|{"at_time":999999},
+				"view_owner_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+				"view_private_metadata_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
+				"transfer_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
 			},
 			{
 				"...": "..."
@@ -1757,7 +1757,7 @@ VerifyTransferApproval will verify that the specified address has approval to tr
 ```
 {
 	"verify_transfer_approval": {
-		"approved_for_all": true|false,
+		"approved_for_all": true | false,
 		"first_unapproved_token": "token_id"
 	}
 }
