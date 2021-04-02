@@ -324,7 +324,7 @@ SetPrivateMetadata will set the private metadata to the input metadata if the me
 ```
 
 ## <a name="reveal"></a>Reveal
-Reveal unwraps the sealed metadata, irreversibly marking the token as unwrapped.  If the `unwrapped_metadata_is_private` configuration value is true, the formerly sealed metadata will remain private, otherwise it will be made public.
+Reveal unwraps the sealed private metadata, irreversibly marking the token as unwrapped.  If the `unwrapped_metadata_is_private` [configuration value](#config) is true, the formerly sealed metadata will remain private, otherwise it will be made public.
 
 ##### Request
 ```
