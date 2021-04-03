@@ -19,8 +19,8 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 ##### Request
 ```
 {
-    “name”: “name_of_the_token”,
-    “symbol”: “token_symbol”,
+	“name”: “name_of_the_token”,
+	“symbol”: “token_symbol”,
 	“admin”: “optional_admin_address”,
 	“entropy”: “string_used_as_entropy_when_generating_random_viewing_keys”,
 	“config”: {
@@ -59,13 +59,13 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 
 ### <a name="config"></a>Config
 Config is the privacy configuration for the contract.
-* public_token_supply - This config value indicates whether the token IDs and the number of tokens controlled by the contract are public.  If the token supply is private, only minters can view the token IDs and number of tokens controlled by the contract (default: False)
-* public_owner - This config value indicates whether token ownership is public or private by default.  Regardless of this setting a user has the ability to change whether the ownership of their tokens is public or private (default: False)
-* enable_sealed_metadata - This config value indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the private metadata of a newly minted token is not viewable by anyone, not even the owner, until the owner calls the Reveal function.  When Reveal is called, the sealed metadata is irreversibly unwrapped and moved to the public metadata (as default).  If unwrapped_metadata_is_private is set to true, the sealed metadata will remain as private metadata after unwrapping, but the owner will now be able to see it.  Anyone will be able to query the token to know whether it has been unwrapped.  This simulates buying/selling a wrapped card that no one knows which card it is until it is unwrapped. If sealed metadata is not enabled, all tokens are considered unwrapped when minted (default: False)
-* unwrapped_metadata_is_private - This config value indicates if the Reveal function should keep the sealed metadata private after unwrapping.  This config value is ignored if sealed metadata is not enabled (default: False)
-* minter_may_update_metadata - This config value indicates whether a minter is permitted to update a token's metadata (default: True)
-* owner_may_update_metadata - This config value indicates whether the owner of a token is permitted to update a token's metadata (default: False)
-* enable_burn - This config value indicates whether burn functionality is enabled (default: False)
+* `public_token_supply` - This config value indicates whether the token IDs and the number of tokens controlled by the contract are public.  If the token supply is private, only minters can view the token IDs and number of tokens controlled by the contract (default: False)
+* `public_owner` - This config value indicates whether token ownership is public or private by default.  Regardless of this setting a user has the ability to change whether the ownership of their tokens is public or private (default: False)
+* `enable_sealed_metadata` - This config value indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the private metadata of a newly minted token is not viewable by anyone, not even the owner, until the owner calls the [Reveal](#reveal) message.  When Reveal is called, the sealed metadata is irreversibly unwrapped and moved to the public metadata (as default).  If `unwrapped_metadata_is_private` is set to true, the sealed metadata will remain as private metadata after unwrapping, but the owner (and anyone the owner has whitelisted) will now be able to see it.  Anyone will be able to query the token to know whether it has been unwrapped.  This simulates buying/selling a wrapped card that no one knows which card it is until it is unwrapped. If sealed metadata is not enabled, all tokens are considered unwrapped when minted (default: False)
+* `unwrapped_metadata_is_private` - This config value indicates if the [Reveal](#reveal) message should keep the sealed metadata private after unwrapping.  This config value is ignored if sealed metadata is not enabled (default: False)
+* `minter_may_update_metadata` - This config value indicates whether a minter is permitted to update a token's metadata (default: True)
+* `owner_may_update_metadata` - This config value indicates whether the owner of a token is permitted to update a token's metadata (default: False)
+* `enable_burn` - This config value indicates whether burn functionality is enabled (default: False)
 ```
 {
 	“public_token_supply”: true | false,
@@ -87,8 +87,8 @@ Config is the privacy configuration for the contract.
 | owner_may_update_metadata     | bool | yes      | false            |
 | enable_burn                   | bool | yes      | false            |
 
-### <a name="postinitcallback"></a>Post Init Callback
-PostInitCallback is the optional callback message to execute after the token contract has initialized.  This can be useful if another contract is instantiating this token contract and needs the token contract to inform the creating contract of the address it has been given
+### <a name="postinitcallback"></a>PostInitCallback
+The PostInitCallback object is used to have the token contract execute an optional callback message after the contract has initialized.  This can be useful if another contract is instantiating this token contract and needs the token contract to inform the creating contract of the address it has been given.
 ```
 {
 	“msg”: “base64_encoded_Binary_representing_the_msg_to_perform_after_initialization”,
@@ -113,7 +113,7 @@ PostInitCallback is the optional callback message to execute after the token con
 | send             | array of [Coin (see below)](#coin)    | List of native Coin amounts to send with the callback message                                         | no       |                  |
 
 #### <a name="coin"></a>Coin
-Coin is the payment to send with the post-init callback message.  Although `send` is not an optional field of the Post Init Callback, because it is an array, you can just use `[]` to not send any payment with the callback message
+Coin is the payment to send with the post-init callback message.  Although `send` is not an optional field of the [PostInitCallback](#postinitcallback), because it is an array, you can just use `[]` to not send any payment with the callback message
 ```
 {
 	“denom”: “denom_string_for_native_coin_being_sent_with_this_message”,
@@ -123,11 +123,11 @@ Coin is the payment to send with the post-init callback message.  Although `send
 | Name   | Type             | Description                                                               | Optional | Value If Omitted |
 |--------|------------------|---------------------------------------------------------------------------|----------|------------------|
 | denom  | string           | The denomination of the native Coin (uscrt for SCRT)                      | no       |                  |
-| amount | string (Uint128) | The amount of the native Coin to send with the Post Init Callback message | no       |                  |
+| amount | string (Uint128) | The amount of the native Coin to send with the PostInitCallback message   | no       |                  |
 
 # Messages
 ## MintNft
-MintNft mints a single token.
+MintNft mints a single token.  Only an authorized minting address my execute MintNft.
 
 ##### Request
 ```
@@ -156,7 +156,7 @@ MintNft mints a single token.
 | owner            | string (HumanAddr)                     | Address of the owner of the minted token                                                      | yes      | env.message.sender   |
 | public_metadata  | [Metadata (see below)](#metadata)      | The metadata that is publicly viewable                                                        | yes      | nothing              |
 | private_metadata | [Metadata (see below)](#metadata)      | The metadata that is viewable only by the token owner and addresses the owner has whitelisted | yes      | nothing              |
-| memo             | string                                 | `memo` for the mint tx that is only viewable by addresses involved in the mint (minter/owner) | yes      | nothing              |
+| memo             | string                                 | `memo` for the mint tx that is only viewable by addresses involved in the mint (minter, owner)| yes      | nothing              |
 | padding          | string                                 | An ignored string that can be used to maintain constant message length                        | yes      | nothing              |
 
 ##### Response
@@ -185,7 +185,7 @@ Metadata for a token that follows CW-721 metadata specification, which is based 
 | image       | string | String that can hold a link to additional off-chain metadata or image | yes      | nothing              |
 
 ## BatchMintNft
-BatchMintNft mints a list of tokens.
+BatchMintNft mints a list of tokens.  Only an authorized minting address my execute BatchMintNft.
 
 ##### Request
 ```
@@ -233,7 +233,7 @@ BatchMintNft mints a list of tokens.
 The IDs of the minted tokens will also be returned in a LogAttribute with the key `minted`.
 
 ### <a name="mint"></a>Mint
-Mint defines the data necessary to perform one minting operation
+The Mint object defines the data necessary to mint one token.
 ```
 {
 	"token_id": "optional_ID_of_new_token",
@@ -260,7 +260,7 @@ Mint defines the data necessary to perform one minting operation
 | memo             | string                               | `memo` for the mint tx that is only viewable by addresses involved in the mint (minter, owner)     | yes      | nothing              |
 
 ## <a name="setpublic"></a>SetPublicMetadata
-SetPublicMetadata will set the public metadata to the input metadata if the message sender is either the token owner or an approved minter and they have been given this power by the configuration value chosen during instantiation
+SetPublicMetadata will set the public metadata to the input metadata if the message sender is either the token owner or an approved minter and they have been given this power by the configuration value chosen during instantiation.
 
 ##### Request
 ```
@@ -416,7 +416,7 @@ If the message signer grants an address (or everyone in the case of SetGlobalApp
 ### <a name="expiration"></a>Expiration
 The Expiration object is used to set an expiration for any approvals granted in the message.  Expiration can be set to a specified blockheight, a time in seconds since epoch 01/01/1970, or "never".  Values for blockheight and time are specified as a u64.  If no expiration is given, it will default to "never".
 
-One should be aware that the current blockheight and time is not available to a query on Secret Network at this moment, but there are plans to make the BlockInfo available to queries in a future hardfork.  To get around this limitation, the contract saves the BlockInfo every time a message is executed, and uses the blockheight and time of the last message execution to check viewing permission expiration during a query.  Therefore it is possible that a whitelisted address may be able to view the owner or metadata of a token past its permission expiration if no one executed any contract message since before the expiration.  However, because transferring/burning a token is executing a message, it does have the current blockheight and time available and can not occur if transfer permission has expired.
+One should be aware that the current blockheight and time is not available to a query on Secret Network at this moment, but there are plans to make the BlockInfo available to queries in a future hardfork.  To get around this limitation, the contract saves the BlockInfo every time a message is executed, and uses the blockheight and time of the last message execution to check viewing permission expiration during a query.  Therefore it is possible that a whitelisted address may be able to view the owner or metadata of a token past its approval expiration if no one executed any contract message since before the expiration.  However, because transferring/burning a token is executing a message, it does have the current blockheight and time available and can not occur if transfer approval has expired.
 
 * `"never"` - the approval will never expire
 * `{"at_time": 1700000000}` - the approval will expire 1700000000 seconds after 01/01/1970 (time value is u64)
@@ -571,7 +571,7 @@ RevokeAll is used to revoke all transfer approvals granted to an address.  Revok
 ```
 
 ## TransferNft
-TransferNft is used to transfer ownership of the token to the recipient address.  This requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the recipient address is the same as the current owner, no transfer will be done (transaction history will not include a transfer that does not change ownership).  If the token is transferred to a new owner, its single-token approvals will be cleared.
+TransferNft is used to transfer ownership of the token to the `recipient` address.  This requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the `recipient` address is the same as the current owner, no transfer will be done (transaction history will not include a transfer that does not change ownership).  If the token is transferred to a new owner, its single-token approvals will be cleared.
 
 ##### Request
 ```
@@ -601,7 +601,9 @@ TransferNft is used to transfer ownership of the token to the recipient address.
 ```
 
 ## BatchTransferNft
-BatchTransferNft is used to perform multiple token transfers.  The message sender may specify a list of tokens to transfer to one `recipient` address in each [Transfer](#transfer) object, and any `memo` provided will be applied to every token transferred in that one `Transfer` object.  The message sender may provide multiple `Transfer` objects to perform transfers to multiple addresses, providing a different `memo` for each address if desired.  Each individual transfer of a token will show separately in transaction histories.  The message sender must have permission to transfer all the tokens listed (either by being the owner or being granted transfer approval) and every listed `token_id` must be valid.  A contract may use the VerifyTransferApproval query to verify that it has permission to transfer all the tokens.  If the message sender does not have permission to transfer any one of the listed tokens, the entire message will fail (no tokens will be transferred) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.  If any token transfer involves a recipient address that is the same as its current owner, that transfer will not be done (transaction history will not include a transfer that does not change ownership), but all the other transfers will proceed.  Any token that is transferred to a new owner will have its single-token approvals cleared.
+BatchTransferNft is used to perform multiple token transfers.  The message sender may specify a list of tokens to transfer to one `recipient` address in each [Transfer](#transfer) object, and any `memo` provided will be applied to every token transferred in that one `Transfer` object.  The message sender may provide multiple `Transfer` objects to perform transfers to multiple addresses, providing a different `memo` for each address if desired.  Each individual transfer of a token will show separately in transaction histories.  The message sender must have permission to transfer all the tokens listed (either by being the owner or being granted transfer approval) and every listed `token_id` must be valid.  A contract may use the [VerifyTransferApproval](#verifyapproval) query to verify that it has permission to transfer all the tokens.  
+
+If the message sender does not have permission to transfer any one of the listed tokens, the entire message will fail (no tokens will be transferred) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.  If any token transfer involves a `recipient` address that is the same as its current owner, that transfer will not be done (transaction history will not include a transfer that does not change ownership), but all the other transfers will proceed.  Any token that is transferred to a new owner will have its single-token approvals cleared.
 
 ##### Request
 ```
@@ -655,7 +657,9 @@ The Transfer object provides a list of tokens to transfer to one `recipient` add
 | memo      | string             | `memo` for the transfer transactions that is only viewable by addresses involved in the transfer (recipient, sender, previous owner)| yes      | nothing          |
 
 ## <a name="sendnft"></a>SendNft
-SendNft is used to transfer ownership of the token to the `contract` address, and then call the recipient's BatchReceiveNft (or ReceiveNft, [see below](#receiver)) if the recipient contract has registered its receiver interface with the NFT contract.  If the recipient contract registered that it implements BatchReceiveNft, a BatchReceiveNft callback will be performed with only the single token ID in the `token_ids` array.  While SendNft keeps the `contract` field name in order to maintain CW-721 compliance, Secret Network does not have the same limitations as Cosmos, and it is possible to use SendNft to transfer token ownership to a personal address (not a contract) or to a contract that does not implement any Receiver Interface.
+SendNft is used to transfer ownership of the token to the `contract` address, and then call the recipient's [BatchReceiveNft](#batchreceivenft) (or [ReceiveNft](#receivenft)) if the recipient contract has registered its receiver interface with the NFT contract.  If the recipient contract registered that it implements BatchReceiveNft, a BatchReceiveNft callback will be performed with only the single token ID in the `token_ids` array.  
+
+While SendNft keeps the `contract` field name in order to maintain CW-721 compliance, Secret Network does not have the same limitations as Cosmos, and it is possible to use SendNft to transfer token ownership to a personal address (not a contract) or to a contract that does not implement any [Receiver Interface](#receiver).
 
 SendNft requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the recipient address is the same as the current owner, no transfer will be done (transaction history will not include a transfer that does not change ownership), but the BatchReceiveNft (or ReceiveNft) callback will be performed if registered.  If the token is transferred to a new owner, its single-token approvals will be cleared.  If the BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction will be reverted (even the transfer will not take place).
 
@@ -777,7 +781,7 @@ BurnNft is used to burn a single token, providing an optional `memo` to include 
 ```
 
 ## BatchBurnNft
-BatchBurnNft is used to burn multiple tokens.  The message sender may specify a list of tokens to burn in each [Burn](#burn) object, and any `memo` provided will be applied to every token burned in that one `Burn` object.  The message sender will usually list every token to be burned in one `Burn` object, but if a different `memo` is needed for different tokens being burned, multiple `Burn` objects may be listed. Each individual burning of a token will show separately in transaction histories.  The message sender must have permission to transfer/burn all the tokens listed (either by being the owner or being granted transfer approval).  A contract may use the VerifyTransferApproval query to verify that it has permission to transfer/burn all the tokens.  If the message sender does not have permission to transfer/burn any one of the listed tokens, the entire message will fail (no tokens will be burned) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.
+BatchBurnNft is used to burn multiple tokens.  The message sender may specify a list of tokens to burn in each [Burn](#burn) object, and any `memo` provided will be applied to every token burned in that one `Burn` object.  The message sender will usually list every token to be burned in one `Burn` object, but if a different `memo` is needed for different tokens being burned, multiple `Burn` objects may be listed. Each individual burning of a token will show separately in transaction histories.  The message sender must have permission to transfer/burn all the tokens listed (either by being the owner or being granted transfer approval).  A contract may use the [VerifyTransferApproval](#verifyapproval) query to verify that it has permission to transfer/burn all the tokens.  If the message sender does not have permission to transfer/burn any one of the listed tokens, the entire message will fail (no tokens will be burned) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.
 
 ##### Request
 ```
@@ -1053,7 +1057,7 @@ Queries are off-chain requests, that are not cryptographically validated; theref
 
 Any query that inquires about a specific token will return an error if the input token ID does not exist.  If the token supply is public, the error will indicate that the token does not exist.  If the token supply is private, the query will return the same error response whether the token does not exist or the querier does not have permission to view the requested information.
 
-<a name="queryblockinfo"></a>One should be aware that the current blockheight and time is not available to a query on Secret Network at this moment, but there are plans to make the BlockInfo available to queries in a future hardfork.  To get around this limitation, the contract saves the BlockInfo every time a message is executed, and uses the blockheight and time of the last message execution to check viewing permission expiration during a query.  Therefore it is possible that a whitelisted address may be able to view the owner or metadata of a token past its permission expiration if no one executed any contract message since before the expiration.  However, because transferring/burning a token is executing a message, it does have the current blockheight and time available and can enforce exact expiration.
+<a name="queryblockinfo"></a>One should be aware that the current blockheight and time is not available to a query on Secret Network at this moment, but there are plans to make the BlockInfo available to queries in a future hardfork.  To get around this limitation, the contract saves the BlockInfo every time a message is executed, and uses the blockheight and time of the last message execution to check viewing approval expiration during a query.  Therefore it is possible that a whitelisted address may be able to view the owner or metadata of a token past its approval expiration if no one executed any contract message since before the expiration.  However, because transferring/burning a token is executing a message, it does have the current blockheight and time available and can enforce exact expiration.
 
 ## ContractInfo
 ContractInfo returns the contract's name and symbol.  This query is not authenticated.
@@ -1131,7 +1135,7 @@ Minters returns the list of addresses that are authorized to mint tokens.  This 
 | minters | array of string (HumanAddr) | List of addresses with minting authority | no       |
 
 ## RegisteredCodeHash
-RegisteredCodeHash will display the code hash of the specified contract if it has registered its receiver interface and will indicate whether the contract implements [BatchReceiveNft](#receiver).
+RegisteredCodeHash will display the code hash of the specified contract if it has registered its [receiver interface](#receiver) and will indicate whether the contract implements [BatchReceiveNft](#batchreceivenft).
 
 ##### Request
 ```
@@ -1266,7 +1270,7 @@ IsUnwrapped indicates whether the token has been unwrapped.  If sealed metadata 
 | token_is_unwrapped  | bool | True if the token is unwrapped (or sealed metadata is not enabled)   | no       |
 
 ## <a name="ownerof"></a>OwnerOf
-OwnerOf returns the owner of the specified token if the querier is the owner or has been granted permission to view the owner.  If the querier is the owner, OwnerOf will also display all the addresses that have been given transfer permission.  The transfer approval list is provided as part of CW-721 compliance; however, the token owner is advised to use [NftDossier (see below)](#nftdossier) for a more complete list that includes view_owner and view_private_metadata approvals (which CW-721 is not capable of keeping private).  If no [viewer](#viewerinfo) is provided, OwnerOf will only display the owner if ownership is public for this token.
+OwnerOf returns the owner of the specified token if the querier is the owner or has been granted permission to view the owner.  If the querier is the owner, OwnerOf will also display all the addresses that have been given transfer permission.  The transfer approval list is provided as part of CW-721 compliance; however, the token owner is advised to use [NftDossier](#nftdossier) for a more complete list that includes view_owner and view_private_metadata approvals (which CW-721 is not capable of keeping private).  If no [viewer](#viewerinfo) is provided, OwnerOf will only display the owner if ownership is public for this token.
 
 ##### Request
 ```
