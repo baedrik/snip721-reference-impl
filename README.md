@@ -1203,7 +1203,7 @@ The ViewerInfo object provides the address and viewing key of the querier.  It i
 | viewing_key | string             | The querying address' viewing key                                                                                     | no       |                  |
 
 ## AllTokens
-AllTokens returns an optionally paginated list of all the token IDs controlled by the contract.  If the contract's token supply is private, only an authenticated minter's address will be allowed to perform this query.  When paginating, supply the last token ID received in a response as the `start_after` string of the next query to continue listing where the previous query stopped.
+AllTokens returns an optionally paginated, lexicographically ordered list of all the token IDs controlled by the contract.  If the contract's token supply is private, only an authenticated minter's address will be allowed to perform this query.  When paginating, supply the last token ID received in a response as the `start_after` string of the next query to continue listing where the previous query stopped.
 
 ##### Request
 ```
