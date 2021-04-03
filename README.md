@@ -1737,7 +1737,7 @@ Tokens displays an optionally paginated, lexicographically ordered list of all t
 | tokens  | array of string | A list of token IDs owned by the specified `owner`                   | no       |
 
 ## <a name="verifyapproval"></a> VerifyTransferApproval
-VerifyTransferApproval will verify that the specified address has approval to transfer the entire provided list of tokens.  As explained [above](#queryblockinfo), queries may experience a delay in revealing expired permissions, so it is possible that a transfer attempt will still fail even after being verified by VerifyTransferApproval.  If the address does not have transfer approval on all the tokens, the response will indicate the first token encountered that can not be transferred by the address.
+VerifyTransferApproval will verify that the specified address has approval to transfer the entire provided list of tokens.  As explained [above](#queryblockinfo), queries may experience a delay in revealing expired approvals, so it is possible that a transfer attempt will still fail even after being verified by VerifyTransferApproval.  If the address does not have transfer approval on all the tokens, the response will indicate the first token encountered that can not be transferred by the address.
 
 ##### Request
 ```
@@ -1785,12 +1785,12 @@ TransactionHistory displays an optionally paginated list of transactions (mint, 
 	}
 }
 ```
-| Name        | Type               | Description                                                                                                       | Optional | Value If Omitted |
-|-------------|--------------------|-------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| address     | string (HumanAddr) | The address whose transaction history is being queried                                                            | no       |                  |
-| viewing_key | string             | The address' viewing key                                                                                          | no       |                  |
-| page        | number (u32)       | The page number to display, where the first transaction shown skips the page * page_size most recent transactions | yes      | 0                |
-| page_size   | number (u32)       | Number of transactions to return                                                                                  | yes      | 30               |
+| Name        | Type               | Description                                                                                                           | Optional | Value If Omitted |
+|-------------|--------------------|-----------------------------------------------------------------------------------------------------------------------|----------|------------------|
+| address     | string (HumanAddr) | The address whose transaction history is being queried                                                                | no       |                  |
+| viewing_key | string             | The address' viewing key                                                                                              | no       |                  |
+| page        | number (u32)       | The page number to display, where the first transaction shown skips the `page` * `page_size` most recent transactions | yes      | 0                |
+| page_size   | number (u32)       | Number of transactions to return                                                                                      | yes      | 30               |
 
 ##### Response
 ```
@@ -1845,8 +1845,8 @@ TransactionHistory displays an optionally paginated list of transactions (mint, 
 |------|--------------------------------|----------------------------------------------------------------------------------------|----------|
 | txs  | array of [Tx (see below)](#tx) | list of transactions in reverse chronological order that involve the specified address | no       |
 
-### <a name="tx"></a> Tx
-The Tx object contains all the information pertaining to a mint, burn, or transfer transaction.
+### <a name="tx"></a>Tx
+The Tx object contains all the information pertaining to a [mint](#txmint), [burn](#txburn), or [transfer](#txxfer) transaction.
 ```
 {
 	"tx_id": 9999,
@@ -1867,7 +1867,7 @@ The Tx object contains all the information pertaining to a mint, burn, or transf
 ### <a name="txaction"></a> TxAction
 The TxAction object defines the type of transaction and holds the information specific to that type.
 
-* TxAction::Mint
+* <a name="txmint"></a>TxAction::Mint
 ```
 {
 	"minter": "address_that_minted_the_token",
@@ -1880,7 +1880,7 @@ The TxAction object defines the type of transaction and holds the information sp
 | minter    | string (HumanAddr) | The address that minted the token                                              | no       |
 | recipient | string (HumanAddr) | The address of the newly minted token's owner                                  | no       |
 
-* TxAction::Transfer
+* <a name="txxfer"></a>TxAction::Transfer
 ```
 {
 	"from": "previous_owner_of_the_token",
@@ -1895,7 +1895,7 @@ The TxAction object defines the type of transaction and holds the information sp
 | sender    | string (HumanAddr) | The address that sent the token if different than the previous owner           | yes      |
 | recipient | string (HumanAddr) | The new owner of the token                                                     | no       |
 
-* TxAction::Burn
+* <a name="txburn"></a>TxAction::Burn
 ```
 {
 	"owner": "previous_owner_of_the_token",
