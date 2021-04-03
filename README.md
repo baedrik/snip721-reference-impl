@@ -61,8 +61,8 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 Config is the privacy configuration for the contract.
 * `public_token_supply` - This config value indicates whether the token IDs and the number of tokens controlled by the contract are public.  If the token supply is private, only minters can view the token IDs and number of tokens controlled by the contract (default: False)
 * `public_owner` - This config value indicates whether token ownership is public or private by default.  Regardless of this setting a user has the ability to change whether the ownership of their tokens is public or private (default: False)
-* `enable_sealed_metadata` - This config value indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the private metadata of a newly minted token is not viewable by anyone, not even the owner, until the owner calls the [Reveal](#reveal) message.  When Reveal is called, the sealed metadata is irreversibly unwrapped and moved to the public metadata (as default).  If `unwrapped_metadata_is_private` is set to true, the sealed metadata will remain as private metadata after unwrapping, but the owner (and anyone the owner has whitelisted) will now be able to see it.  Anyone will be able to query the token to know whether it has been unwrapped.  This simulates buying/selling a wrapped card that no one knows which card it is until it is unwrapped. If sealed metadata is not enabled, all tokens are considered unwrapped when minted (default: False)
-* `unwrapped_metadata_is_private` - This config value indicates if the [Reveal](#reveal) message should keep the sealed metadata private after unwrapping.  This config value is ignored if sealed metadata is not enabled (default: False)
+* <a name="enablesealed"></a>`enable_sealed_metadata` - This config value indicates whether sealed metadata should be enabled.  If sealed metadata is enabled, the private metadata of a newly minted token is not viewable by anyone, not even the owner, until the owner calls the [Reveal](#reveal) message.  When Reveal is called, the sealed metadata is irreversibly unwrapped and moved to the public metadata (as default).  If `unwrapped_metadata_is_private` is set to true, the sealed metadata will remain as private metadata after unwrapping, but the owner (and anyone the owner has whitelisted) will now be able to see it.  Anyone will be able to query the token to know whether it has been unwrapped.  This simulates buying/selling a wrapped card that no one knows which card it is until it is unwrapped. If sealed metadata is not enabled, all tokens are considered unwrapped when minted (default: False)
+* <a name="unwrapprivate"></a>`unwrapped_metadata_is_private` - This config value indicates if the [Reveal](#reveal) message should keep the sealed metadata private after unwrapping.  This config value is ignored if sealed metadata is not enabled (default: False)
 * `minter_may_update_metadata` - This config value indicates whether a minter is permitted to update a token's metadata (default: True)
 * `owner_may_update_metadata` - This config value indicates whether the owner of a token is permitted to update a token's metadata (default: False)
 * `enable_burn` - This config value indicates whether burn functionality is enabled (default: False)
@@ -292,7 +292,7 @@ SetPublicMetadata will set the public metadata to the input metadata if the mess
 ```
 
 ## <a name="setprivate"></a>SetPrivateMetadata
-SetPrivateMetadata will set the private metadata to the input metadata if the message sender is either the token owner or an approved minter and they have been given this power by the configuration value chosen during instantiation.  The private metadata of a sealed token may not be altered until after it has been unwrapped.
+SetPrivateMetadata will set the private metadata to the input metadata if the message sender is either the token owner or an approved minter and they have been given this power by the configuration value chosen during instantiation.  The private metadata of a [sealed](#enablesealed) token may not be altered until after it has been unwrapped.
 
 ##### Request
 ```
@@ -324,7 +324,7 @@ SetPrivateMetadata will set the private metadata to the input metadata if the me
 ```
 
 ## <a name="reveal"></a>Reveal
-Reveal unwraps the sealed private metadata, irreversibly marking the token as unwrapped.  If the `unwrapped_metadata_is_private` [configuration value](#config) is true, the formerly sealed metadata will remain private, otherwise it will be made public.
+Reveal unwraps the [sealed](#enablesealed) private metadata, irreversibly marking the token as unwrapped.  If the `unwrapped_metadata_is_private` [configuration value](#unwrapprivate) is true, the formerly sealed metadata will remain private, otherwise it will be made public.
 
 ##### Request
 ```
@@ -1243,7 +1243,7 @@ AllTokens returns an optionally paginated, lexicographically ordered list of all
 | tokens  | array of string | A list of token IDs controlled by this contract                      | no       |
 
 ## IsUnwrapped
-IsUnwrapped indicates whether the token has been unwrapped.  If sealed metadata is not enabled, all tokens are considered to be unwrapped.  This query is not authenticated.
+IsUnwrapped indicates whether the token has been unwrapped.  If [sealed metadata](#enablesealed) is not enabled, all tokens are considered to be unwrapped.  This query is not authenticated.
 
 ##### Request
 ```
@@ -1265,9 +1265,9 @@ IsUnwrapped indicates whether the token has been unwrapped.  If sealed metadata 
 	}
 }
 ```
-| Name                | Type | Description                                                          | Optional | 
-|---------------------|------|----------------------------------------------------------------------|----------|
-| token_is_unwrapped  | bool | True if the token is unwrapped (or sealed metadata is not enabled)   | no       |
+| Name                | Type | Description                                                                           | Optional | 
+|---------------------|------|---------------------------------------------------------------------------------------|----------|
+| token_is_unwrapped  | bool | True if the token is unwrapped (or [sealed metadata](#enablesealed) is not enabled)   | no       |
 
 ## <a name="ownerof"></a>OwnerOf
 OwnerOf returns the owner of the specified token if the querier is the owner or has been granted permission to view the owner.  If the querier is the owner, OwnerOf will also display all the addresses that have been given transfer permission.  The transfer approval list is provided as part of CW-721 compliance; however, the token owner is advised to use [NftDossier](#nftdossier) for a more complete list that includes view_owner and view_private_metadata approvals (which CW-721 is not capable of keeping private).  If no [viewer](#viewerinfo) is provided, OwnerOf will only display the owner if ownership is public for this token.
@@ -1430,7 +1430,7 @@ The Cw721OwnerOfResponse object is used to display a token's owner if the querie
 | approvals | array of [Cw721Approval (see above)](#cw721approval) | List of approvals to transfer this token                 | no       |
 
 ## PrivateMetadata
-PrivateMetadata returns the private metadata of a token if the querier is permitted to view it.  It follows CW-721 metadata specification, which is based on ERC-721 Metadata JSON Schema.  If the metadata is sealed, no one is permitted to view it until it has been unwrapped with [Reveal](#reveal).  If no [viewer](#viewerinfo) is provided, PrivateMetadata will only display the private metadata if the private metadata is public for this token.
+PrivateMetadata returns the private metadata of a token if the querier is permitted to view it.  It follows CW-721 metadata specification, which is based on ERC-721 Metadata JSON Schema.  If the metadata is [sealed](#enablesealed), no one is permitted to view it until it has been unwrapped with [Reveal](#reveal).  If no [viewer](#viewerinfo) is provided, PrivateMetadata will only display the private metadata if the private metadata is public for this token.
 
 ##### Request
 ```
