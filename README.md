@@ -1743,7 +1743,7 @@ VerifyTransferApproval will verify that the specified address has approval to tr
 ```
 {
 	"verify_transfer_approval": {
-		"tokens": [
+		"token_ids": [
 			"list", "of", "tokens", "to", "check", "for", "transfer", "approval", "..."
 		],
 		"address": "address_to_use_for_approval_checking",
@@ -1753,7 +1753,7 @@ VerifyTransferApproval will verify that the specified address has approval to tr
 ```
 | Name        | Type               | Description                                                                              | Optional | Value If Omitted |
 |-------------|--------------------|------------------------------------------------------------------------------------------|----------|------------------|
-| tokens      | array of string    | List of tokens to check for the address' transfer approval                               | no       |                  |
+| token_ids   | array of string    | List of tokens to check for the address' transfer approval                               | no       |                  |
 | address     | string (HumanAddr) | Address being checked for transfer approval                                              | no       |                  |
 | viewing_key | string             | The address' viewing key                                                                 | no       |                  |
 
@@ -1768,7 +1768,7 @@ VerifyTransferApproval will verify that the specified address has approval to tr
 ```
 | Name                   | Type   | Description                                                                       | Optional | 
 |------------------------|--------|-----------------------------------------------------------------------------------|----------|
-| approved_for_all       | bool   | True if the `address` has transfer approval on all the `tokens`                   | no       |
+| approved_for_all       | bool   | True if the `address` has transfer approval on all the `token_ids`                | no       |
 | first_unapproved_token | string | The first token in the list that the `address` does not have approval to transfer | yes      |
 
 ## TransactionHistory

@@ -99,11 +99,11 @@ pub enum HandleMsg {
     MintNft {
         /// optional token id. if omitted, use current token index
         token_id: Option<String>,
-        /// optional owner address. if omitted, owned by the minter
+        /// optional owner address. if omitted, owned by the message sender
         owner: Option<HumanAddr>,
         /// optional public metadata that can be seen by everyone
         public_metadata: Option<Metadata>,
-        /// optional private metadata that can only be seen by owner and whitelist
+        /// optional private metadata that can only be seen by the owner and whitelist
         private_metadata: Option<Metadata>,
         /// optional memo for the tx
         memo: Option<String>,
@@ -112,7 +112,7 @@ pub enum HandleMsg {
     },
     /// Mint multiple tokens
     BatchMintNft {
-        /// list of mints to perform
+        /// list of mint operations to perform
         mints: Vec<Mint>,
         /// optional message length padding
         padding: Option<String>,
@@ -151,13 +151,13 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// use this to add/remove approval(s) that whitelist everyone (makes public)
+    /// add/remove approval(s) that whitelist everyone (makes public)
     SetGlobalApproval {
-        /// optional token id to apply approval to
+        /// optional token id to apply approval/revocation to
         token_id: Option<String>,
-        /// optional permission to view owner
+        /// optional permission level for viewing the owner
         view_owner: Option<AccessLevel>,
-        /// optional permission to view private metadata
+        /// optional permission level for viewing private metadata
         view_private_metadata: Option<AccessLevel>,
         /// optional expiration
         expires: Option<Expiration>,
@@ -167,15 +167,15 @@ pub enum HandleMsg {
     /// add/remove approval(s) for a specific address on the token(s) you own.  Any permissions
     /// that are omitted will keep the current permission setting for that whitelist address
     SetWhitelistedApproval {
-        /// address being granted permission
+        /// address being granted/revoked permission
         address: HumanAddr,
-        /// optional token id to apply approval to
+        /// optional token id to apply approval/revocation to
         token_id: Option<String>,
-        /// optional permission to view owner
+        /// optional permission level for viewing the owner
         view_owner: Option<AccessLevel>,
-        /// optional permission to view private metadata
+        /// optional permission level for viewing private metadata
         view_private_metadata: Option<AccessLevel>,
-        /// optional permission to transfer
+        /// optional permission level for transferring
         transfer: Option<AccessLevel>,
         /// optional expiration
         expires: Option<Expiration>,
@@ -188,7 +188,7 @@ pub enum HandleMsg {
     Approve {
         /// address being granted the permission
         spender: HumanAddr,
-        /// id of the token that spender can transfer
+        /// id of the token that the spender can transfer
         token_id: String,
         /// optional expiration for this approval
         expires: Option<Expiration>,
@@ -197,12 +197,12 @@ pub enum HandleMsg {
     },
     /// revokes the spender's permission to transfer the specified token.  If you are the owner
     /// of the token, you can use SetWhitelistedApproval to accomplish the same thing.  If you
-    /// are an operator, you can only use Revoke, but you can not revoke the transfer permission
+    /// are an operator, you can only use Revoke, but you can not revoke the transfer approval
     /// of another operator
     Revoke {
         /// address whose permission is revoked
         spender: HumanAddr,
-        /// id of the token that spender can no longer transfer
+        /// id of the token that the spender can no longer transfer
         token_id: String,
         /// optional message length padding
         padding: Option<String>,
@@ -245,7 +245,7 @@ pub enum HandleMsg {
     },
     /// send a token and call receiving contract's (Batch)ReceiveNft
     SendNft {
-        /// contract to send the token to
+        /// address to send the token to
         contract: HumanAddr,
         /// id of the token to send
         token_id: String,
@@ -279,9 +279,10 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// register that the contract implements ReceiveNft and possibly BatchReceiveNft.  If
-    /// a contract implements BatchReceiveNft, SendNft will always call BatchReceiveNft even
-    /// if there is only one token transfered (the token_ids Vec will only contain one ID)
+    /// register that the message sending contract implements ReceiveNft and possibly
+    /// BatchReceiveNft.  If a contract implements BatchReceiveNft, SendNft will always
+    /// call BatchReceiveNft even if there is only one token transferred (the token_ids
+    /// Vec will only contain one ID)
     RegisterReceiveNft {
         /// receving contract's code hash
         code_hash: String,
@@ -664,7 +665,7 @@ pub enum QueryMsg {
     /// verify that the specified address has approval to transfer every listed token
     VerifyTransferApproval {
         /// list of tokens to verify approval for
-        tokens: Vec<String>,
+        token_ids: Vec<String>,
         /// address that has approval
         address: HumanAddr,
         /// viewing key

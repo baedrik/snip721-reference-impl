@@ -20,7 +20,7 @@
               ]
             },
             "owner": {
-              "description": "optional owner address. if omitted, owned by the minter",
+              "description": "optional owner address. if omitted, owned by the message sender",
               "anyOf": [
                 {
                   "$ref": "#/definitions/HumanAddr"
@@ -38,7 +38,7 @@
               ]
             },
             "private_metadata": {
-              "description": "optional private metadata that can only be seen by owner and whitelist",
+              "description": "optional private metadata that can only be seen by the owner and whitelist",
               "anyOf": [
                 {
                   "$ref": "#/definitions/Metadata"
@@ -84,7 +84,7 @@
           ],
           "properties": {
             "mints": {
-              "description": "list of mints to perform",
+              "description": "list of mint operations to perform",
               "type": "array",
               "items": {
                 "$ref": "#/definitions/Mint"
@@ -225,7 +225,7 @@
       }
     },
     {
-      "description": "use this to add/remove approval(s) that whitelist everyone (makes public)",
+      "description": "add/remove approval(s) that whitelist everyone (makes public)",
       "type": "object",
       "required": [
         "set_global_approval"
@@ -253,14 +253,14 @@
               ]
             },
             "token_id": {
-              "description": "optional token id to apply approval to",
+              "description": "optional token id to apply approval/revocation to",
               "type": [
                 "string",
                 "null"
               ]
             },
             "view_owner": {
-              "description": "optional permission to view owner",
+              "description": "optional permission level for viewing the owner",
               "anyOf": [
                 {
                   "$ref": "#/definitions/AccessLevel"
@@ -271,7 +271,7 @@
               ]
             },
             "view_private_metadata": {
-              "description": "optional permission to view private metadata",
+              "description": "optional permission level for viewing private metadata",
               "anyOf": [
                 {
                   "$ref": "#/definitions/AccessLevel"
@@ -299,7 +299,7 @@
           ],
           "properties": {
             "address": {
-              "description": "address being granted permission",
+              "description": "address being granted/revoked permission",
               "allOf": [
                 {
                   "$ref": "#/definitions/HumanAddr"
@@ -325,14 +325,14 @@
               ]
             },
             "token_id": {
-              "description": "optional token id to apply approval to",
+              "description": "optional token id to apply approval/revocation to",
               "type": [
                 "string",
                 "null"
               ]
             },
             "transfer": {
-              "description": "optional permission to transfer",
+              "description": "optional permission level for transferring",
               "anyOf": [
                 {
                   "$ref": "#/definitions/AccessLevel"
@@ -343,7 +343,7 @@
               ]
             },
             "view_owner": {
-              "description": "optional permission to view owner",
+              "description": "optional permission level for viewing the owner",
               "anyOf": [
                 {
                   "$ref": "#/definitions/AccessLevel"
@@ -354,7 +354,7 @@
               ]
             },
             "view_private_metadata": {
-              "description": "optional permission to view private metadata",
+              "description": "optional permission level for viewing private metadata",
               "anyOf": [
                 {
                   "$ref": "#/definitions/AccessLevel"
@@ -409,7 +409,7 @@
               ]
             },
             "token_id": {
-              "description": "id of the token that spender can transfer",
+              "description": "id of the token that the spender can transfer",
               "type": "string"
             }
           }
@@ -417,7 +417,7 @@
       }
     },
     {
-      "description": "revokes the spender's permission to transfer the specified token.  If you are the owner of the token, you can use SetWhitelistedApproval to accomplish the same thing.  If you are an operator, you can only use Revoke, but you can not revoke the transfer permission of another operator",
+      "description": "revokes the spender's permission to transfer the specified token.  If you are the owner of the token, you can use SetWhitelistedApproval to accomplish the same thing.  If you are an operator, you can only use Revoke, but you can not revoke the transfer approval of another operator",
       "type": "object",
       "required": [
         "revoke"
@@ -446,7 +446,7 @@
               ]
             },
             "token_id": {
-              "description": "id of the token that spender can no longer transfer",
+              "description": "id of the token that the spender can no longer transfer",
               "type": "string"
             }
           }
@@ -618,7 +618,7 @@
           ],
           "properties": {
             "contract": {
-              "description": "contract to send the token to",
+              "description": "address to send the token to",
               "allOf": [
                 {
                   "$ref": "#/definitions/HumanAddr"
@@ -756,7 +756,7 @@
       }
     },
     {
-      "description": "register that the contract implements ReceiveNft and possibly BatchReceiveNft.  If a contract implements BatchReceiveNft, SendNft will always call BatchReceiveNft even if there is only one token transfered (the token_ids Vec will only contain one ID)",
+      "description": "register that the message sending contract implements ReceiveNft and possibly BatchReceiveNft.  If a contract implements BatchReceiveNft, SendNft will always call BatchReceiveNft even if there is only one token transferred (the token_ids Vec will only contain one ID)",
       "type": "object",
       "required": [
         "register_receive_nft"

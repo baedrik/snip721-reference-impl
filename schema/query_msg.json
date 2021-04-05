@@ -452,7 +452,7 @@
           "type": "object",
           "required": [
             "address",
-            "tokens",
+            "token_ids",
             "viewing_key"
           ],
           "properties": {
@@ -464,7 +464,7 @@
                 }
               ]
             },
-            "tokens": {
+            "token_ids": {
               "description": "list of tokens to verify approval for",
               "type": "array",
               "items": {

@@ -2805,7 +2805,7 @@ mod tests {
         // test that charlie can transfer nft1 and 2 with operator approval,
         // nft3 with token approval, and nft4 because he owns it
         let query_msg = QueryMsg::VerifyTransferApproval {
-            tokens: vec![nft1.clone(), nft2.clone(), nft3.clone(), nft4.clone()],
+            token_ids: vec![nft1.clone(), nft2.clone(), nft3.clone(), nft4.clone()],
             address: charlie.clone(),
             viewing_key: "ckey".to_string(),
         };
@@ -2824,7 +2824,7 @@ mod tests {
 
         // test an unknown token id
         let query_msg = QueryMsg::VerifyTransferApproval {
-            tokens: vec![
+            token_ids: vec![
                 nft1.clone(),
                 nft2.clone(),
                 "NFT10".to_string(),
@@ -2849,7 +2849,7 @@ mod tests {
 
         // test not having approval on NFT5
         let query_msg = QueryMsg::VerifyTransferApproval {
-            tokens: vec![
+            token_ids: vec![
                 nft1.clone(),
                 nft2.clone(),
                 nft3.clone(),

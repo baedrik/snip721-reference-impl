@@ -1527,10 +1527,10 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
             limit,
         } => query_tokens(deps, &owner, viewer, viewing_key, start_after, limit),
         QueryMsg::VerifyTransferApproval {
-            tokens,
+            token_ids,
             address,
             viewing_key,
-        } => query_verify_approval(deps, &tokens, &address, viewing_key),
+        } => query_verify_approval(deps, &token_ids, &address, viewing_key),
         QueryMsg::IsUnwrapped { token_id } => query_is_unwrapped(&deps.storage, &token_id),
         QueryMsg::TransactionHistory {
             address,
@@ -2293,12 +2293,12 @@ pub fn query_transactions<S: Storage, A: Api, Q: Querier>(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
-/// * `tokens` - a list of token ids to check if the address has transfer approval
+/// * `token_ids` - a list of token ids to check if the address has transfer approval
 /// * `address` - a reference to the address whose transactions should be displayed
 /// * `viewing_key` - viewing key String
 pub fn query_verify_approval<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
-    tokens: &[String],
+    token_ids: &[String],
     address: &HumanAddr,
     viewing_key: String,
 ) -> StdResult<Binary> {
@@ -2312,7 +2312,7 @@ pub fn query_verify_approval<S: Storage, A: Api, Q: Querier>(
         chain_id: "secret-2".to_string(),
     });
     let mut oper_for: Vec<CanonicalAddr> = Vec::new();
-    for id in tokens {
+    for id in token_ids {
         if get_token_if_permitted(
             deps,
             &block,
