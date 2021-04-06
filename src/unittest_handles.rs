@@ -464,7 +464,7 @@ mod tests {
         };
         let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let minted = extract_log(handle_result);
-        assert!(minted.contains("\"MyNFT\""));
+        assert!(minted.contains("MyNFT"));
         // verify the token is in the id and index maps
         let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
         assert!(tokens.contains("MyNFT"));

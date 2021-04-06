@@ -1,4 +1,3 @@
-use serde_json_wasm as serde_json;
 /// This contract implements SNIP-721 standard:
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
 use std::collections::HashSet;
@@ -426,13 +425,12 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
         memo,
     }];
     let mut minted = mint_list(deps, &env.block, config, &sender_raw, &mut mints)?;
-    let minted_str = serde_json::to_string(&minted[0])
-        .map_err(|e| StdError::generic_err(format!("Error serializing minted token id: {}", e)))?;
+    let minted_str = minted.pop().unwrap_or_else(String::new);
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![log("minted", minted_str)],
+        log: vec![log("minted", &minted_str)],
         data: Some(to_binary(&HandleAnswer::MintNft {
-            token_id: minted.pop().unwrap_or_else(String::new),
+            token_id: minted_str,
         })?),
     })
 }
@@ -465,11 +463,9 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
         ));
     }
     let minted = mint_list(deps, &env.block, config, &sender_raw, mints)?;
-    let minted_str = serde_json::to_string(&minted)
-        .map_err(|e| StdError::generic_err(format!("Error serializing minted token ids: {}", e)))?;
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![log("minted", minted_str)],
+        log: vec![log("minted", format!("{:?}", &minted))],
         data: Some(to_binary(&HandleAnswer::BatchMintNft {
             token_ids: minted,
         })?),
