@@ -213,7 +213,8 @@ pub fn store_transfer<S: Storage>(
         action,
         memo,
     };
-    append_tx(storage, &tx)?;
+    let mut tx_store = PrefixedStorage::new(PREFIX_TXS, storage);
+    json_save(&mut tx_store, &config.tx_cnt.to_le_bytes(), &tx)?;
     if let StoredTxAction::Transfer {
         from,
         sender,
@@ -260,7 +261,8 @@ pub fn store_mint<S: Storage>(
         action,
         memo,
     };
-    append_tx(storage, &tx)?;
+    let mut tx_store = PrefixedStorage::new(PREFIX_TXS, storage);
+    json_save(&mut tx_store, &config.tx_cnt.to_le_bytes(), &tx)?;
     if let StoredTxAction::Mint { minter, recipient } = tx.action {
         append_tx_for_addr(storage, config.tx_cnt, &recipient)?;
         if recipient != minter {
@@ -299,7 +301,8 @@ pub fn store_burn<S: Storage>(
         action,
         memo,
     };
-    append_tx(storage, &tx)?;
+    let mut tx_store = PrefixedStorage::new(PREFIX_TXS, storage);
+    json_save(&mut tx_store, &config.tx_cnt.to_le_bytes(), &tx)?;
     if let StoredTxAction::Burn { owner, burner } = tx.action {
         append_tx_for_addr(storage, config.tx_cnt, &owner)?;
         if let Some(bnr) = burner.as_ref() {
@@ -308,18 +311,6 @@ pub fn store_burn<S: Storage>(
     }
     config.tx_cnt += 1;
     Ok(())
-}
-
-/// Returns StdResult<()> after saving tx
-///
-/// # Arguments
-///
-/// * `storage` - a mutable reference to the storage this item should go to
-/// * `tx` - a reference to the tx to store
-fn append_tx<S: Storage>(storage: &mut S, tx: &StoredTx) -> StdResult<()> {
-    let mut store = PrefixedStorage::new(PREFIX_TXS, storage);
-    let mut store = AppendStoreMut::attach_or_create_with_serialization(&mut store, Json)?;
-    store.push(tx)
 }
 
 /// Returns StdResult<()> after saving tx id
@@ -360,15 +351,13 @@ pub fn get_txs<A: Api, S: ReadonlyStorage>(
 
     // Try to access the storage of tx ids for the account.
     // If it doesn't exist yet, return an empty list of txs.
-    let id_store = if let Some(result) = AppendStore::<u32, _>::attach(&id_store) {
+    let id_store = if let Some(result) = AppendStore::<u64, _>::attach(&id_store) {
         result?
     } else {
         return Ok(vec![]);
     };
-    // try to access tx storage
+    // access tx storage
     let tx_store = ReadonlyPrefixedStorage::new(PREFIX_TXS, storage);
-    let tx_store = AppendStore::<StoredTx, _, _>::attach_with_serialization(&tx_store, Json)
-        .ok_or_else(|| StdError::generic_err("Unable to retrieve tx data"))??;
     // Take `page_size` txs starting from the latest tx, potentially skipping `page * page_size`
     // txs from the start.
     let txs: StdResult<Vec<Tx>> = id_store
@@ -377,8 +366,11 @@ pub fn get_txs<A: Api, S: ReadonlyStorage>(
         .skip((page * page_size) as usize)
         .take(page_size as usize)
         .map(|id| {
-            id.map(|id| tx_store.get_at(id).and_then(|tx| tx.into_humanized(api)))
-                .and_then(|x| x)
+            id.map(|id| {
+                json_load(&tx_store, &id.to_le_bytes())
+                    .and_then(|tx: StoredTx| tx.into_humanized(api))
+            })
+            .and_then(|x| x)
         })
         .collect();
 
