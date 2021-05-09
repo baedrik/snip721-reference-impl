@@ -24,7 +24,7 @@ use crate::state::{
     store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, BLOCK_KEY,
     CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS,
     PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_OWNED, PREFIX_OWNER_PRIV, PREFIX_PRIV_META,
-    PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY, PRNG_SEED_KEY, TOKENS_KEY,
+    PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_TOKENS, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
 };
 use crate::token::{Metadata, Token};
 use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -32,6 +32,8 @@ use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
 /// pad handle responses and log attributes to blocks of 256 bytes to prevent leaking info based on
 /// response size
 pub const BLOCK_SIZE: usize = 256;
+/// max number of token ids to keep in id list block
+pub const ID_BLOCK_SIZE: u32 = 64;
 
 ////////////////////////////////////// Init ///////////////////////////////////////
 /// Returns InitResult
@@ -48,7 +50,6 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: InitMsg,
 ) -> InitResult {
-    let tokens: HashSet<String> = HashSet::new();
     let admin = msg.admin.unwrap_or(env.message.sender);
     let admin_raw = deps.api.canonical_address(&admin)?;
     let prng_seed: Vec<u8> = sha_256(base64::encode(msg.entropy).as_bytes()).to_vec();
@@ -72,7 +73,6 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 
     let minters = vec![admin_raw];
     save(&mut deps.storage, CONFIG_KEY, &config)?;
-    save(&mut deps.storage, TOKENS_KEY, &tokens)?;
     save(&mut deps.storage, MINTERS_KEY, &minters)?;
     save(&mut deps.storage, PRNG_SEED_KEY, &prng_seed)?;
     // TODO remove this after BlockInfo becomes available to queries
@@ -1601,10 +1601,16 @@ pub fn query_num_tokens<S: Storage, A: Api, Q: Querier>(
 ) -> QueryResult {
     // authenticate permission to view token supply
     check_view_supply(deps, viewer)?;
-    let tokens: HashSet<String> = may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(HashSet::new);
-    to_binary(&QueryAnswer::NumTokens {
-        count: tokens.len() as u32,
-    })
+    let config: Config = load(&deps.storage, CONFIG_KEY)?;
+    let last_block = config.mint_cnt.saturating_sub(1) / ID_BLOCK_SIZE;
+    let mut count = 0u32;
+    let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+    for i in 0..=last_block {
+        let tokens: HashSet<String> =
+            may_load(&token_store, &i.to_le_bytes())?.unwrap_or_else(HashSet::new);
+        count += tokens.len() as u32;
+    }
+    to_binary(&QueryAnswer::NumTokens { count })
 }
 
 /// Returns QueryResult displaying the list of tokens that the contract controls
@@ -1626,12 +1632,17 @@ pub fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
     check_view_supply(deps, viewer)?;
     let after = start_after.unwrap_or_else(String::new);
     let size = limit.unwrap_or(300) as usize;
-    let token_list: HashSet<String> =
-        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(HashSet::new);
+    let config: Config = load(&deps.storage, CONFIG_KEY)?;
+    let last_block = config.mint_cnt.saturating_sub(1) / ID_BLOCK_SIZE;
+    let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
     let mut tokens = Vec::new();
-    for id in token_list {
-        if id > after {
-            tokens.push(id.to_string());
+    for i in 0..=last_block {
+        let token_list: HashSet<String> =
+            may_load(&token_store, &i.to_le_bytes())?.unwrap_or_else(HashSet::new);
+        for id in token_list {
+            if id > after {
+                tokens.push(id.to_string());
+            }
         }
     }
     tokens.sort_unstable();
@@ -3794,6 +3805,14 @@ fn send_list<S: Storage, A: Api, Q: Querier>(
     Ok(messages)
 }
 
+// a block of token ids and its index
+pub struct IdBlock {
+    // block number
+    pub index: u32,
+    // token ids
+    pub tokens: HashSet<String>,
+}
+
 /// Returns StdResult<()>
 ///
 /// burns a list of tokens
@@ -3815,8 +3834,7 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
     let mut oper_for: Vec<CanonicalAddr> = Vec::new();
     let mut inv_updates: Vec<InventoryUpdate> = Vec::new();
     let num_perm_types = PermissionType::ViewOwner.num_types();
-    let mut tokens: HashSet<String> =
-        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(HashSet::new);
+    let mut id_blocks: Vec<IdBlock> = Vec::new();
     for burn in burns.drain(..) {
         for token_id in burn.token_ids.into_iter() {
             let (token, idx) = get_token_if_permitted(
@@ -3846,8 +3864,23 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
                 inv_updates.push(new_inv);
             }
             let token_key = idx.to_le_bytes();
-            // remove from token list and maps
-            tokens.remove(&token_id);
+            // remove from block of token ids
+            let this_block = idx / ID_BLOCK_SIZE;
+            // if already burned a token in the same block
+            if let Some(id_block) = id_blocks.iter_mut().find(|i| i.index == this_block) {
+                id_block.tokens.remove(&token_id);
+            // otherwise first time removing from this block
+            } else {
+                let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+                let mut tokens =
+                    may_load(&token_store, &this_block.to_le_bytes())?.unwrap_or_else(HashSet::new);
+                tokens.remove(&token_id);
+                id_blocks.push(IdBlock {
+                    index: this_block,
+                    tokens,
+                });
+            }
+            // remove from maps
             let mut map2idx = PrefixedStorage::new(PREFIX_MAP_TO_INDEX, &mut deps.storage);
             remove(&mut map2idx, token_id.as_bytes());
             let mut map2id = PrefixedStorage::new(PREFIX_MAP_TO_ID, &mut deps.storage);
@@ -3878,7 +3911,14 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
         }
     }
     save(&mut deps.storage, CONFIG_KEY, &config)?;
-    save(&mut deps.storage, TOKENS_KEY, &tokens)?;
+    let mut token_store = PrefixedStorage::new(PREFIX_TOKENS, &mut deps.storage);
+    for id_block in id_blocks.iter() {
+        save(
+            &mut token_store,
+            &id_block.index.to_le_bytes(),
+            &id_block.tokens,
+        )?;
+    }
     update_owner_inventory(&mut deps.storage, &inv_updates, num_perm_types)?;
     Ok(())
 }
@@ -3909,18 +3949,24 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
     sender_raw: &CanonicalAddr,
     mints: &mut Vec<Mint>,
 ) -> StdResult<Vec<String>> {
-    let mut tokens: HashSet<String> =
-        may_load(&deps.storage, TOKENS_KEY)?.unwrap_or_else(HashSet::new);
     let mut inventories: Vec<Inventory> = Vec::new();
     let mut minted: Vec<String> = Vec::new();
+    let mut old_block = u64::MAX;
+    let mut tokens: HashSet<String> = HashSet::new();
+    let save_tokens = !mints.is_empty();
     for mint in mints.drain(..) {
         let id = mint.token_id.unwrap_or(format!("{}", config.mint_cnt));
-        if tokens.contains(&id) {
+        // check if id already exists
+        let mut map2idx = PrefixedStorage::new(PREFIX_MAP_TO_INDEX, &mut deps.storage);
+        let may_exist: Option<u32> = may_load(&map2idx, id.as_bytes())?;
+        if may_exist.is_some() {
             return Err(StdError::generic_err(format!(
                 "Token ID {} is already in use",
                 id
             )));
         }
+        // map new token id to its index
+        save(&mut map2idx, id.as_bytes(), &config.mint_cnt)?;
         let recipient = if let Some(o) = mint.owner {
             deps.api.canonical_address(&o)?
         } else {
@@ -3962,10 +4008,25 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
         if !found {
             inventories.push(new_inv);
         }
-        // add to token list, id and index maps
+        // add to block of token ids
+        let this_block = config.mint_cnt / ID_BLOCK_SIZE;
+        // if first in mint list or filled last block
+        if this_block as u64 != old_block {
+            let mut token_store = PrefixedStorage::new(PREFIX_TOKENS, &mut deps.storage);
+            // if first in mint list, just load the block
+            if old_block == u64::MAX {
+                tokens =
+                    may_load(&token_store, &this_block.to_le_bytes())?.unwrap_or_else(HashSet::new);
+            // else filled last block so save it
+            } else {
+                save(&mut token_store, &(old_block as u32).to_le_bytes(), &tokens)?;
+                tokens.clear();
+            }
+        }
+        // add new token id
         tokens.insert(id.clone());
-        let mut map2idx = PrefixedStorage::new(PREFIX_MAP_TO_INDEX, &mut deps.storage);
-        save(&mut map2idx, id.as_bytes(), &config.mint_cnt)?;
+        old_block = this_block as u64;
+        // map index to id
         let mut map2id = PrefixedStorage::new(PREFIX_MAP_TO_ID, &mut deps.storage);
         save(&mut map2id, &token_key, &id)?;
 
@@ -4008,7 +4069,10 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
             &inventory.tokens,
         )?;
     }
-    save(&mut deps.storage, TOKENS_KEY, &tokens)?;
+    if save_tokens {
+        let mut token_store = PrefixedStorage::new(PREFIX_TOKENS, &mut deps.storage);
+        save(&mut token_store, &(old_block as u32).to_le_bytes(), &tokens)?;
+    }
     save(&mut deps.storage, CONFIG_KEY, &config)?;
     Ok(minted)
 }

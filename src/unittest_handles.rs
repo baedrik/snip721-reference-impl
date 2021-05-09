@@ -11,7 +11,7 @@ mod tests {
         get_txs, json_load, json_may_load, load, may_load, AuthList, Config, Permission,
         PermissionType, CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
         PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_OWNED, PREFIX_OWNER_PRIV,
-        PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY, TOKENS_KEY,
+        PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_TOKENS, PREFIX_VIEW_KEY,
     };
     use crate::token::{Metadata, Token};
     use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -308,7 +308,8 @@ mod tests {
         }
 
         // verify the tokens are in the id and index maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert_eq!(tokens.len(), 4);
         assert!(tokens.contains("0"));
         assert!(tokens.contains("NFT2"));
@@ -466,7 +467,8 @@ mod tests {
         let minted = extract_log(handle_result);
         assert!(minted.contains("MyNFT"));
         // verify the token is in the id and index maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -563,7 +565,8 @@ mod tests {
         }
 
         // verify token is in the token list
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("1"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "1".as_bytes()).unwrap();
@@ -908,7 +911,8 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -1151,7 +1155,8 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -4481,7 +4486,8 @@ mod tests {
             handle_msg,
         );
         // confirm token was removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(!tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: Option<u32> = may_load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -4600,7 +4606,8 @@ mod tests {
             handle_msg,
         );
         // confirm token was removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(!tokens.contains("MyNFT2"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: Option<u32> = may_load(&map2idx, "MyNFT2".as_bytes()).unwrap();
@@ -4671,7 +4678,8 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         // confirm token was removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.is_empty());
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: Option<u32> = may_load(&map2idx, "MyNFT3".as_bytes()).unwrap();
@@ -5436,7 +5444,8 @@ mod tests {
             .unwrap();
         let charlie_key = charlie_raw.as_slice();
         // confirm correct tokens were removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert_eq!(tokens.len(), 3);
         assert!(!tokens.contains("NFT1"));
         assert!(tokens.contains("NFT2"));
@@ -5831,7 +5840,8 @@ mod tests {
             handle_msg,
         );
         // confirm token was not removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -5927,7 +5937,8 @@ mod tests {
             handle_msg,
         );
         // confirm token was not removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -6019,7 +6030,8 @@ mod tests {
             handle_msg,
         );
         // confirm token was not removed from the list
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -6083,7 +6095,8 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
         // confirm token was not removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -6627,7 +6640,8 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("david", &[]), handle_msg);
         // confirm token was not removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("NFT1"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "NFT1".as_bytes()).unwrap();
@@ -7270,7 +7284,8 @@ mod tests {
         assert_eq!(messages[0], msg_fr_al);
 
         // confirm token was not removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -7399,7 +7414,8 @@ mod tests {
         });
         assert_eq!(messages[0], msg_fr_al);
         // confirm token was not removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -7516,7 +7532,8 @@ mod tests {
         });
         assert_eq!(messages[0], msg_fr_dv);
         // confirm token was not removed from the list
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -7598,7 +7615,8 @@ mod tests {
         });
         assert_eq!(messages[0], msg_fr_ch);
         // confirm token was not removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
@@ -7996,7 +8014,8 @@ mod tests {
         });
         assert_eq!(messages[1], msg_fr_al);
         // confirm token was not removed from the maps
-        let tokens: HashSet<String> = load(&deps.storage, TOKENS_KEY).unwrap();
+        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
+        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
         assert!(tokens.contains("NFT1"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "NFT1".as_bytes()).unwrap();
