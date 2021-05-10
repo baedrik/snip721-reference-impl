@@ -33,7 +33,7 @@ use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
 /// response size
 pub const BLOCK_SIZE: usize = 256;
 /// max number of token ids to keep in id list block
-pub const ID_BLOCK_SIZE: u32 = 64;
+pub const ID_BLOCK_SIZE: u32 = 128;
 
 ////////////////////////////////////// Init ///////////////////////////////////////
 /// Returns InitResult
