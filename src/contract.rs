@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use cosmwasm_std::{
     log, to_binary, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Env, Extern, HandleResponse,
     HandleResult, HumanAddr, InitResponse, InitResult, Querier, QueryResult, ReadonlyStorage,
-    StdError, StdResult, Storage, WasmMsg,
+    StdError, StdResult, Storage, Uint128, WasmMsg,
 };
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 
@@ -1535,8 +1535,27 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
             page_size,
         } => query_transactions(deps, &address, viewing_key, page, page_size),
         QueryMsg::RegisteredCodeHash { contract } => query_code_hash(deps, &contract),
+
+        // Keplr compatibility
+        QueryMsg::TokenInfo {} => query_token_info(&deps.storage),
+        QueryMsg::Balance { .. } => query_balance(),
     };
     pad_query_result(response, BLOCK_SIZE)
+}
+
+fn query_token_info<S: ReadonlyStorage>(storage: &S) -> QueryResult {
+    let config: Config = load(storage, CONFIG_KEY)?;
+
+    to_binary(&QueryAnswer::TokenInfo {
+        name: config.name,
+        symbol: config.symbol,
+        decimals: 0,
+        total_supply: None,
+    })
+}
+
+fn query_balance() -> QueryResult {
+    to_binary(&QueryAnswer::Balance { amount: Uint128(0) })
 }
 
 /// Returns QueryResult displaying the contract's name and symbol

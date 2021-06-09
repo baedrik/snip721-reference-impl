@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Binary, Coin, HumanAddr};
+use cosmwasm_std::{Binary, Coin, HumanAddr, Uint128};
 
 use crate::expiration::Expiration;
 use crate::token::Metadata;
@@ -585,7 +585,9 @@ pub enum QueryMsg {
         include_expired: Option<bool>,
     },
     /// displays the public metadata of a token
-    NftInfo { token_id: String },
+    NftInfo {
+        token_id: String,
+    },
     /// displays all the information contained in the OwnerOf and NftInfo queries
     AllNftInfo {
         token_id: String,
@@ -661,7 +663,9 @@ pub enum QueryMsg {
         limit: Option<u32>,
     },
     /// display if a token is unwrapped
-    IsUnwrapped { token_id: String },
+    IsUnwrapped {
+        token_id: String,
+    },
     /// verify that the specified address has approval to transfer every listed token
     VerifyTransferApproval {
         /// list of tokens to verify approval for
@@ -687,6 +691,13 @@ pub enum QueryMsg {
     RegisteredCodeHash {
         /// the contract whose receive registration info you want to view
         contract: HumanAddr,
+    },
+
+    // Keplr compatibility
+    TokenInfo {},
+    Balance {
+        address: HumanAddr,
+        key: String,
     },
 }
 
@@ -806,6 +817,17 @@ pub enum QueryAnswer {
     RegisteredCodeHash {
         code_hash: Option<String>,
         also_implements_batch_receive_nft: bool,
+    },
+
+    // Keplr compatibility
+    TokenInfo {
+        name: String,
+        symbol: String,
+        decimals: u8,
+        total_supply: Option<Uint128>,
+    },
+    Balance {
+        amount: Uint128,
     },
 }
 
