@@ -117,23 +117,15 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// set the public metadata.  This can be called by either the token owner or a valid minter
-    /// if they have been given this power by the appropriate config values
-    SetPublicMetadata {
-        /// id of the token whose public metadata should be updated
+    /// set the public and/or private metadata.  This can be called by either the token owner or
+    /// a valid minter if they have been given this power by the appropriate config values
+    SetMetadata {
+        /// id of the token whose metadata should be updated
         token_id: String,
-        /// the new public metadata
-        metadata: Metadata,
-        /// optional message length padding
-        padding: Option<String>,
-    },
-    /// set the private metadata.  This can be called by either the token owner or a valid minter
-    /// if they have been given this power by the appropriate config values
-    SetPrivateMetadata {
-        /// id of the token whose private metadata should be updated
-        token_id: String,
-        /// the new private metadata
-        metadata: Metadata,
+        /// the optional new public metadata
+        public_metadata: Option<Metadata>,
+        /// the optional new private metadata
+        private_metadata: Option<Metadata>,
         /// optional message length padding
         padding: Option<String>,
     },
@@ -419,10 +411,7 @@ pub enum HandleAnswer {
     BatchMintNft {
         token_ids: Vec<String>,
     },
-    SetPublicMetadata {
-        status: ResponseStatus,
-    },
-    SetPrivateMetadata {
+    SetMetadata {
         status: ResponseStatus,
     },
     MakeOwnershipPrivate {
@@ -536,7 +525,9 @@ pub struct Tx {
     /// tx id
     pub tx_id: u64,
     /// the block containing this tx
-    pub blockheight: u64,
+    pub block_height: u64,
+    /// the time (in seconds since 01/01/1970) of the block containing this tx
+    pub block_time: u64,
     /// token id
     pub token_id: String,
     /// tx type and specifics
@@ -801,6 +792,8 @@ pub enum QueryAnswer {
         first_unapproved_token: Option<String>,
     },
     TransactionHistory {
+        /// total transaction count
+        total: u64,
         txs: Vec<Tx>,
     },
     RegisteredCodeHash {

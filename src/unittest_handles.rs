@@ -364,8 +364,8 @@ mod tests {
         assert!(owned.contains(&1));
         assert!(owned.contains(&3));
         // verify mint tx was logged
-        let txs = get_txs(&deps.api, &deps.storage, &admin_raw, 0, 4).unwrap();
-        assert_eq!(txs.len(), 4);
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &admin_raw, 0, 4).unwrap();
+        assert_eq!(total, 4);
         assert_eq!(txs[0].token_id, "3".to_string());
         assert_eq!(
             txs[0].action,
@@ -506,7 +506,8 @@ mod tests {
         let owned: HashSet<u32> = load(&owned_store, alice_raw.as_slice()).unwrap();
         assert!(owned.contains(&0));
         // verify mint tx was logged to both parties
-        let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        assert_eq!(total, 1);
         assert_eq!(txs.len(), 1);
         assert_eq!(txs[0].token_id, "MyNFT".to_string());
         assert_eq!(
@@ -517,7 +518,8 @@ mod tests {
             }
         );
         assert_eq!(txs[0].memo, Some("Mint it baby!".to_string()));
-        let tx2 = get_txs(&deps.api, &deps.storage, &admin_raw, 0, 1).unwrap();
+        let (tx2, total) = get_txs(&deps.api, &deps.storage, &admin_raw, 0, 1).unwrap();
+        assert_eq!(total, 1);
         assert_eq!(txs, tx2);
         // test minting with an existing token id
         let handle_msg = HandleMsg::MintNft {
@@ -598,7 +600,8 @@ mod tests {
         let owned: HashSet<u32> = load(&owned_store, admin_raw.as_slice()).unwrap();
         assert!(owned.contains(&1));
         // verify mint tx was logged
-        let txs = get_txs(&deps.api, &deps.storage, &admin_raw, 0, 10).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &admin_raw, 0, 10).unwrap();
+        assert_eq!(total, 2);
         assert_eq!(txs.len(), 2);
         assert_eq!(txs[0].token_id, "1".to_string());
         assert_eq!(
@@ -632,13 +635,14 @@ mod tests {
         );
 
         // test token does not exist when supply is public
-        let handle_msg = HandleMsg::SetPublicMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "SNIP20".to_string(),
-            metadata: Metadata {
+            public_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("I changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
+            private_metadata: None,
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
@@ -653,13 +657,14 @@ mod tests {
         );
 
         // test token does not exist when supply is private
-        let handle_msg = HandleMsg::SetPublicMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "SNIP20".to_string(),
-            metadata: Metadata {
+            public_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("I changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
+            private_metadata: None,
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
@@ -673,13 +678,14 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::SetPublicMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "MyNFT".to_string(),
-            metadata: Metadata {
+            public_metadata: Some(Metadata {
                 name: Some("MyNFT".to_string()),
                 description: None,
                 image: Some("uri".to_string()),
-            },
+            }),
+            private_metadata: None,
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
@@ -706,13 +712,14 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         // test not minter nor owner
-        let handle_msg = HandleMsg::SetPublicMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "MyNFT".to_string(),
-            metadata: Metadata {
+            public_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("I changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
+            private_metadata: None,
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
@@ -720,13 +727,14 @@ mod tests {
         assert!(error.contains("Not authorized to update metadata"));
 
         // test owner tries but not allowed to change metadata
-        let handle_msg = HandleMsg::SetPublicMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "MyNFT".to_string(),
-            metadata: Metadata {
+            public_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("I changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
+            private_metadata: None,
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
@@ -754,13 +762,14 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetPublicMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "MyNFT".to_string(),
-            metadata: Metadata {
+            public_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("I changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
+            private_metadata: None,
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
@@ -787,13 +796,14 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetPublicMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "MyNFT".to_string(),
-            metadata: Metadata {
+            public_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("I changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
+            private_metadata: None,
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
@@ -821,13 +831,14 @@ mod tests {
         );
 
         // test token does not exist when supply is private
-        let handle_msg = HandleMsg::SetPrivateMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "SNIP20".to_string(),
-            metadata: Metadata {
+            public_metadata: None,
+            private_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("I changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
@@ -878,13 +889,14 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetPrivateMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "MyNFT".to_string(),
-            metadata: Metadata {
+            public_metadata: None,
+            private_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("I changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
@@ -892,13 +904,14 @@ mod tests {
         assert!(error.contains("The private metadata of a sealed token can not be modified"));
 
         // test token does not exist when supply is public
-        let handle_msg = HandleMsg::SetPrivateMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "SNIP20".to_string(),
-            metadata: Metadata {
+            public_metadata: None,
+            private_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("I changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
@@ -923,27 +936,37 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &token_key).unwrap();
         assert!(token.unwrapped);
-        let handle_msg = HandleMsg::SetPrivateMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "MyNFT".to_string(),
-            metadata: Metadata {
-                name: Some("New Name".to_string()),
-                description: Some("Minter changed the metadata".to_string()),
-                image: Some("new uri".to_string()),
-            },
+            public_metadata: Some(Metadata {
+                name: Some("New Name Pub".to_string()),
+                description: Some("Minter changed the public metadata".to_string()),
+                image: Some("new uri pub".to_string()),
+            }),
+            private_metadata: Some(Metadata {
+                name: Some("New Name Priv".to_string()),
+                description: Some("Minter changed the private metadata".to_string()),
+                image: Some("new uri priv".to_string()),
+            }),
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
+        let pub_meta: Metadata = load(&pub_store, &token_key).unwrap();
+        assert_eq!(pub_meta.name, Some("New Name Pub".to_string()));
+        assert_eq!(
+            pub_meta.description,
+            Some("Minter changed the public metadata".to_string())
+        );
+        assert_eq!(pub_meta.image, Some("new uri pub".to_string()));
         let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
         let priv_meta: Metadata = load(&priv_store, &token_key).unwrap();
-        assert_eq!(priv_meta.name, Some("New Name".to_string()));
+        assert_eq!(priv_meta.name, Some("New Name Priv".to_string()));
         assert_eq!(
             priv_meta.description,
-            Some("Minter changed the metadata".to_string())
+            Some("Minter changed the private metadata".to_string())
         );
-        assert_eq!(priv_meta.image, Some("new uri".to_string()));
-        let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
-        let pub_meta: Option<Metadata> = may_load(&pub_store, &token_key).unwrap();
-        assert!(pub_meta.is_none());
+        assert_eq!(priv_meta.image, Some("new uri priv".to_string()));
 
         // test setting metadata when status prevents it
         let handle_msg = HandleMsg::SetContractStatus {
@@ -952,13 +975,14 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
-        let handle_msg = HandleMsg::SetPrivateMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "MyNFT".to_string(),
-            metadata: Metadata {
+            public_metadata: None,
+            private_metadata: Some(Metadata {
                 name: Some("MyNFT".to_string()),
                 description: None,
                 image: Some("uri".to_string()),
-            },
+            }),
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
@@ -972,13 +996,14 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         // test owner trying when not authorized
-        let handle_msg = HandleMsg::SetPrivateMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "MyNFT".to_string(),
-            metadata: Metadata {
+            public_metadata: None,
+            private_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("I changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
             padding: None,
         };
         let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
@@ -1006,13 +1031,14 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetPrivateMetadata {
+        let handle_msg = HandleMsg::SetMetadata {
             token_id: "MyNFT".to_string(),
-            metadata: Metadata {
+            public_metadata: None,
+            private_metadata: Some(Metadata {
                 name: Some("New Name".to_string()),
                 description: Some("Owner changed the metadata".to_string()),
                 image: Some("new uri".to_string()),
-            },
+            }),
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
@@ -4507,7 +4533,8 @@ mod tests {
         let pub_meta: Option<Metadata> = may_load(&pub_store, &tok_key).unwrap();
         assert!(pub_meta.is_none());
         // confirm the tx was logged to both parties
-        let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        assert_eq!(total, 2);
         assert_eq!(txs.len(), 1);
         assert_eq!(txs[0].token_id, "MyNFT".to_string());
         assert_eq!(
@@ -4518,7 +4545,8 @@ mod tests {
             }
         );
         assert_eq!(txs[0].memo, Some("Burn, baby, burn!".to_string()));
-        let tx2 = get_txs(&deps.api, &deps.storage, &bob_raw, 0, 1).unwrap();
+        let (tx2, total) = get_txs(&deps.api, &deps.storage, &bob_raw, 0, 1).unwrap();
+        assert_eq!(total, 1);
         assert_eq!(txs, tx2);
         // confirm charlie's AuthList was removed because the only token was burned
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
@@ -4643,7 +4671,8 @@ mod tests {
         let pub_meta: Option<Metadata> = may_load(&pub_store, &tok2_key).unwrap();
         assert!(pub_meta.is_none());
         // confirm the tx was logged to both parties
-        let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        assert_eq!(total, 5);
         assert_eq!(txs[0].token_id, "MyNFT2".to_string());
         assert_eq!(
             txs[0].action,
@@ -4653,7 +4682,8 @@ mod tests {
             }
         );
         assert!(txs[0].memo.is_none());
-        let tx2 = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
+        let (tx2, total) = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
+        assert_eq!(total, 1);
         assert_eq!(txs, tx2);
         // confirm charlie's AuthList was removed because his only approved token was burned
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
@@ -4699,7 +4729,8 @@ mod tests {
         let pub_meta: Option<Metadata> = may_load(&pub_store, &tok3_key).unwrap();
         assert!(pub_meta.is_none());
         // confirm the tx was logged
-        let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        assert_eq!(total, 6);
         assert_eq!(txs[0].token_id, "MyNFT3".to_string());
         assert_eq!(
             txs[0].action,
@@ -5573,7 +5604,8 @@ mod tests {
         let charlie_list: Option<Vec<AuthList>> = may_load(&auth_store, charlie_key).unwrap();
         assert!(charlie_list.is_none());
         // confirm one of the txs
-        let txs = get_txs(&deps.api, &deps.storage, &bob_raw, 0, 3).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &bob_raw, 0, 3).unwrap();
+        assert_eq!(total, 8);
         assert_eq!(txs.len(), 3);
         assert_eq!(txs[0].token_id, "NFT8".to_string());
         assert_eq!(
@@ -5586,7 +5618,8 @@ mod tests {
         assert_eq!(txs[0].memo, Some("Phew!".to_string()));
         assert_eq!(txs[1].memo, Some("Phew!".to_string()));
         assert_eq!(txs[2].memo, Some("Phew!".to_string()));
-        let tx2 = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
+        let (tx2, total) = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
+        assert_eq!(total, 4);
         assert_eq!(txs[0], tx2[0]);
     }
 
@@ -5878,7 +5911,8 @@ mod tests {
         );
         assert!(token.unwrapped);
         // confirm no transfer tx was logged (latest should be the mint tx)
-        let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        assert_eq!(total, 1);
         assert_eq!(
             txs[0].action,
             TxAction::Mint {
@@ -5964,7 +5998,8 @@ mod tests {
         assert_eq!(pub_meta.description, Some("pubmetadata".to_string()));
         assert_eq!(pub_meta.image, Some("puburi".to_string()));
         // confirm the tx was logged to all involved parties
-        let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        assert_eq!(total, 2);
         assert_eq!(txs.len(), 1);
         assert_eq!(txs[0].token_id, "MyNFT".to_string());
         assert_eq!(
@@ -5976,8 +6011,10 @@ mod tests {
             }
         );
         assert_eq!(txs[0].memo, Some("Xfer it".to_string()));
-        let tx2 = get_txs(&deps.api, &deps.storage, &bob_raw, 0, 1).unwrap();
-        let tx3 = get_txs(&deps.api, &deps.storage, &david_raw, 0, 1).unwrap();
+        let (tx2, total) = get_txs(&deps.api, &deps.storage, &bob_raw, 0, 1).unwrap();
+        assert_eq!(total, 1);
+        let (tx3, total) = get_txs(&deps.api, &deps.storage, &david_raw, 0, 1).unwrap();
+        assert_eq!(total, 1);
         assert_eq!(txs, tx2);
         assert_eq!(tx2, tx3);
         // confirm both owner lists are correct
@@ -6057,7 +6094,8 @@ mod tests {
         assert_eq!(pub_meta.description, Some("pubmetadata".to_string()));
         assert_eq!(pub_meta.image, Some("puburi".to_string()));
         // confirm the tx was logged to all involved parties
-        let txs = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 10).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 10).unwrap();
+        assert_eq!(total, 1);
         assert_eq!(txs.len(), 1);
         assert_eq!(txs[0].token_id, "MyNFT".to_string());
         assert_eq!(
@@ -6069,7 +6107,8 @@ mod tests {
             }
         );
         assert_eq!(txs[0].memo, None);
-        let tx2 = get_txs(&deps.api, &deps.storage, &david_raw, 0, 1).unwrap();
+        let (tx2, total) = get_txs(&deps.api, &deps.storage, &david_raw, 0, 1).unwrap();
+        assert_eq!(total, 2);
         assert_eq!(txs, tx2);
         // confirm both owner lists are correct
         let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
@@ -6111,7 +6150,8 @@ mod tests {
         assert!(token.permissions.is_empty());
         assert!(token.unwrapped);
         // confirm the tx was logged to all involved parties
-        let txs = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
+        assert_eq!(total, 2);
         assert_eq!(txs[0].token_id, "MyNFT".to_string());
         assert_eq!(
             txs[0].action,
@@ -6122,7 +6162,8 @@ mod tests {
             }
         );
         assert_eq!(txs[0].memo, None);
-        let tx2 = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        let (tx2, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        assert_eq!(total, 3);
         assert_eq!(txs, tx2);
         // confirm both owner lists are correct
         let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
@@ -6656,7 +6697,8 @@ mod tests {
         assert!(token.permissions.is_empty());
         assert!(token.unwrapped);
         // confirm transfer txs were logged
-        let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 10).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 10).unwrap();
+        assert_eq!(total, 6);
         assert_eq!(txs.len(), 6);
         assert_eq!(
             txs[2].action,
@@ -6931,7 +6973,8 @@ mod tests {
         }
         let xfer4 = Tx {
             tx_id: 8,
-            blockheight: 12345,
+            block_height: 12345,
+            block_time: 1571797419,
             token_id: "NFT4".to_string(),
             memo: Some("test memo".to_string()),
             action: TxAction::Transfer {
@@ -6942,7 +6985,8 @@ mod tests {
         };
         let xfer1 = Tx {
             tx_id: 9,
-            blockheight: 12345,
+            block_height: 12345,
+            block_time: 1571797419,
             token_id: "NFT1".to_string(),
             memo: None,
             action: TxAction::Transfer {
@@ -6960,22 +7004,8 @@ mod tests {
         let query_result = query(&deps, query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
-            QueryAnswer::TransactionHistory { txs } => {
-                assert_eq!(txs[1], xfer1);
-                assert_eq!(txs[2], xfer4);
-            }
-            _ => panic!("unexpected"),
-        }
-        let query_msg = QueryMsg::TransactionHistory {
-            address: HumanAddr("charlie".to_string()),
-            viewing_key: "ckey".to_string(),
-            page: None,
-            page_size: None,
-        };
-        let query_result = query(&deps, query_msg);
-        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
-        match query_answer {
-            QueryAnswer::TransactionHistory { txs } => {
+            QueryAnswer::TransactionHistory { total, txs } => {
+                assert_eq!(total, 6);
                 assert_eq!(txs[1], xfer1);
                 assert_eq!(txs[2], xfer4);
             }
@@ -7322,7 +7352,8 @@ mod tests {
         );
         assert!(token.unwrapped);
         // confirm no transfer tx was logged (latest should be the mint tx)
-        let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        assert_eq!(total, 1);
         assert_eq!(
             txs[0].action,
             TxAction::Mint {
@@ -7441,7 +7472,8 @@ mod tests {
         assert_eq!(pub_meta.description, Some("pubmetadata".to_string()));
         assert_eq!(pub_meta.image, Some("puburi".to_string()));
         // confirm the tx was logged to all involved parties
-        let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        assert_eq!(total, 2);
         assert_eq!(txs.len(), 1);
         assert_eq!(txs[0].token_id, "MyNFT".to_string());
         assert_eq!(
@@ -7453,8 +7485,10 @@ mod tests {
             }
         );
         assert_eq!(txs[0].memo, Some("Xfer it".to_string()));
-        let tx2 = get_txs(&deps.api, &deps.storage, &bob_raw, 0, 1).unwrap();
-        let tx3 = get_txs(&deps.api, &deps.storage, &david_raw, 0, 1).unwrap();
+        let (tx2, total) = get_txs(&deps.api, &deps.storage, &bob_raw, 0, 1).unwrap();
+        assert_eq!(total, 1);
+        let (tx3, total) = get_txs(&deps.api, &deps.storage, &david_raw, 0, 1).unwrap();
+        assert_eq!(total, 1);
         assert_eq!(txs, tx2);
         assert_eq!(tx2, tx3);
         // confirm both owner lists are correct
@@ -7559,7 +7593,8 @@ mod tests {
         assert_eq!(pub_meta.description, Some("pubmetadata".to_string()));
         assert_eq!(pub_meta.image, Some("puburi".to_string()));
         // confirm the tx was logged to all involved parties
-        let txs = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 10).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 10).unwrap();
+        assert_eq!(total, 1);
         assert_eq!(txs.len(), 1);
         assert_eq!(txs[0].token_id, "MyNFT".to_string());
         assert_eq!(
@@ -7571,7 +7606,8 @@ mod tests {
             }
         );
         assert_eq!(txs[0].memo, None);
-        let tx2 = get_txs(&deps.api, &deps.storage, &david_raw, 0, 1).unwrap();
+        let (tx2, total) = get_txs(&deps.api, &deps.storage, &david_raw, 0, 1).unwrap();
+        assert_eq!(total, 2);
         assert_eq!(txs, tx2);
         // confirm both owner lists are correct
         let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
@@ -7631,7 +7667,8 @@ mod tests {
         assert!(token.permissions.is_empty());
         assert!(token.unwrapped);
         // confirm the tx was logged to all involved parties
-        let txs = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 1).unwrap();
+        assert_eq!(total, 2);
         assert_eq!(txs[0].token_id, "MyNFT".to_string());
         assert_eq!(
             txs[0].action,
@@ -7642,7 +7679,8 @@ mod tests {
             }
         );
         assert_eq!(txs[0].memo, None);
-        let tx2 = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        let (tx2, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
+        assert_eq!(total, 3);
         assert_eq!(txs, tx2);
         // confirm both owner lists are correct
         let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
@@ -8030,7 +8068,8 @@ mod tests {
         assert!(token.permissions.is_empty());
         assert!(token.unwrapped);
         // confirm transfer txs were logged
-        let txs = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 10).unwrap();
+        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 10).unwrap();
+        assert_eq!(total, 6);
         assert_eq!(txs.len(), 6);
         assert_eq!(
             txs[2].action,
@@ -8434,7 +8473,8 @@ mod tests {
         }
         let xfer6 = Tx {
             tx_id: 11,
-            blockheight: 12345,
+            block_height: 12345,
+            block_time: 1571797419,
             token_id: "NFT6".to_string(),
             memo: None,
             action: TxAction::Transfer {
@@ -8445,7 +8485,8 @@ mod tests {
         };
         let xfer3 = Tx {
             tx_id: 7,
-            blockheight: 12345,
+            block_height: 12345,
+            block_time: 1571797419,
             token_id: "NFT3".to_string(),
             memo: Some("test memo".to_string()),
             action: TxAction::Transfer {
@@ -8463,7 +8504,8 @@ mod tests {
         let query_result = query(&deps, query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
-            QueryAnswer::TransactionHistory { txs } => {
+            QueryAnswer::TransactionHistory { total, txs } => {
+                assert_eq!(total, 8);
                 assert_eq!(txs[3], xfer3);
                 assert_eq!(txs[0], xfer6);
             }

@@ -2908,8 +2908,9 @@ mod tests {
         let query_result = query(&deps, query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
-            QueryAnswer::TransactionHistory { txs } => {
+            QueryAnswer::TransactionHistory { total, txs } => {
                 assert!(txs.is_empty());
+                assert_eq!(total, 0);
             }
             _ => panic!("unexpected"),
         }
@@ -2947,7 +2948,8 @@ mod tests {
 
         let mint1 = Tx {
             tx_id: 0,
-            blockheight: 12345,
+            block_height: 12345,
+            block_time: 1571797419,
             token_id: "NFT1".to_string(),
             memo: None,
             action: TxAction::Mint {
@@ -2957,7 +2959,8 @@ mod tests {
         };
         let mint2 = Tx {
             tx_id: 1,
-            blockheight: 12345,
+            block_height: 12345,
+            block_time: 1571797419,
             token_id: "NFT2".to_string(),
             memo: Some("Mint 2".to_string()),
             action: TxAction::Mint {
@@ -2967,7 +2970,8 @@ mod tests {
         };
         let xfer1 = Tx {
             tx_id: 2,
-            blockheight: 12345,
+            block_height: 12345,
+            block_time: 1571797419,
             token_id: "NFT1".to_string(),
             memo: None,
             action: TxAction::Transfer {
@@ -2978,7 +2982,8 @@ mod tests {
         };
         let burn2 = Tx {
             tx_id: 3,
-            blockheight: 12345,
+            block_height: 12345,
+            block_time: 1571797419,
             token_id: "NFT2".to_string(),
             memo: None,
             action: TxAction::Burn {
@@ -2997,11 +3002,12 @@ mod tests {
         let query_result = query(&deps, query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
-            QueryAnswer::TransactionHistory { txs } => {
+            QueryAnswer::TransactionHistory { total, txs } => {
                 assert_eq!(
                     txs,
                     vec![burn2.clone(), xfer1.clone(), mint2.clone(), mint1.clone()]
                 );
+                assert_eq!(total, 4);
             }
             _ => panic!("unexpected"),
         }
@@ -3016,8 +3022,9 @@ mod tests {
         let query_result = query(&deps, query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
-            QueryAnswer::TransactionHistory { txs } => {
+            QueryAnswer::TransactionHistory { total, txs } => {
                 assert_eq!(txs, vec![burn2.clone(), xfer1.clone()]);
+                assert_eq!(total, 4);
             }
             _ => panic!("unexpected"),
         }
@@ -3032,8 +3039,9 @@ mod tests {
         let query_result = query(&deps, query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
-            QueryAnswer::TransactionHistory { txs } => {
+            QueryAnswer::TransactionHistory { total, txs } => {
                 assert_eq!(txs, vec![mint2.clone()]);
+                assert_eq!(total, 4);
             }
             _ => panic!("unexpected"),
         }
@@ -3048,8 +3056,9 @@ mod tests {
         let query_result = query(&deps, query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
-            QueryAnswer::TransactionHistory { txs } => {
+            QueryAnswer::TransactionHistory { total, txs } => {
                 assert_eq!(txs, vec![xfer1.clone()]);
+                assert_eq!(total, 1);
             }
             _ => panic!("unexpected"),
         }

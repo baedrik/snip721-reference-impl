@@ -139,25 +139,19 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             ContractStatus::Normal.to_u8(),
             &mut mints,
         ),
-        HandleMsg::SetPublicMetadata {
-            token_id, metadata, ..
-        } => set_public_metadata(
+        HandleMsg::SetMetadata {
+            token_id,
+            public_metadata,
+            private_metadata,
+            ..
+        } => set_metadata(
             deps,
             env,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             &token_id,
-            &metadata,
-        ),
-        HandleMsg::SetPrivateMetadata {
-            token_id, metadata, ..
-        } => set_private_metadata(
-            deps,
-            env,
-            &config,
-            ContractStatus::StopTransactions.to_u8(),
-            &token_id,
-            &metadata,
+            public_metadata,
+            private_metadata,
         ),
         HandleMsg::Reveal { token_id, .. } => reveal(
             deps,
@@ -474,7 +468,7 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
 
 /// Returns HandleResult
 ///
-/// sets new public metadata
+/// sets new public and/or private metadata
 ///
 /// # Arguments
 ///
@@ -483,70 +477,57 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest status level this action is permitted at
 /// * `token_id` - token id String slice of token whose metadata should be updated
-/// * `metadata` - a reference to the new public metadata viewable by everyone
-pub fn set_public_metadata<S: Storage, A: Api, Q: Querier>(
+/// * `public_metadata` - the optional new public metadata viewable by everyone
+/// * `private_metadata` - the optional new private metadata viewable by everyone
+pub fn set_metadata<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     config: &Config,
     priority: u8,
     token_id: &str,
-    metadata: &Metadata,
+    public_metadata: Option<Metadata>,
+    private_metadata: Option<Metadata>,
 ) -> HandleResult {
     check_status(config.status, priority)?;
+    let custom_err = format!("Not authorized to update metadata of token {}", token_id);
+    // if token supply is private, don't leak that the token id does not exist
+    // instead just say they are not authorized for that token
+    let opt_err = if config.token_supply_is_public {
+        None
+    } else {
+        Some(&*custom_err)
+    };
+    let (token, idx) = get_token(&deps.storage, token_id, opt_err)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    set_metadata(
-        &mut deps.storage,
-        &sender_raw,
-        token_id,
-        PREFIX_PUB_META,
-        metadata,
-        config,
-    )?;
-    Ok(HandleResponse {
-        messages: vec![],
-        log: vec![],
-        data: Some(to_binary(&HandleAnswer::SetPublicMetadata {
-            status: Success,
-        })?),
-    })
-}
 
-/// Returns HandleResult
-///
-/// sets new private metadata
-///
-/// # Arguments
-///
-/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `config` - a reference to the Config
-/// * `priority` - u8 representation of highest status level this action is permitted at
-/// * `token_id` - token id String slice of token whose metadata should be updated
-/// * `metadata` - a reference to the new private metadata
-pub fn set_private_metadata<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    config: &Config,
-    priority: u8,
-    token_id: &str,
-    metadata: &Metadata,
-) -> HandleResult {
-    check_status(config.status, priority)?;
-    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    set_metadata(
-        &mut deps.storage,
-        &sender_raw,
-        token_id,
-        PREFIX_PRIV_META,
-        metadata,
-        config,
-    )?;
+    if let Some(public) = public_metadata {
+        set_metadata_impl(
+            &mut deps.storage,
+            &sender_raw,
+            &token,
+            idx,
+            PREFIX_PUB_META,
+            &public,
+            config,
+            &custom_err,
+        )?;
+    }
+    if let Some(private) = private_metadata {
+        set_metadata_impl(
+            &mut deps.storage,
+            &sender_raw,
+            &token,
+            idx,
+            PREFIX_PRIV_META,
+            &private,
+            config,
+            &custom_err,
+        )?;
+    }
     Ok(HandleResponse {
         messages: vec![],
         log: vec![],
-        data: Some(to_binary(&HandleAnswer::SetPrivateMetadata {
-            status: Success,
-        })?),
+        data: Some(to_binary(&HandleAnswer::SetMetadata { status: Success })?),
     })
 }
 
@@ -2284,14 +2265,14 @@ pub fn query_transactions<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     let address_raw = deps.api.canonical_address(address)?;
     check_key(&deps.storage, &address_raw, viewing_key)?;
-    let txs = get_txs(
+    let (txs, total) = get_txs(
         &deps.api,
         &deps.storage,
         &address_raw,
         page.unwrap_or(0),
         page_size.unwrap_or(30),
     )?;
-    to_binary(&QueryAnswer::TransactionHistory { txs })
+    to_binary(&QueryAnswer::TransactionHistory { total, txs })
 }
 
 /// Returns QueryResult after verifying that the specified address has transfer approval
@@ -2968,27 +2949,23 @@ fn check_status(contract_status: u8, priority: u8) -> StdResult<()> {
 ///
 /// * `storage` - a mutable reference to the contract's storage
 /// * `sender` - a reference to the message sender address
-/// * `token_id` - token id String slice of token whose metadata should be updated
+/// * `token` - a reference to the token whose metadata should be updated
+/// * `idx` - the token identifier index
 /// * `prefix` - storage prefix for the type of metadata being updated
 /// * `metadata` - a reference to the new metadata
 /// * `config` - a reference to the Config
-fn set_metadata<S: Storage>(
+/// * `custom_err` - a reference to the error message to use if unauthorized
+#[allow(clippy::too_many_arguments)]
+fn set_metadata_impl<S: Storage>(
     storage: &mut S,
     sender: &CanonicalAddr,
-    token_id: &str,
+    token: &Token,
+    idx: u32,
     prefix: &[u8],
     metadata: &Metadata,
     config: &Config,
+    custom_err: &str,
 ) -> StdResult<()> {
-    let custom_err = format!("Not authorized to update metadata of token {}", token_id);
-    // if token supply is private, don't leak that the token id does not exist
-    // instead just say they are not authorized for that token
-    let opt_err = if config.token_supply_is_public {
-        None
-    } else {
-        Some(&*custom_err)
-    };
-    let (token, idx) = get_token(storage, token_id, opt_err)?;
     // do not allow the altering of sealed metadata
     if !token.unwrapped && prefix == PREFIX_PRIV_META {
         return Err(StdError::generic_err(
@@ -3700,7 +3677,7 @@ fn transfer_impl<S: Storage, A: Api, Q: Querier>(
     store_transfer(
         &mut deps.storage,
         config,
-        block.height,
+        block,
         token_id,
         old_owner.clone(),
         sndr,
@@ -3902,7 +3879,7 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
             store_burn(
                 &mut deps.storage,
                 config,
-                block.height,
+                block,
                 token_id,
                 token.owner,
                 brnr,
@@ -4050,7 +4027,7 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
         store_mint(
             &mut deps.storage,
             config,
-            block.height,
+            block,
             id.clone(),
             sender_raw.clone(),
             recipient,

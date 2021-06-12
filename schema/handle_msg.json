@@ -102,27 +102,18 @@
       }
     },
     {
-      "description": "set the public metadata.  This can be called by either the token owner or a valid minter if they have been given this power by the appropriate config values",
+      "description": "set the public and/or private metadata.  This can be called by either the token owner or a valid minter if they have been given this power by the appropriate config values",
       "type": "object",
       "required": [
-        "set_public_metadata"
+        "set_metadata"
       ],
       "properties": {
-        "set_public_metadata": {
+        "set_metadata": {
           "type": "object",
           "required": [
-            "metadata",
             "token_id"
           ],
           "properties": {
-            "metadata": {
-              "description": "the new public metadata",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/Metadata"
-                }
-              ]
-            },
             "padding": {
               "description": "optional message length padding",
               "type": [
@@ -130,45 +121,30 @@
                 "null"
               ]
             },
-            "token_id": {
-              "description": "id of the token whose public metadata should be updated",
-              "type": "string"
-            }
-          }
-        }
-      }
-    },
-    {
-      "description": "set the private metadata.  This can be called by either the token owner or a valid minter if they have been given this power by the appropriate config values",
-      "type": "object",
-      "required": [
-        "set_private_metadata"
-      ],
-      "properties": {
-        "set_private_metadata": {
-          "type": "object",
-          "required": [
-            "metadata",
-            "token_id"
-          ],
-          "properties": {
-            "metadata": {
-              "description": "the new private metadata",
-              "allOf": [
+            "private_metadata": {
+              "description": "the optional new private metadata",
+              "anyOf": [
                 {
                   "$ref": "#/definitions/Metadata"
+                },
+                {
+                  "type": "null"
                 }
               ]
             },
-            "padding": {
-              "description": "optional message length padding",
-              "type": [
-                "string",
-                "null"
+            "public_metadata": {
+              "description": "the optional new public metadata",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Metadata"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "token_id": {
-              "description": "id of the token whose private metadata should be updated",
+              "description": "id of the token whose metadata should be updated",
               "type": "string"
             }
           }

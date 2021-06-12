@@ -522,9 +522,16 @@
         "transaction_history": {
           "type": "object",
           "required": [
+            "total",
             "txs"
           ],
           "properties": {
+            "total": {
+              "description": "total transaction count",
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
             "txs": {
               "type": "array",
               "items": {
@@ -739,7 +746,8 @@
       "type": "object",
       "required": [
         "action",
-        "blockheight",
+        "block_height",
+        "block_time",
         "token_id",
         "tx_id"
       ],
@@ -752,8 +760,14 @@
             }
           ]
         },
-        "blockheight": {
+        "block_height": {
           "description": "the block containing this tx",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "block_time": {
+          "description": "the time (in seconds since 01/01/1970) of the block containing this tx",
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
