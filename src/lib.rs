@@ -1,9 +1,11 @@
-//#![allow(clippy::field_reassign_with_default)]
+#![allow(clippy::field_reassign_with_default)]
 pub mod contract;
 pub mod expiration;
+pub mod mint_run;
 pub mod msg;
 mod rand;
 pub mod receiver;
+pub mod royalties;
 pub mod state;
 pub mod token;
 mod unittest_handles;

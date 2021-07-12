@@ -67,6 +67,25 @@
     {
       "type": "object",
       "required": [
+        "set_royalty_info"
+      ],
+      "properties": {
+        "set_royalty_info": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "$ref": "#/definitions/ResponseStatus"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
         "make_ownership_private"
       ],
       "properties": {

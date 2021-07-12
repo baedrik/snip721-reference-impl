@@ -2,6 +2,7 @@
 mod tests {
     use crate::contract::{handle, init, query};
     use crate::expiration::Expiration;
+    use crate::mint_run::MintRunInfo;
     use crate::msg::{
         AccessLevel, Cw721Approval, HandleMsg, InitConfig, InitMsg, QueryAnswer, QueryMsg,
         Snip721Approval, Tx, TxAction, ViewerInfo,
@@ -12,7 +13,6 @@ mod tests {
         from_binary, Binary, BlockInfo, Env, Extern, HumanAddr, InitResponse, MessageInfo,
         StdError, StdResult,
     };
-
     use std::any::Any;
 
     // Helper functions
@@ -224,6 +224,8 @@ mod tests {
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -237,6 +239,8 @@ mod tests {
                 image: Some("URI 2".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -318,6 +322,8 @@ mod tests {
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -331,6 +337,8 @@ mod tests {
                 image: Some("URI 2".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -377,6 +385,8 @@ mod tests {
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -390,6 +400,8 @@ mod tests {
                 image: Some("URI 2".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -403,6 +415,8 @@ mod tests {
                 image: Some("URI 3".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -493,6 +507,8 @@ mod tests {
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -506,6 +522,8 @@ mod tests {
                 image: Some("URI 2".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -519,6 +537,8 @@ mod tests {
                 image: Some("URI 3".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -532,6 +552,8 @@ mod tests {
                 image: Some("URI 5".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -545,6 +567,8 @@ mod tests {
                 image: Some("URI 4".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -632,6 +656,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
             private_metadata: Some(private_meta.clone()),
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -690,6 +716,8 @@ mod tests {
                 owner,
                 public_metadata,
                 private_metadata,
+                royalty_info: _,
+                mint_run_info: _,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -730,6 +758,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
             private_metadata: Some(private_meta.clone()),
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -785,6 +815,8 @@ mod tests {
                 owner,
                 public_metadata,
                 private_metadata,
+                royalty_info: _,
+                mint_run_info: _,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -880,6 +912,8 @@ mod tests {
                 owner,
                 public_metadata,
                 private_metadata,
+                royalty_info: _,
+                mint_run_info: _,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -978,6 +1012,8 @@ mod tests {
                 owner,
                 public_metadata,
                 private_metadata,
+                royalty_info: _,
+                mint_run_info: _,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -1018,6 +1054,8 @@ mod tests {
                 owner,
                 public_metadata,
                 private_metadata,
+                royalty_info: _,
+                mint_run_info: _,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -1072,6 +1110,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
             private_metadata: Some(private_meta.clone()),
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1142,6 +1182,8 @@ mod tests {
                 owner,
                 public_metadata,
                 private_metadata,
+                royalty_info: _,
+                mint_run_info: _,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -1191,6 +1233,8 @@ mod tests {
                 owner,
                 public_metadata,
                 private_metadata,
+                royalty_info: _,
+                mint_run_info: _,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -1245,6 +1289,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1254,6 +1300,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1263,6 +1311,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1272,6 +1322,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1281,6 +1333,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1290,6 +1344,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1518,6 +1574,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1572,6 +1630,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1642,6 +1702,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1893,6 +1955,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1946,6 +2010,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1984,6 +2050,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -2047,6 +2115,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: None,
             private_metadata: Some(private_meta.clone()),
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -2140,6 +2210,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: None,
             private_metadata: Some(private_meta.clone()),
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -2324,6 +2396,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -2740,6 +2814,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -2749,6 +2825,8 @@ mod tests {
             owner: Some(alice.clone()),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -2758,6 +2836,8 @@ mod tests {
             owner: Some(bob.clone()),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -2767,6 +2847,8 @@ mod tests {
             owner: Some(charlie.clone()),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -2776,6 +2858,8 @@ mod tests {
             owner: Some(david.clone()),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -2919,6 +3003,8 @@ mod tests {
             owner: None,
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -2928,6 +3014,8 @@ mod tests {
             owner: None,
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint 2".to_string()),
             padding: None,
         };

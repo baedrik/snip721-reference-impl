@@ -1,9 +1,12 @@
+#![allow(clippy::large_enum_variant)]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Coin, HumanAddr};
 
 use crate::expiration::Expiration;
+use crate::mint_run::{MintRunInfo, SerialNumber};
+use crate::royalties::RoyaltyInfo;
 use crate::token::Metadata;
 
 /// Instantiation message
@@ -105,6 +108,10 @@ pub enum HandleMsg {
         public_metadata: Option<Metadata>,
         /// optional private metadata that can only be seen by the owner and whitelist
         private_metadata: Option<Metadata>,
+        /// optional serial number for this token
+        serial_number: Option<SerialNumber>,
+        /// optional royalty information for this token
+        royalty_info: Option<RoyaltyInfo>,
         /// optional memo for the tx
         memo: Option<String>,
         /// optional message length padding
@@ -128,6 +135,14 @@ pub enum HandleMsg {
         private_metadata: Option<Metadata>,
         /// optional message length padding
         padding: Option<String>,
+    },
+    /// set the royalty information.  This can only be called by the token creator and only
+    /// when the creator is the current owner
+    SetRoyaltyInfo {
+        /// id of the token whose royalty information should be updated
+        token_id: String,
+        /// the new royalty information
+        royalty_info: RoyaltyInfo,
     },
     /// Reveal the private metadata of a sealed token and mark the token as having been unwrapped
     Reveal {
@@ -361,6 +376,10 @@ pub struct Mint {
     pub public_metadata: Option<Metadata>,
     /// optional private metadata that can only be seen by owner and whitelist
     pub private_metadata: Option<Metadata>,
+    /// optional serial number for this token
+    pub serial_number: Option<SerialNumber>,
+    /// optional royalty info for this token
+    pub royalty_info: Option<RoyaltyInfo>,
     /// optional memo for the tx
     pub memo: Option<String>,
 }
@@ -412,6 +431,9 @@ pub enum HandleAnswer {
         token_ids: Vec<String>,
     },
     SetMetadata {
+        status: ResponseStatus,
+    },
+    SetRoyaltyInfo {
         status: ResponseStatus,
     },
     MakeOwnershipPrivate {
@@ -773,6 +795,8 @@ pub enum QueryAnswer {
         owner: Option<HumanAddr>,
         public_metadata: Option<Metadata>,
         private_metadata: Option<Metadata>,
+        royalty_info: Option<RoyaltyInfo>,
+        mint_run_info: Option<MintRunInfo>,
         display_private_metadata_error: Option<String>,
         owner_is_public: bool,
         public_ownership_expiration: Option<Expiration>,

@@ -231,6 +231,8 @@ mod tests {
                 owner: Some(alice.clone()),
                 public_metadata: Some(pub1.clone()),
                 private_metadata: None,
+                royalty_info: None,
+                serial_number: None,
                 memo: None,
             },
             Mint {
@@ -238,6 +240,8 @@ mod tests {
                 owner: None,
                 public_metadata: None,
                 private_metadata: Some(priv2.clone()),
+                royalty_info: None,
+                serial_number: None,
                 memo: None,
             },
             Mint {
@@ -245,6 +249,8 @@ mod tests {
                 owner: Some(alice.clone()),
                 public_metadata: None,
                 private_metadata: None,
+                royalty_info: None,
+                serial_number: None,
                 memo: None,
             },
             Mint {
@@ -252,6 +258,8 @@ mod tests {
                 owner: Some(admin.clone()),
                 public_metadata: None,
                 private_metadata: None,
+                royalty_info: None,
+                serial_number: None,
                 memo: Some("has id 3".to_string()),
             },
         ];
@@ -410,6 +418,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -433,6 +443,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -460,6 +472,8 @@ mod tests {
                 description: Some("Nifty".to_string()),
                 image: Some("privuri".to_string()),
             }),
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -535,6 +549,8 @@ mod tests {
                 description: Some("Nifty".to_string()),
                 image: Some("privuri".to_string()),
             }),
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -552,6 +568,8 @@ mod tests {
                 image: None,
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Admin wants his own".to_string()),
             padding: None,
         };
@@ -706,6 +724,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -758,6 +778,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -792,6 +814,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -862,6 +886,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -885,6 +911,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -1027,6 +1055,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -1117,6 +1147,8 @@ mod tests {
                 image: Some("sealed_uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -1163,6 +1195,8 @@ mod tests {
                 image: Some("sealed_uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -1228,6 +1262,8 @@ mod tests {
                 image: Some("sealed_uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -1306,6 +1342,8 @@ mod tests {
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1319,6 +1357,8 @@ mod tests {
                 image: Some("URI 2".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1332,6 +1372,8 @@ mod tests {
                 image: Some("URI 3".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -1345,6 +1387,8 @@ mod tests {
                 image: Some("URI 4".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -3279,6 +3323,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -3586,6 +3632,8 @@ mod tests {
                 image: Some("uri2".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -3599,6 +3647,8 @@ mod tests {
                 image: Some("uri3".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -3771,6 +3821,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4149,6 +4201,8 @@ mod tests {
                 image: Some("uri2".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4162,6 +4216,8 @@ mod tests {
                 image: Some("uri3".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4293,6 +4349,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -4378,6 +4436,8 @@ mod tests {
                 description: Some("pubmetadata".to_string()),
                 image: Some("puburi".to_string()),
             }),
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -4573,6 +4633,8 @@ mod tests {
                 description: Some("pubmetadata2".to_string()),
                 image: Some("puburi2".to_string()),
             }),
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4590,6 +4652,8 @@ mod tests {
                 description: Some("pubmetadata3".to_string()),
                 image: Some("puburi3".to_string()),
             }),
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4765,6 +4829,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4814,6 +4880,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4824,6 +4892,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4841,6 +4911,8 @@ mod tests {
                 description: Some("pubmetadata3".to_string()),
                 image: Some("puburi3".to_string()),
             }),
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4850,6 +4922,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4859,6 +4933,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4868,6 +4944,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4877,6 +4955,8 @@ mod tests {
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -4886,6 +4966,8 @@ mod tests {
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5034,6 +5116,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5044,6 +5128,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5061,6 +5147,8 @@ mod tests {
                 description: Some("pubmetadata3".to_string()),
                 image: Some("puburi3".to_string()),
             }),
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5070,6 +5158,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5079,6 +5169,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5088,6 +5180,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5097,6 +5191,8 @@ mod tests {
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5106,6 +5202,8 @@ mod tests {
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5249,6 +5347,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5259,6 +5359,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5276,6 +5378,8 @@ mod tests {
                 description: Some("pubmetadata3".to_string()),
                 image: Some("puburi3".to_string()),
             }),
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5285,6 +5389,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5294,6 +5400,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5303,6 +5411,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5312,6 +5422,8 @@ mod tests {
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5321,6 +5433,8 @@ mod tests {
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -5643,6 +5757,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -5721,6 +5837,8 @@ mod tests {
                 description: Some("pubmetadata".to_string()),
                 image: Some("puburi".to_string()),
             }),
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -6201,6 +6319,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -6294,6 +6414,8 @@ mod tests {
                     owner: Some(HumanAddr("alice".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -6301,6 +6423,8 @@ mod tests {
                     owner: Some(HumanAddr("alice".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -6308,6 +6432,8 @@ mod tests {
                     owner: Some(HumanAddr("alice".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -6315,6 +6441,8 @@ mod tests {
                     owner: Some(HumanAddr("bob".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -6322,6 +6450,8 @@ mod tests {
                     owner: Some(HumanAddr("bob".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -6329,6 +6459,8 @@ mod tests {
                     owner: Some(HumanAddr("charlie".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
             ],
@@ -6495,6 +6627,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -6505,6 +6639,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -6514,6 +6650,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -6523,6 +6661,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -6532,6 +6672,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -6541,6 +6683,8 @@ mod tests {
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -6864,6 +7008,8 @@ mod tests {
                     owner: Some(HumanAddr("alice".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -6871,6 +7017,8 @@ mod tests {
                     owner: Some(HumanAddr("alice".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -6878,6 +7026,8 @@ mod tests {
                     owner: Some(HumanAddr("alice".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -6885,6 +7035,8 @@ mod tests {
                     owner: Some(HumanAddr("bob".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -6892,6 +7044,8 @@ mod tests {
                     owner: Some(HumanAddr("bob".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -6899,6 +7053,8 @@ mod tests {
                     owner: Some(HumanAddr("charlie".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
             ],
@@ -7053,6 +7209,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -7134,6 +7292,8 @@ mod tests {
                 description: Some("pubmetadata".to_string()),
                 image: Some("puburi".to_string()),
             }),
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -7718,6 +7878,8 @@ mod tests {
                 image: Some("uri".to_string()),
             }),
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -7811,6 +7973,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -7821,6 +7985,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -7830,6 +7996,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -7839,6 +8007,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -7848,6 +8018,8 @@ mod tests {
             owner: Some(HumanAddr("bob".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -7857,6 +8029,8 @@ mod tests {
             owner: Some(HumanAddr("charlie".to_string())),
             private_metadata: None,
             public_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -8270,6 +8444,8 @@ mod tests {
                     owner: Some(HumanAddr("alice".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -8277,6 +8453,8 @@ mod tests {
                     owner: Some(HumanAddr("alice".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -8284,6 +8462,8 @@ mod tests {
                     owner: Some(HumanAddr("alice".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -8291,6 +8471,8 @@ mod tests {
                     owner: Some(HumanAddr("bob".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -8298,6 +8480,8 @@ mod tests {
                     owner: Some(HumanAddr("bob".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
                 Mint {
@@ -8305,6 +8489,8 @@ mod tests {
                     owner: Some(HumanAddr("charlie".to_string())),
                     private_metadata: None,
                     public_metadata: None,
+                    royalty_info: None,
+                    serial_number: None,
                     memo: None,
                 },
             ],
@@ -9100,6 +9286,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -9109,6 +9297,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -9118,6 +9308,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -9309,6 +9501,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -9318,6 +9512,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -9327,6 +9523,8 @@ mod tests {
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: None,
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -9644,6 +9842,8 @@ mod tests {
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -9995,6 +10195,8 @@ mod tests {
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -10008,6 +10210,8 @@ mod tests {
                 image: Some("URI 2".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -10047,6 +10251,8 @@ mod tests {
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -10060,6 +10266,8 @@ mod tests {
                 image: Some("URI 2".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -10370,6 +10578,8 @@ mod tests {
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -10383,6 +10593,8 @@ mod tests {
                 image: Some("URI 2".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -10559,6 +10771,8 @@ mod tests {
                 image: Some("URI 1".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
@@ -10572,6 +10786,8 @@ mod tests {
                 image: Some("URI 2".to_string()),
             }),
             private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
             memo: None,
             padding: None,
         };
