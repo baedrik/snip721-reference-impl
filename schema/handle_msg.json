@@ -183,15 +183,17 @@
         "set_royalty_info": {
           "type": "object",
           "required": [
-            "royalty_info",
             "token_id"
           ],
           "properties": {
             "royalty_info": {
-              "description": "the new royalty information",
-              "allOf": [
+              "description": "the new royalty information.  If None, existing royalty information will be deleted",
+              "anyOf": [
                 {
                   "$ref": "#/definitions/RoyaltyInfo"
+                },
+                {
+                  "type": "null"
                 }
               ]
             },

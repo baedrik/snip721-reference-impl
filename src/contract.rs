@@ -174,7 +174,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             &config,
             ContractStatus::StopTransactions.to_u8(),
             &token_id,
-            &royalty_info,
+            royalty_info.as_ref(),
         ),
         HandleMsg::Reveal { token_id, .. } => reveal(
             deps,
@@ -571,14 +571,14 @@ pub fn set_metadata<S: Storage, A: Api, Q: Querier>(
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest status level this action is permitted at
 /// * `token_id` - token id String slice of token whose royalty info should be updated
-/// * `royalty_info` - a reference to the new RoyaltyInfo
+/// * `royalty_info` - a optional reference to the new RoyaltyInfo
 pub fn set_royalty_info<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     config: &Config,
     priority: u8,
     token_id: &str,
-    royalty_info: &RoyaltyInfo,
+    royalty_info: Option<&RoyaltyInfo>,
 ) -> HandleResult {
     check_status(config.status, priority)?;
     let custom_err = format!(
@@ -4131,8 +4131,8 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
         let mut run_store = PrefixedStorage::new(PREFIX_MINT_RUN, &mut deps.storage);
         save(&mut run_store, &token_key, &mint_info)?;
         // check/save royalty information
-        if let Some(roy_inf) = mint.royalty_info {
-            store_royalties(deps, &roy_inf, &token_key)?;
+        if mint.royalty_info.is_some() {
+            store_royalties(deps, mint.royalty_info.as_ref(), &token_key)?;
         }
         //
         //
@@ -4175,28 +4175,33 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
 /// # Arguments
 ///
 /// * `deps` - a mutable reference to Extern containing all the contract's external dependencies
-/// * `royalty_info` - a reference to the token's RoyaltyInfo
+/// * `royalty_info` - a optional reference to the token's RoyaltyInfo
 /// * `token_key` - the storage key for this token
 fn store_royalties<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    royalty_info: &RoyaltyInfo,
+    royalty_info: Option<&RoyaltyInfo>,
     token_key: &[u8],
 ) -> StdResult<()> {
-    // the allowed message length won't let enough u16 rates to overflow u128
-    let total_rates: u128 = royalty_info.royalties.iter().map(|r| r.rate as u128).sum();
-    let (royalty_den, overflow) =
-        U256::from(10).overflowing_pow(U256::from(royalty_info.decimal_places_in_rates));
-    if overflow {
-        return Err(StdError::generic_err(
-            "The number of decimal places used in the royalty rates is larger than supported",
-        ));
-    }
-    if U256::from(total_rates) > royalty_den {
-        return Err(StdError::generic_err(
-            "The sum of royalty rates must not exceed 100%",
-        ));
-    }
-    let stored = royalty_info.to_stored(&deps.api)?;
     let mut roy_store = PrefixedStorage::new(PREFIX_ROYALTY_INFO, &mut deps.storage);
-    save(&mut roy_store, token_key, &stored)
+    if let Some(royal_inf) = royalty_info {
+        // the allowed message length won't let enough u16 rates to overflow u128
+        let total_rates: u128 = royal_inf.royalties.iter().map(|r| r.rate as u128).sum();
+        let (royalty_den, overflow) =
+            U256::from(10).overflowing_pow(U256::from(royal_inf.decimal_places_in_rates));
+        if overflow {
+            return Err(StdError::generic_err(
+                "The number of decimal places used in the royalty rates is larger than supported",
+            ));
+        }
+        if U256::from(total_rates) > royalty_den {
+            return Err(StdError::generic_err(
+                "The sum of royalty rates must not exceed 100%",
+            ));
+        }
+        let stored = royal_inf.to_stored(&deps.api)?;
+        save(&mut roy_store, token_key, &stored)
+    } else {
+        remove(&mut roy_store, token_key);
+        Ok(())
+    }
 }

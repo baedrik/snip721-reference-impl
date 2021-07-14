@@ -141,8 +141,8 @@ pub enum HandleMsg {
     SetRoyaltyInfo {
         /// id of the token whose royalty information should be updated
         token_id: String,
-        /// the new royalty information
-        royalty_info: RoyaltyInfo,
+        /// the new royalty information.  If None, existing royalty information will be deleted
+        royalty_info: Option<RoyaltyInfo>,
     },
     /// Reveal the private metadata of a sealed token and mark the token as having been unwrapped
     Reveal {
