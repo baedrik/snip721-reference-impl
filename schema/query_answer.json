@@ -586,6 +586,29 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "default_royalty_info"
+      ],
+      "properties": {
+        "default_royalty_info": {
+          "type": "object",
+          "properties": {
+            "default_royalty_info": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/RoyaltyInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {

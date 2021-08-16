@@ -24,10 +24,10 @@ use crate::royalties::{RoyaltyInfo, StoredRoyaltyInfo};
 use crate::state::{
     get_txs, json_may_load, json_save, load, may_load, remove, save, store_burn, store_mint,
     store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, BLOCK_KEY,
-    CONFIG_KEY, CREATOR_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS,
-    PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN, PREFIX_OWNED, PREFIX_OWNER_PRIV,
-    PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_ROYALTY_INFO, PREFIX_TOKENS,
-    PREFIX_VIEW_KEY, PRNG_SEED_KEY,
+    CONFIG_KEY, CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS,
+    PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN,
+    PREFIX_OWNED, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS,
+    PREFIX_ROYALTY_INFO, PREFIX_TOKENS, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
 };
 use crate::token::{Metadata, Token};
 use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -41,7 +41,7 @@ pub const ID_BLOCK_SIZE: u32 = 64;
 ////////////////////////////////////// Init ///////////////////////////////////////
 /// Returns InitResult
 ///
-/// Initializes the factory and creates a prng from the entropy String
+/// Initializes the contract
 ///
 /// # Arguments
 ///
@@ -85,6 +85,16 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     save(&mut deps.storage, PRNG_SEED_KEY, &prng_seed)?;
     // TODO remove this after BlockInfo becomes available to queries
     save(&mut deps.storage, BLOCK_KEY, &env.block)?;
+
+    if msg.royalty_info.is_some() {
+        store_royalties(
+            &mut deps.storage,
+            &deps.api,
+            msg.royalty_info.as_ref(),
+            None,
+            DEFAULT_ROYALTY_KEY,
+        )?;
+    }
 
     // perform the post init callback if needed
     let messages: Vec<CosmosMsg> = if let Some(callback) = msg.post_init_callback {
@@ -168,12 +178,13 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         HandleMsg::SetRoyaltyInfo {
             token_id,
             royalty_info,
+            ..
         } => set_royalty_info(
             deps,
             env,
             &config,
             ContractStatus::StopTransactions.to_u8(),
-            &token_id,
+            token_id.as_deref(),
             royalty_info.as_ref(),
         ),
         HandleMsg::Reveal { token_id, .. } => reveal(
@@ -562,7 +573,8 @@ pub fn set_metadata<S: Storage, A: Api, Q: Querier>(
 
 /// Returns HandleResult
 ///
-/// sets new royalty information
+/// sets new royalty information for a specified token or if no token ID is provided, sets new
+/// royalty information as the contract's default
 ///
 /// # Arguments
 ///
@@ -570,39 +582,65 @@ pub fn set_metadata<S: Storage, A: Api, Q: Querier>(
 /// * `env` - Env of contract's environment
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest status level this action is permitted at
-/// * `token_id` - token id String slice of token whose royalty info should be updated
+/// * `token_id` - optional token id String slice of token whose royalty info should be updated
 /// * `royalty_info` - a optional reference to the new RoyaltyInfo
 pub fn set_royalty_info<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     config: &Config,
     priority: u8,
-    token_id: &str,
+    token_id: Option<&str>,
     royalty_info: Option<&RoyaltyInfo>,
 ) -> HandleResult {
     check_status(config.status, priority)?;
-    let custom_err = format!(
-        "Not authorized to update royalty information of token {}",
-        token_id
-    );
-    // if token supply is private, don't leak that the token id does not exist
-    // instead just say they are not authorized for that token
-    let opt_err = if config.token_supply_is_public {
-        None
-    } else {
-        Some(&*custom_err)
-    };
-    let (token, idx) = get_token(&deps.storage, token_id, opt_err)?;
-    let token_key = idx.to_le_bytes();
-    let run_store = ReadonlyPrefixedStorage::new(PREFIX_MINT_RUN, &deps.storage);
-    let mint_run: StoredMintRunInfo = load(&run_store, &token_key)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    if sender_raw != mint_run.token_creator || sender_raw != token.owner {
-        return Err(StdError::generic_err(
-            "RoyaltyInfo may only be set by the token creator when they are also the token owner",
-        ));
-    }
-    store_royalties(deps, royalty_info, &token_key)?;
+    // set a token's royalties
+    if let Some(id) = token_id {
+        let custom_err = "A token's RoyaltyInfo may only be set by the token creator when they are also the token owner";
+        // if token supply is private, don't leak that the token id does not exist
+        // instead just say they are not authorized for that token
+        let opt_err = if config.token_supply_is_public {
+            None
+        } else {
+            Some(custom_err)
+        };
+        let (token, idx) = get_token(&deps.storage, id, opt_err)?;
+        let token_key = idx.to_le_bytes();
+        let run_store = ReadonlyPrefixedStorage::new(PREFIX_MINT_RUN, &deps.storage);
+        let mint_run: StoredMintRunInfo = load(&run_store, &token_key)?;
+        if sender_raw != mint_run.token_creator || sender_raw != token.owner {
+            return Err(StdError::generic_err(custom_err));
+        }
+        let default_roy = royalty_info.as_ref().map_or_else(
+            || may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY),
+            |_r| Ok(None),
+        )?;
+        let mut roy_store = PrefixedStorage::new(PREFIX_ROYALTY_INFO, &mut deps.storage);
+        store_royalties(
+            &mut roy_store,
+            &deps.api,
+            royalty_info,
+            default_roy.as_ref(),
+            &token_key,
+        )?;
+    // set default royalty
+    } else {
+        let minters: Vec<CanonicalAddr> =
+            may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+        if !minters.contains(&sender_raw) {
+            return Err(StdError::generic_err(
+                "Only designated minters can set default royalties for the contract",
+            ));
+        }
+        store_royalties(
+            &mut deps.storage,
+            &deps.api,
+            royalty_info,
+            None,
+            DEFAULT_ROYALTY_KEY,
+        )?;
+    };
+
     Ok(HandleResponse {
         messages: vec![],
         log: vec![],
@@ -1535,6 +1573,7 @@ pub fn set_contract_status<S: Storage, A: Api, Q: Querier>(
 pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryMsg) -> QueryResult {
     let response = match msg {
         QueryMsg::ContractInfo {} => query_contract_info(&deps.storage),
+        QueryMsg::DefaultRoyaltyInfo {} => query_default_royalty(deps),
         QueryMsg::ContractConfig {} => query_config(&deps.storage),
         QueryMsg::Minters {} => query_minters(deps),
         QueryMsg::NumTokens { viewer } => query_num_tokens(deps, viewer),
@@ -1612,6 +1651,20 @@ pub fn query_contract_info<S: ReadonlyStorage>(storage: &S) -> QueryResult {
     to_binary(&QueryAnswer::ContractInfo {
         name: config.name,
         symbol: config.symbol,
+    })
+}
+
+/// Returns QueryResult displaying the contract's default royalty info if present
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+pub fn query_default_royalty<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> QueryResult {
+    let default: Option<StoredRoyaltyInfo> = may_load(&deps.storage, DEFAULT_ROYALTY_KEY)?;
+    to_binary(&QueryAnswer::DefaultRoyaltyInfo {
+        default_royalty_info: default.map(|d| d.to_human(&deps.api)).transpose()?,
     })
 }
 
@@ -3960,6 +4013,13 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
             remove(&mut pub_store, &token_key);
             let mut priv_store = PrefixedStorage::new(PREFIX_PRIV_META, &mut deps.storage);
             remove(&mut priv_store, &token_key);
+            // remove mint run info if existent
+            let mut run_store = PrefixedStorage::new(PREFIX_MINT_RUN, &mut deps.storage);
+            remove(&mut run_store, &token_key);
+            // remove royalty info if existent
+            let mut roy_store = PrefixedStorage::new(PREFIX_ROYALTY_INFO, &mut deps.storage);
+            remove(&mut roy_store, &token_key);
+
             let brnr = if token.owner == *sender {
                 None
             } else {
@@ -4021,6 +4081,7 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
     let mut old_block = u64::MAX;
     let mut tokens: HashSet<String> = HashSet::new();
     let save_tokens = !mints.is_empty();
+    let default_roy: Option<StoredRoyaltyInfo> = may_load(&deps.storage, DEFAULT_ROYALTY_KEY)?;
     for mint in mints.drain(..) {
         let id = mint.token_id.unwrap_or(format!("{}", config.mint_cnt));
         // check if id already exists
@@ -4131,9 +4192,14 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
         let mut run_store = PrefixedStorage::new(PREFIX_MINT_RUN, &mut deps.storage);
         save(&mut run_store, &token_key, &mint_info)?;
         // check/save royalty information
-        if mint.royalty_info.is_some() {
-            store_royalties(deps, mint.royalty_info.as_ref(), &token_key)?;
-        }
+        let mut roy_store = PrefixedStorage::new(PREFIX_ROYALTY_INFO, &mut deps.storage);
+        store_royalties(
+            &mut roy_store,
+            &deps.api,
+            mint.royalty_info.as_ref(),
+            default_roy.as_ref(),
+            &token_key,
+        )?;
         //
         //
 
@@ -4171,18 +4237,24 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
 /// Returns StdResult<()>
 ///
 /// verifies the royalty information is valid and if so, stores the royalty info for the token
+/// or as default
 ///
 /// # Arguments
 ///
-/// * `deps` - a mutable reference to Extern containing all the contract's external dependencies
-/// * `royalty_info` - a optional reference to the token's RoyaltyInfo
-/// * `token_key` - the storage key for this token
-fn store_royalties<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
+/// * `storage` - a mutable reference to the storage for this RoyaltyInfo
+/// * `api` - a reference to the Api used to convert human and canonical addresses
+/// * `royalty_info` - an optional reference to the RoyaltyInfo to store
+/// * `default` - an optional reference to the default StoredRoyaltyInfo to use if royalty_info is
+///               not provided
+/// * `key` - the storage key (either token key or default key)
+fn store_royalties<S: Storage, A: Api>(
+    storage: &mut S,
+    api: &A,
     royalty_info: Option<&RoyaltyInfo>,
-    token_key: &[u8],
+    default: Option<&StoredRoyaltyInfo>,
+    key: &[u8],
 ) -> StdResult<()> {
-    let mut roy_store = PrefixedStorage::new(PREFIX_ROYALTY_INFO, &mut deps.storage);
+    // if RoyaltyInfo is provided, check and save it
     if let Some(royal_inf) = royalty_info {
         // the allowed message length won't let enough u16 rates to overflow u128
         let total_rates: u128 = royal_inf.royalties.iter().map(|r| r.rate as u128).sum();
@@ -4198,10 +4270,12 @@ fn store_royalties<S: Storage, A: Api, Q: Querier>(
                 "The sum of royalty rates must not exceed 100%",
             ));
         }
-        let stored = royal_inf.to_stored(&deps.api)?;
-        save(&mut roy_store, token_key, &stored)
+        let stored = royal_inf.to_stored(api)?;
+        save(storage, key, &stored)
+    } else if let Some(def) = default {
+        save(storage, key, def)
     } else {
-        remove(&mut roy_store, token_key);
+        remove(storage, key);
         Ok(())
     }
 }

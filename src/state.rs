@@ -23,6 +23,8 @@ pub const MINTERS_KEY: &[u8] = b"minters";
 pub const PRNG_SEED_KEY: &[u8] = b"prngseed";
 /// storage key for the contract instantiator
 pub const CREATOR_KEY: &[u8] = b"creator";
+/// storage key for the default RoyaltyInfo to use if none is supplied when minting
+pub const DEFAULT_ROYALTY_KEY: &[u8] = b"defaultroy";
 /// prefix for storage of the token ids
 pub const PREFIX_TOKENS: &[u8] = b"tokens";
 /// prefix for storage that maps ids to indices

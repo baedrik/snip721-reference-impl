@@ -546,6 +546,18 @@
           }
         }
       }
+    },
+    {
+      "description": "display the default royalty info that is used whenever any token is minted without specifying its own royalty information",
+      "type": "object",
+      "required": [
+        "default_royalty_info"
+      ],
+      "properties": {
+        "default_royalty_info": {
+          "type": "object"
+        }
+      }
     }
   ],
   "definitions": {

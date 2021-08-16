@@ -50,6 +50,17 @@
         }
       ]
     },
+    "royalty_info": {
+      "description": "optional royalty information to use as default when RoyaltyInfo is not provided to a minting function",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RoyaltyInfo"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "symbol": {
       "description": "token contract symbol",
       "type": "string"
@@ -168,6 +179,53 @@
           "type": "array",
           "items": {
             "$ref": "#/definitions/Coin"
+          }
+        }
+      }
+    },
+    "Royalty": {
+      "description": "data for a single royalty",
+      "type": "object",
+      "required": [
+        "rate",
+        "recipient"
+      ],
+      "properties": {
+        "rate": {
+          "description": "royalty rate",
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "recipient": {
+          "description": "address to send royalties to",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        }
+      }
+    },
+    "RoyaltyInfo": {
+      "description": "all royalty information",
+      "type": "object",
+      "required": [
+        "decimal_places_in_rates",
+        "royalties"
+      ],
+      "properties": {
+        "decimal_places_in_rates": {
+          "description": "decimal places in royalty rates",
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "royalties": {
+          "description": "list of royalties",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Royalty"
           }
         }
       }

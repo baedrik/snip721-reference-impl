@@ -174,7 +174,7 @@
       }
     },
     {
-      "description": "set the royalty information.  This can only be called by the token creator and only when the creator is the current owner",
+      "description": "set royalty information.  If no token ID is provided, this royalty info will become the default RoyaltyInfo for any new tokens minted on the contract.  If a token ID is provided, this can only be called by the token creator and only when the creator is the current owner",
       "type": "object",
       "required": [
         "set_royalty_info"
@@ -182,12 +182,16 @@
       "properties": {
         "set_royalty_info": {
           "type": "object",
-          "required": [
-            "token_id"
-          ],
           "properties": {
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "royalty_info": {
-              "description": "the new royalty information.  If None, existing royalty information will be deleted",
+              "description": "the new royalty information.  If None, existing royalty information will be deleted.  It should be noted, that if deleting a token's royalty information while the contract has a default royalty info set up will give the token the default royalty information",
               "anyOf": [
                 {
                   "$ref": "#/definitions/RoyaltyInfo"
@@ -198,8 +202,11 @@
               ]
             },
             "token_id": {
-              "description": "id of the token whose royalty information should be updated",
-              "type": "string"
+              "description": "optional id of the token whose royalty information should be updated.  If not provided, this updates the default royalty information for any new tokens minted on the contract",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         }

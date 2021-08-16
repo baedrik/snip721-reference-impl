@@ -20,6 +20,9 @@ pub struct InitMsg {
     pub admin: Option<HumanAddr>,
     /// entropy used for prng seed
     pub entropy: String,
+    /// optional royalty information to use as default when RoyaltyInfo is not provided to a
+    /// minting function
+    pub royalty_info: Option<RoyaltyInfo>,
     /// optional privacy configuration for the contract
     pub config: Option<InitConfig>,
     /// optional callback message to execute after instantiation.  This will
@@ -136,13 +139,19 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// set the royalty information.  This can only be called by the token creator and only
-    /// when the creator is the current owner
+    /// set royalty information.  If no token ID is provided, this royalty info will become the default
+    /// RoyaltyInfo for any new tokens minted on the contract.  If a token ID is provided, this can only
+    /// be called by the token creator and only when the creator is the current owner
     SetRoyaltyInfo {
-        /// id of the token whose royalty information should be updated
-        token_id: String,
-        /// the new royalty information.  If None, existing royalty information will be deleted
+        /// optional id of the token whose royalty information should be updated.  If not provided,
+        /// this updates the default royalty information for any new tokens minted on the contract
+        token_id: Option<String>,
+        /// the new royalty information.  If None, existing royalty information will be deleted.  It should
+        /// be noted, that if deleting a token's royalty information while the contract has a default royalty
+        /// info set up will give the token the default royalty information
         royalty_info: Option<RoyaltyInfo>,
+        /// optional message length padding
+        padding: Option<String>,
     },
     /// Reveal the private metadata of a sealed token and mark the token as having been unwrapped
     Reveal {
@@ -701,6 +710,9 @@ pub enum QueryMsg {
         /// the contract whose receive registration info you want to view
         contract: HumanAddr,
     },
+    /// display the default royalty info that is used whenever any token is minted without
+    /// specifying its own royalty information
+    DefaultRoyaltyInfo {},
 }
 
 /// SNIP721 Approval
@@ -823,6 +835,9 @@ pub enum QueryAnswer {
     RegisteredCodeHash {
         code_hash: Option<String>,
         also_implements_batch_receive_nft: bool,
+    },
+    DefaultRoyaltyInfo {
+        default_royalty_info: Option<RoyaltyInfo>,
     },
 }
 
