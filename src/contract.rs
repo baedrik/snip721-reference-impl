@@ -26,8 +26,8 @@ use crate::state::{
     store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, BLOCK_KEY,
     CONFIG_KEY, CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS,
     PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN,
-    PREFIX_OWNED, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS,
-    PREFIX_ROYALTY_INFO, PREFIX_TOKENS, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
+    PREFIX_MINT_RUN_NUM, PREFIX_OWNED, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META,
+    PREFIX_RECEIVERS, PREFIX_ROYALTY_INFO, PREFIX_TOKENS, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
 };
 use crate::token::{Metadata, Token};
 use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -160,6 +160,28 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             &mut config,
             ContractStatus::Normal.to_u8(),
             &mut mints,
+        ),
+        HandleMsg::MintNftClones {
+            mint_run_id,
+            quantity,
+            owner,
+            public_metadata,
+            private_metadata,
+            royalty_info,
+            memo,
+            ..
+        } => mint_clones(
+            deps,
+            env,
+            &mut config,
+            ContractStatus::Normal.to_u8(),
+            mint_run_id.as_ref(),
+            quantity,
+            owner,
+            public_metadata,
+            private_metadata,
+            royalty_info,
+            memo,
         ),
         HandleMsg::SetMetadata {
             token_id,
@@ -501,6 +523,92 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
         messages: vec![],
         log: vec![log("minted", format!("{:?}", &minted))],
         data: Some(to_binary(&HandleAnswer::BatchMintNft {
+            token_ids: minted,
+        })?),
+    })
+}
+
+/// Returns HandleResult
+///
+/// mints clones of a token
+///
+/// # Arguments
+///
+/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
+/// * `env` - Env of contract's environment
+/// * `config` - a mutable reference to the Config
+/// * `priority` - u8 representation of highest status level this action is permitted at
+/// * `mint_run_id` - optional id used to track subsequent mint runs
+/// * `quantity` - number of clones to mint
+/// * `owner` - optional owner of this token, if not specified, use the minter's address
+/// * `public_metadata` - optional public metadata viewable by everyone
+/// * `private_metadata` - optional private metadata viewable only by owner and whitelist
+/// * `royalty_info` - optional royalties information for these clones
+/// * `memo` - optional memo for the mint txs
+#[allow(clippy::too_many_arguments)]
+pub fn mint_clones<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    config: &mut Config,
+    priority: u8,
+    mint_run_id: Option<&String>,
+    quantity: u32,
+    owner: Option<HumanAddr>,
+    public_metadata: Option<Metadata>,
+    private_metadata: Option<Metadata>,
+    royalty_info: Option<RoyaltyInfo>,
+    memo: Option<String>,
+) -> HandleResult {
+    check_status(config.status, priority)?;
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let minters: Vec<CanonicalAddr> =
+        may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+    if !minters.contains(&sender_raw) {
+        return Err(StdError::generic_err(
+            "Only designated minters are allowed to mint",
+        ));
+    }
+    if quantity == 0 {
+        return Err(StdError::generic_err("Quantity can not be zero"));
+    }
+    let mint_run = mint_run_id
+        .map(|i| {
+            let key = i.as_bytes();
+            let mut run_store = PrefixedStorage::new(PREFIX_MINT_RUN_NUM, &mut deps.storage);
+            let last_num: u32 = may_load(&run_store, key)?.unwrap_or(0);
+            let this_num: u32 = last_num.checked_add(1).ok_or_else(|| {
+                StdError::generic_err(format!(
+                    "Mint run ID {} has already reached its maximum possible value",
+                    i
+                ))
+            })?;
+            save(&mut run_store, key, &this_num)?;
+            Ok(this_num)
+        })
+        .transpose()?;
+    let mut serial_number = SerialNumber {
+        mint_run,
+        serial_number: 1,
+        quantity_minted_this_run: Some(quantity),
+    };
+    let mut mints: Vec<Mint> = Vec::new();
+    for _ in 0..quantity {
+        mints.push(Mint {
+            token_id: None,
+            owner: owner.clone(),
+            public_metadata: public_metadata.clone(),
+            private_metadata: private_metadata.clone(),
+            serial_number: Some(serial_number.clone()),
+            royalty_info: royalty_info.clone(),
+            memo: memo.clone(),
+        });
+        serial_number.serial_number += 1;
+    }
+    let minted = mint_list(deps, &env, config, &sender_raw, &mut mints)?;
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![log("minted", format!("{:?}", &minted))],
+        data: Some(to_binary(&HandleAnswer::MintNftClones {
             token_ids: minted,
         })?),
     })

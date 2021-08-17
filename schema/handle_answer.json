@@ -46,6 +46,29 @@
       }
     },
     {
+      "description": "MintNftClones will also display the minted tokens' IDs in the log attributes under the key `minted` in case minting was done as a callback message",
+      "type": "object",
+      "required": [
+        "mint_nft_clones"
+      ],
+      "properties": {
+        "mint_nft_clones": {
+          "type": "object",
+          "required": [
+            "token_ids"
+          ],
+          "properties": {
+            "token_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "type": "object",
       "required": [
         "set_metadata"

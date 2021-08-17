@@ -9,6 +9,7 @@ pub mod royalties;
 pub mod state;
 pub mod token;
 mod unittest_handles;
+mod unittest_mint_run;
 mod unittest_queries;
 mod unittest_royalties;
 mod utils;

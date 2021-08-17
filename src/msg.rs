@@ -127,6 +127,31 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
+    /// create a mint run of clones that will have MintRunInfos showing they are serialized
+    /// copies in the same mint run with the specified quantity.  Mint_run_id can be used to
+    /// track mint run numbers in subsequent MintNftClones calls.  So, if provided, the first
+    /// MintNftClones call will have mint run number 1, the next time MintNftClones is called
+    /// with the same mint_run_id, those clones will have mint run number 2, etc...  If no
+    /// mint_run_id is specified, the clones will not have any mint run number assigned to their
+    /// MintRunInfos
+    MintNftClones {
+        /// optional mint run ID
+        mint_run_id: Option<String>,
+        /// number of clones to mint
+        quantity: u32,
+        /// optional owner address. if omitted, owned by the message sender
+        owner: Option<HumanAddr>,
+        /// optional public metadata that can be seen by everyone
+        public_metadata: Option<Metadata>,
+        /// optional private metadata that can only be seen by the owner and whitelist
+        private_metadata: Option<Metadata>,
+        /// optional royalty information for these tokens
+        royalty_info: Option<RoyaltyInfo>,
+        /// optional memo for the mint txs
+        memo: Option<String>,
+        /// optional message length padding
+        padding: Option<String>,
+    },
     /// set the public and/or private metadata.  This can be called by either the token owner or
     /// a valid minter if they have been given this power by the appropriate config values
     SetMetadata {
@@ -437,6 +462,11 @@ pub enum HandleAnswer {
     /// BatchMintNft will also display the minted tokens' IDs in the log attributes under the
     /// key `minted` in case minting was done as a callback message
     BatchMintNft {
+        token_ids: Vec<String>,
+    },
+    /// MintNftClones will also display the minted tokens' IDs in the log attributes under the
+    /// key `minted` in case minting was done as a callback message
+    MintNftClones {
         token_ids: Vec<String>,
     },
     SetMetadata {

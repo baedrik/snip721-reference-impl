@@ -124,6 +124,94 @@
       }
     },
     {
+      "description": "create a mint run of clones that will have MintRunInfos showing they are serialized copies in the same mint run with the specified quantity.  Mint_run_id can be used to track mint run numbers in subsequent MintNftClones calls.  So, if provided, the first MintNftClones call will have mint run number 1, the next time MintNftClones is called with the same mint_run_id, those clones will have mint run number 2, etc...  If no mint_run_id is specified, the clones will not have any mint run number assigned to their MintRunInfos",
+      "type": "object",
+      "required": [
+        "mint_nft_clones"
+      ],
+      "properties": {
+        "mint_nft_clones": {
+          "type": "object",
+          "required": [
+            "quantity"
+          ],
+          "properties": {
+            "memo": {
+              "description": "optional memo for the mint txs",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "mint_run_id": {
+              "description": "optional mint run ID",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "owner": {
+              "description": "optional owner address. if omitted, owned by the message sender",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "padding": {
+              "description": "optional message length padding",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "private_metadata": {
+              "description": "optional private metadata that can only be seen by the owner and whitelist",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Metadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "public_metadata": {
+              "description": "optional public metadata that can be seen by everyone",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Metadata"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "quantity": {
+              "description": "number of clones to mint",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0.0
+            },
+            "royalty_info": {
+              "description": "optional royalty information for these tokens",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/RoyaltyInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
       "description": "set the public and/or private metadata.  This can be called by either the token owner or a valid minter if they have been given this power by the appropriate config values",
       "type": "object",
       "required": [

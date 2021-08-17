@@ -57,6 +57,8 @@ pub const PREFIX_OWNER_PRIV: &[u8] = b"ownerpriv";
 pub const PREFIX_VIEW_KEY: &[u8] = b"viewkeys";
 /// prefix for the storage of the code hashes of contract's that have implemented ReceiveNft
 pub const PREFIX_RECEIVERS: &[u8] = b"receivers";
+/// prefix for the storage of mint run numbers
+pub const PREFIX_MINT_RUN_NUM: &[u8] = b"runnum";
 
 /// Token contract config
 #[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
