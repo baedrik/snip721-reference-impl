@@ -69,6 +69,7 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 | royalty_info       | [RoyaltyInfo (see below)](#royaltyinfo)                | Default RoyaltyInfo for the contract                                | yes      | nothing            |
 | config             | [Config (see below)](#config)                          | Privacy configuration for the contract                              | yes      | defined below      |
 | post_init_callback | [PostInitCallback (see below)](#postinitcallback)      | Information used to perform a callback message after initialization | yes      | nothing            |
+
 The contract's default RoyaltyInfo is the RoyaltyInfo that will be assigned to any token that is minted without explicitly defining its own RoyaltyInfo.  It should be noted that default RoyaltyInfo only applies to new tokens minted while the default is in effect, and will not alter the royalties for any existing NFTs.  This is because a token creator should not be able to sell a token with only 1% advertised royalty, and then change it to 100% once it is purchased.
 
 ### <a name="royaltyinfo"></a>RoyaltyInfo
@@ -265,6 +266,7 @@ SerialNumber is used to serialize identical NFTs.
 | mint_run                 | number (u32) | The mint run this token was minted in.  This is analogous to book printing editions                 | yes      | nothing              |
 | serial_number            | number (u32) | The serial number of this token                                                                     | no       |                      |
 | quantity_minted_this_run | number (u32) | The number of tokens minted in this mint run.                                                       | yes      | nothing              |
+
 The combination of the above data is used to indicate, for example, that this token was number 67 of 1000 minted in mint run number 3.
 
 ## BatchMintNft
@@ -1780,6 +1782,7 @@ MintRunInfo contains information aout the minting of this token.
 | mint_run                 | number (u32)       | The mint run this token was minted in.  This is analogous to book printing editions         | yes      |
 | serial_number            | number (u32)       | The serial number of this token                                                             | yes      |
 | quantity_minted_this_run | number (u32)       | The number of tokens minted in this mint run.                                               | yes      |
+
 The combination of mint_run, serial_number, and quantity_minted_this_run is used to indicate, for example, that this token was number 67 of 1000 minted in mint run number 3.
 
 ### <a name="snipapproval"></a> Snip721Approval
