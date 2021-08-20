@@ -1,17 +1,18 @@
-/// This contract implements SNIP-721 standard:
-/// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
-use std::collections::HashSet;
-
 use cosmwasm_std::{
     log, to_binary, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Env, Extern, HandleResponse,
     HandleResult, HumanAddr, InitResponse, InitResult, Querier, QueryResult, ReadonlyStorage,
     StdError, StdResult, Storage, WasmMsg,
 };
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
+use primitive_types::U256;
+/// This contract implements SNIP-721 standard:
+/// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
+use std::collections::HashSet;
 
 use secret_toolkit::utils::{pad_handle_result, pad_query_result};
 
 use crate::expiration::Expiration;
+use crate::mint_run::{SerialNumber, StoredMintRunInfo};
 use crate::msg::{
     AccessLevel, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse, HandleAnswer,
     HandleMsg, InitMsg, Mint, QueryAnswer, QueryMsg, ResponseStatus::Success, Send,
@@ -19,12 +20,14 @@ use crate::msg::{
 };
 use crate::rand::sha_256;
 use crate::receiver::{batch_receive_nft_msg, receive_nft_msg};
+use crate::royalties::{RoyaltyInfo, StoredRoyaltyInfo};
 use crate::state::{
     get_txs, json_may_load, json_save, load, may_load, remove, save, store_burn, store_mint,
     store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, BLOCK_KEY,
-    CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS,
-    PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_OWNED, PREFIX_OWNER_PRIV, PREFIX_PRIV_META,
-    PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_TOKENS, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
+    CONFIG_KEY, CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS,
+    PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN,
+    PREFIX_MINT_RUN_NUM, PREFIX_OWNED, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META,
+    PREFIX_RECEIVERS, PREFIX_ROYALTY_INFO, PREFIX_TOKENS, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
 };
 use crate::token::{Metadata, Token};
 use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -38,7 +41,7 @@ pub const ID_BLOCK_SIZE: u32 = 64;
 ////////////////////////////////////// Init ///////////////////////////////////////
 /// Returns InitResult
 ///
-/// Initializes the factory and creates a prng from the entropy String
+/// Initializes the contract
 ///
 /// # Arguments
 ///
@@ -50,8 +53,13 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     env: Env,
     msg: InitMsg,
 ) -> InitResult {
-    let admin = msg.admin.unwrap_or(env.message.sender);
-    let admin_raw = deps.api.canonical_address(&admin)?;
+    let creator_raw = deps.api.canonical_address(&env.message.sender)?;
+    save(&mut deps.storage, CREATOR_KEY, &creator_raw)?;
+    let admin_raw = msg
+        .admin
+        .map(|a| deps.api.canonical_address(&a))
+        .transpose()?
+        .unwrap_or(creator_raw);
     let prng_seed: Vec<u8> = sha_256(base64::encode(msg.entropy).as_bytes()).to_vec();
     let init_config = msg.config.unwrap_or_default();
 
@@ -77,6 +85,16 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
     save(&mut deps.storage, PRNG_SEED_KEY, &prng_seed)?;
     // TODO remove this after BlockInfo becomes available to queries
     save(&mut deps.storage, BLOCK_KEY, &env.block)?;
+
+    if msg.royalty_info.is_some() {
+        store_royalties(
+            &mut deps.storage,
+            &deps.api,
+            msg.royalty_info.as_ref(),
+            None,
+            DEFAULT_ROYALTY_KEY,
+        )?;
+    }
 
     // perform the post init callback if needed
     let messages: Vec<CosmosMsg> = if let Some(callback) = msg.post_init_callback {
@@ -119,6 +137,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             owner,
             public_metadata,
             private_metadata,
+            serial_number,
+            royalty_info,
             memo,
             ..
         } => mint(
@@ -130,6 +150,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             owner,
             public_metadata,
             private_metadata,
+            serial_number,
+            royalty_info,
             memo,
         ),
         HandleMsg::BatchMintNft { mut mints, .. } => batch_mint(
@@ -138,6 +160,28 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             &mut config,
             ContractStatus::Normal.to_u8(),
             &mut mints,
+        ),
+        HandleMsg::MintNftClones {
+            mint_run_id,
+            quantity,
+            owner,
+            public_metadata,
+            private_metadata,
+            royalty_info,
+            memo,
+            ..
+        } => mint_clones(
+            deps,
+            env,
+            &mut config,
+            ContractStatus::Normal.to_u8(),
+            mint_run_id.as_ref(),
+            quantity,
+            owner,
+            public_metadata,
+            private_metadata,
+            royalty_info,
+            memo,
         ),
         HandleMsg::SetMetadata {
             token_id,
@@ -152,6 +196,18 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             &token_id,
             public_metadata,
             private_metadata,
+        ),
+        HandleMsg::SetRoyaltyInfo {
+            token_id,
+            royalty_info,
+            ..
+        } => set_royalty_info(
+            deps,
+            env,
+            &config,
+            ContractStatus::StopTransactions.to_u8(),
+            token_id.as_deref(),
+            royalty_info.as_ref(),
         ),
         HandleMsg::Reveal { token_id, .. } => reveal(
             deps,
@@ -389,6 +445,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
 /// * `owner` - optional owner of this token, if not specified, use the minter's address
 /// * `public_metadata` - optional public metadata viewable by everyone
 /// * `private_metadata` - optional private metadata viewable only by owner and whitelist
+/// * `serial_number` - optional serial number information for this token
+/// * `royalty_info` - optional royalties information for this token
 /// * `memo` - optional memo for the mint tx
 #[allow(clippy::too_many_arguments)]
 pub fn mint<S: Storage, A: Api, Q: Querier>(
@@ -400,6 +458,8 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
     owner: Option<HumanAddr>,
     public_metadata: Option<Metadata>,
     private_metadata: Option<Metadata>,
+    serial_number: Option<SerialNumber>,
+    royalty_info: Option<RoyaltyInfo>,
     memo: Option<String>,
 ) -> HandleResult {
     check_status(config.status, priority)?;
@@ -416,9 +476,11 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
         owner,
         public_metadata,
         private_metadata,
+        serial_number,
+        royalty_info,
         memo,
     }];
-    let mut minted = mint_list(deps, &env.block, config, &sender_raw, &mut mints)?;
+    let mut minted = mint_list(deps, &env, config, &sender_raw, &mut mints)?;
     let minted_str = minted.pop().unwrap_or_else(String::new);
     Ok(HandleResponse {
         messages: vec![],
@@ -456,12 +518,111 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
             "Only designated minters are allowed to mint",
         ));
     }
-    let minted = mint_list(deps, &env.block, config, &sender_raw, mints)?;
+    let minted = mint_list(deps, &env, config, &sender_raw, mints)?;
     Ok(HandleResponse {
         messages: vec![],
         log: vec![log("minted", format!("{:?}", &minted))],
         data: Some(to_binary(&HandleAnswer::BatchMintNft {
             token_ids: minted,
+        })?),
+    })
+}
+
+/// Returns HandleResult
+///
+/// mints clones of a token
+///
+/// # Arguments
+///
+/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
+/// * `env` - Env of contract's environment
+/// * `config` - a mutable reference to the Config
+/// * `priority` - u8 representation of highest status level this action is permitted at
+/// * `mint_run_id` - optional id used to track subsequent mint runs
+/// * `quantity` - number of clones to mint
+/// * `owner` - optional owner of this token, if not specified, use the minter's address
+/// * `public_metadata` - optional public metadata viewable by everyone
+/// * `private_metadata` - optional private metadata viewable only by owner and whitelist
+/// * `royalty_info` - optional royalties information for these clones
+/// * `memo` - optional memo for the mint txs
+#[allow(clippy::too_many_arguments)]
+pub fn mint_clones<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    config: &mut Config,
+    priority: u8,
+    mint_run_id: Option<&String>,
+    quantity: u32,
+    owner: Option<HumanAddr>,
+    public_metadata: Option<Metadata>,
+    private_metadata: Option<Metadata>,
+    royalty_info: Option<RoyaltyInfo>,
+    memo: Option<String>,
+) -> HandleResult {
+    check_status(config.status, priority)?;
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    let minters: Vec<CanonicalAddr> =
+        may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+    if !minters.contains(&sender_raw) {
+        return Err(StdError::generic_err(
+            "Only designated minters are allowed to mint",
+        ));
+    }
+    if quantity == 0 {
+        return Err(StdError::generic_err("Quantity can not be zero"));
+    }
+    let mint_run = mint_run_id
+        .map(|i| {
+            let key = i.as_bytes();
+            let mut run_store = PrefixedStorage::new(PREFIX_MINT_RUN_NUM, &mut deps.storage);
+            let last_num: u32 = may_load(&run_store, key)?.unwrap_or(0);
+            let this_num: u32 = last_num.checked_add(1).ok_or_else(|| {
+                StdError::generic_err(format!(
+                    "Mint run ID {} has already reached its maximum possible value",
+                    i
+                ))
+            })?;
+            save(&mut run_store, key, &this_num)?;
+            Ok(this_num)
+        })
+        .transpose()?;
+    let mut serial_number = SerialNumber {
+        mint_run,
+        serial_number: 1,
+        quantity_minted_this_run: Some(quantity),
+    };
+    let mut mints: Vec<Mint> = Vec::new();
+    for _ in 0..quantity {
+        mints.push(Mint {
+            token_id: None,
+            owner: owner.clone(),
+            public_metadata: public_metadata.clone(),
+            private_metadata: private_metadata.clone(),
+            serial_number: Some(serial_number.clone()),
+            royalty_info: royalty_info.clone(),
+            memo: memo.clone(),
+        });
+        serial_number.serial_number += 1;
+    }
+    let mut minted = mint_list(deps, &env, config, &sender_raw, &mut mints)?;
+    // if mint_list did not error, there must be at least one token id
+    let first_minted = minted
+        .first()
+        .ok_or_else(|| StdError::generic_err("List of minted tokens is empty"))?
+        .clone();
+    let last_minted = minted
+        .pop()
+        .ok_or_else(|| StdError::generic_err("List of minted tokens is empty"))?;
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![
+            log("first_minted", &first_minted),
+            log("last_minted", &last_minted),
+        ],
+        data: Some(to_binary(&HandleAnswer::MintNftClones {
+            first_minted,
+            last_minted,
         })?),
     })
 }
@@ -528,6 +689,85 @@ pub fn set_metadata<S: Storage, A: Api, Q: Querier>(
         messages: vec![],
         log: vec![],
         data: Some(to_binary(&HandleAnswer::SetMetadata { status: Success })?),
+    })
+}
+
+/// Returns HandleResult
+///
+/// sets new royalty information for a specified token or if no token ID is provided, sets new
+/// royalty information as the contract's default
+///
+/// # Arguments
+///
+/// * `deps` - mutable reference to Extern containing all the contract's external dependencies
+/// * `env` - Env of contract's environment
+/// * `config` - a reference to the Config
+/// * `priority` - u8 representation of highest status level this action is permitted at
+/// * `token_id` - optional token id String slice of token whose royalty info should be updated
+/// * `royalty_info` - a optional reference to the new RoyaltyInfo
+pub fn set_royalty_info<S: Storage, A: Api, Q: Querier>(
+    deps: &mut Extern<S, A, Q>,
+    env: Env,
+    config: &Config,
+    priority: u8,
+    token_id: Option<&str>,
+    royalty_info: Option<&RoyaltyInfo>,
+) -> HandleResult {
+    check_status(config.status, priority)?;
+    let sender_raw = deps.api.canonical_address(&env.message.sender)?;
+    // set a token's royalties
+    if let Some(id) = token_id {
+        let custom_err = "A token's RoyaltyInfo may only be set by the token creator when they are also the token owner";
+        // if token supply is private, don't leak that the token id does not exist
+        // instead just say they are not authorized for that token
+        let opt_err = if config.token_supply_is_public {
+            None
+        } else {
+            Some(custom_err)
+        };
+        let (token, idx) = get_token(&deps.storage, id, opt_err)?;
+        let token_key = idx.to_le_bytes();
+        let run_store = ReadonlyPrefixedStorage::new(PREFIX_MINT_RUN, &deps.storage);
+        let mint_run: StoredMintRunInfo = load(&run_store, &token_key)?;
+        if sender_raw != mint_run.token_creator || sender_raw != token.owner {
+            return Err(StdError::generic_err(custom_err));
+        }
+        let default_roy = royalty_info.as_ref().map_or_else(
+            || may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY),
+            |_r| Ok(None),
+        )?;
+        let mut roy_store = PrefixedStorage::new(PREFIX_ROYALTY_INFO, &mut deps.storage);
+        store_royalties(
+            &mut roy_store,
+            &deps.api,
+            royalty_info,
+            default_roy.as_ref(),
+            &token_key,
+        )?;
+    // set default royalty
+    } else {
+        let minters: Vec<CanonicalAddr> =
+            may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+        if !minters.contains(&sender_raw) {
+            return Err(StdError::generic_err(
+                "Only designated minters can set default royalties for the contract",
+            ));
+        }
+        store_royalties(
+            &mut deps.storage,
+            &deps.api,
+            royalty_info,
+            None,
+            DEFAULT_ROYALTY_KEY,
+        )?;
+    };
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: Some(to_binary(&HandleAnswer::SetRoyaltyInfo {
+            status: Success,
+        })?),
     })
 }
 
@@ -1454,6 +1694,7 @@ pub fn set_contract_status<S: Storage, A: Api, Q: Querier>(
 pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryMsg) -> QueryResult {
     let response = match msg {
         QueryMsg::ContractInfo {} => query_contract_info(&deps.storage),
+        QueryMsg::RoyaltyInfo { token_id } => query_royalty(deps, token_id.as_deref()),
         QueryMsg::ContractConfig {} => query_config(&deps.storage),
         QueryMsg::Minters {} => query_minters(deps),
         QueryMsg::NumTokens { viewer } => query_num_tokens(deps, viewer),
@@ -1531,6 +1772,44 @@ pub fn query_contract_info<S: ReadonlyStorage>(storage: &S) -> QueryResult {
     to_binary(&QueryAnswer::ContractInfo {
         name: config.name,
         symbol: config.symbol,
+    })
+}
+
+/// Returns QueryResult displaying either a token's royalty information or the contract's
+/// default royalty information if no token_id is specified
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `token_id` - optional token id whose RoyaltyInfo is being requested
+pub fn query_royalty<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    token_id: Option<&str>,
+) -> QueryResult {
+    let royalty = token_id.map_or_else(
+        || may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY),
+        |i| {
+            let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
+            // if token id was found
+            if let Some(idx) = may_load::<u32, _>(&map2idx, i.as_bytes())? {
+                // get the royalty information if present
+                let roy_store = ReadonlyPrefixedStorage::new(PREFIX_ROYALTY_INFO, &deps.storage);
+                may_load::<StoredRoyaltyInfo, _>(&roy_store, &idx.to_le_bytes())
+            // token id not found
+            } else {
+                let config: Config = load(&deps.storage, CONFIG_KEY)?;
+                // if the token supply is public, let them know the token does not exist
+                if config.token_supply_is_public {
+                    Err(StdError::generic_err(format!("Token ID: {} not found", i)))
+                // token supply is private so just say it has the default
+                } else {
+                    may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)
+                }
+            }
+        },
+    )?;
+    to_binary(&QueryAnswer::RoyaltyInfo {
+        royalty_info: royalty.map(|s| s.to_human(&deps.api)).transpose()?,
     })
 }
 
@@ -1664,7 +1943,6 @@ pub fn query_owner_of<S: Storage, A: Api, Q: Querier>(
 /// * `storage` - a reference to the contract's storage
 /// * `token_id` - string slice of the token id
 pub fn query_nft_info<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryResult {
-    let config: Config = load(storage, CONFIG_KEY)?;
     let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, storage);
     let may_idx: Option<u32> = may_load(&map2idx, token_id.as_bytes())?;
     // if token id was found
@@ -1681,6 +1959,7 @@ pub fn query_nft_info<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryR
             image: meta.image,
         });
     }
+    let config: Config = load(storage, CONFIG_KEY)?;
     // token id wasn't found
     // if the token supply is public, let them know the token does not exist
     if config.token_supply_is_public {
@@ -1851,6 +2130,13 @@ pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
         let priv_meta: Option<Metadata> = may_load(&priv_store, &token_key)?;
         priv_meta
     };
+    // get the royalty information if present
+    let roy_store = ReadonlyPrefixedStorage::new(PREFIX_ROYALTY_INFO, &deps.storage);
+    let may_roy_inf: Option<StoredRoyaltyInfo> = may_load(&roy_store, &token_key)?;
+    // get the mint run information
+    let creator_raw: CanonicalAddr = load(&deps.storage, CREATOR_KEY)?;
+    let run_store = ReadonlyPrefixedStorage::new(PREFIX_MINT_RUN, &deps.storage);
+    let mint_run: StoredMintRunInfo = load(&run_store, &token_key)?;
     // get the approvals
     let (token_approv, token_owner_exp, token_meta_exp) = gen_snip721_approvals(
         &deps.api,
@@ -1895,6 +2181,8 @@ pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
         owner,
         public_metadata,
         private_metadata,
+        royalty_info: may_roy_inf.map(|r| r.to_human(&deps.api)).transpose()?,
+        mint_run_info: Some(mint_run.to_human(&deps.api, &creator_raw)?),
         display_private_metadata_error,
         owner_is_public,
         public_ownership_expiration,
@@ -3870,6 +4158,13 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
             remove(&mut pub_store, &token_key);
             let mut priv_store = PrefixedStorage::new(PREFIX_PRIV_META, &mut deps.storage);
             remove(&mut priv_store, &token_key);
+            // remove mint run info if existent
+            let mut run_store = PrefixedStorage::new(PREFIX_MINT_RUN, &mut deps.storage);
+            remove(&mut run_store, &token_key);
+            // remove royalty info if existent
+            let mut roy_store = PrefixedStorage::new(PREFIX_ROYALTY_INFO, &mut deps.storage);
+            remove(&mut roy_store, &token_key);
+
             let brnr = if token.owner == *sender {
                 None
             } else {
@@ -3915,13 +4210,13 @@ pub struct Inventory {
 /// # Arguments
 ///
 /// * `deps` - a mutable reference to Extern containing all the contract's external dependencies
-/// * `block` - a reference to the current BlockInfo
+/// * `env` - a reference to the Env of the contract's environment
 /// * `config` - a mutable reference to the Config
 /// * `sender_raw` - a reference to the message sender address
 /// * `mints` - list of mints to perform
 fn mint_list<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
-    block: &BlockInfo,
+    env: &Env,
     config: &mut Config,
     sender_raw: &CanonicalAddr,
     mints: &mut Vec<Mint>,
@@ -3931,6 +4226,7 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
     let mut old_block = u64::MAX;
     let mut tokens: HashSet<String> = HashSet::new();
     let save_tokens = !mints.is_empty();
+    let default_roy: Option<StoredRoyaltyInfo> = may_load(&deps.storage, DEFAULT_ROYALTY_KEY)?;
     for mint in mints.drain(..) {
         let id = mint.token_id.unwrap_or(format!("{}", config.mint_cnt));
         // check if id already exists
@@ -4020,6 +4316,35 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
             let mut priv_store = PrefixedStorage::new(PREFIX_PRIV_META, &mut deps.storage);
             save(&mut priv_store, &token_key, &priv_meta)?;
         }
+        // save the mint run info
+        let (mint_run, serial_number, quantity_minted_this_run) =
+            if let Some(ser) = mint.serial_number {
+                (
+                    ser.mint_run,
+                    Some(ser.serial_number),
+                    ser.quantity_minted_this_run,
+                )
+            } else {
+                (None, None, None)
+            };
+        let mint_info = StoredMintRunInfo {
+            token_creator: sender_raw.clone(),
+            time_of_minting: env.block.time,
+            mint_run,
+            serial_number,
+            quantity_minted_this_run,
+        };
+        let mut run_store = PrefixedStorage::new(PREFIX_MINT_RUN, &mut deps.storage);
+        save(&mut run_store, &token_key, &mint_info)?;
+        // check/save royalty information
+        let mut roy_store = PrefixedStorage::new(PREFIX_ROYALTY_INFO, &mut deps.storage);
+        store_royalties(
+            &mut roy_store,
+            &deps.api,
+            mint.royalty_info.as_ref(),
+            default_roy.as_ref(),
+            &token_key,
+        )?;
         //
         //
 
@@ -4027,7 +4352,7 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
         store_mint(
             &mut deps.storage,
             config,
-            block,
+            &env.block,
             id.clone(),
             sender_raw.clone(),
             recipient,
@@ -4052,4 +4377,50 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
     }
     save(&mut deps.storage, CONFIG_KEY, &config)?;
     Ok(minted)
+}
+
+/// Returns StdResult<()>
+///
+/// verifies the royalty information is valid and if so, stores the royalty info for the token
+/// or as default
+///
+/// # Arguments
+///
+/// * `storage` - a mutable reference to the storage for this RoyaltyInfo
+/// * `api` - a reference to the Api used to convert human and canonical addresses
+/// * `royalty_info` - an optional reference to the RoyaltyInfo to store
+/// * `default` - an optional reference to the default StoredRoyaltyInfo to use if royalty_info is
+///               not provided
+/// * `key` - the storage key (either token key or default key)
+fn store_royalties<S: Storage, A: Api>(
+    storage: &mut S,
+    api: &A,
+    royalty_info: Option<&RoyaltyInfo>,
+    default: Option<&StoredRoyaltyInfo>,
+    key: &[u8],
+) -> StdResult<()> {
+    // if RoyaltyInfo is provided, check and save it
+    if let Some(royal_inf) = royalty_info {
+        // the allowed message length won't let enough u16 rates to overflow u128
+        let total_rates: u128 = royal_inf.royalties.iter().map(|r| r.rate as u128).sum();
+        let (royalty_den, overflow) =
+            U256::from(10).overflowing_pow(U256::from(royal_inf.decimal_places_in_rates));
+        if overflow {
+            return Err(StdError::generic_err(
+                "The number of decimal places used in the royalty rates is larger than supported",
+            ));
+        }
+        if U256::from(total_rates) > royalty_den {
+            return Err(StdError::generic_err(
+                "The sum of royalty rates must not exceed 100%",
+            ));
+        }
+        let stored = royal_inf.to_stored(api)?;
+        save(storage, key, &stored)
+    } else if let Some(def) = default {
+        save(storage, key, def)
+    } else {
+        remove(storage, key);
+        Ok(())
+    }
 }

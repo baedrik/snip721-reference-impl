@@ -1,9 +1,12 @@
+#![allow(clippy::large_enum_variant)]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Binary, Coin, HumanAddr};
 
 use crate::expiration::Expiration;
+use crate::mint_run::{MintRunInfo, SerialNumber};
+use crate::royalties::RoyaltyInfo;
 use crate::token::Metadata;
 
 /// Instantiation message
@@ -17,6 +20,9 @@ pub struct InitMsg {
     pub admin: Option<HumanAddr>,
     /// entropy used for prng seed
     pub entropy: String,
+    /// optional royalty information to use as default when RoyaltyInfo is not provided to a
+    /// minting function
+    pub royalty_info: Option<RoyaltyInfo>,
     /// optional privacy configuration for the contract
     pub config: Option<InitConfig>,
     /// optional callback message to execute after instantiation.  This will
@@ -105,6 +111,10 @@ pub enum HandleMsg {
         public_metadata: Option<Metadata>,
         /// optional private metadata that can only be seen by the owner and whitelist
         private_metadata: Option<Metadata>,
+        /// optional serial number for this token
+        serial_number: Option<SerialNumber>,
+        /// optional royalty information for this token
+        royalty_info: Option<RoyaltyInfo>,
         /// optional memo for the tx
         memo: Option<String>,
         /// optional message length padding
@@ -117,6 +127,31 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
+    /// create a mint run of clones that will have MintRunInfos showing they are serialized
+    /// copies in the same mint run with the specified quantity.  Mint_run_id can be used to
+    /// track mint run numbers in subsequent MintNftClones calls.  So, if provided, the first
+    /// MintNftClones call will have mint run number 1, the next time MintNftClones is called
+    /// with the same mint_run_id, those clones will have mint run number 2, etc...  If no
+    /// mint_run_id is specified, the clones will not have any mint run number assigned to their
+    /// MintRunInfos
+    MintNftClones {
+        /// optional mint run ID
+        mint_run_id: Option<String>,
+        /// number of clones to mint
+        quantity: u32,
+        /// optional owner address. if omitted, owned by the message sender
+        owner: Option<HumanAddr>,
+        /// optional public metadata that can be seen by everyone
+        public_metadata: Option<Metadata>,
+        /// optional private metadata that can only be seen by the owner and whitelist
+        private_metadata: Option<Metadata>,
+        /// optional royalty information for these tokens
+        royalty_info: Option<RoyaltyInfo>,
+        /// optional memo for the mint txs
+        memo: Option<String>,
+        /// optional message length padding
+        padding: Option<String>,
+    },
     /// set the public and/or private metadata.  This can be called by either the token owner or
     /// a valid minter if they have been given this power by the appropriate config values
     SetMetadata {
@@ -126,6 +161,20 @@ pub enum HandleMsg {
         public_metadata: Option<Metadata>,
         /// the optional new private metadata
         private_metadata: Option<Metadata>,
+        /// optional message length padding
+        padding: Option<String>,
+    },
+    /// set royalty information.  If no token ID is provided, this royalty info will become the default
+    /// RoyaltyInfo for any new tokens minted on the contract.  If a token ID is provided, this can only
+    /// be called by the token creator and only when the creator is the current owner
+    SetRoyaltyInfo {
+        /// optional id of the token whose royalty information should be updated.  If not provided,
+        /// this updates the default royalty information for any new tokens minted on the contract
+        token_id: Option<String>,
+        /// the new royalty information.  If None, existing royalty information will be deleted.  It should
+        /// be noted, that if deleting a token's royalty information while the contract has a default royalty
+        /// info set up will give the token the default royalty information
+        royalty_info: Option<RoyaltyInfo>,
         /// optional message length padding
         padding: Option<String>,
     },
@@ -361,6 +410,10 @@ pub struct Mint {
     pub public_metadata: Option<Metadata>,
     /// optional private metadata that can only be seen by owner and whitelist
     pub private_metadata: Option<Metadata>,
+    /// optional serial number for this token
+    pub serial_number: Option<SerialNumber>,
+    /// optional royalty info for this token
+    pub royalty_info: Option<RoyaltyInfo>,
     /// optional memo for the tx
     pub memo: Option<String>,
 }
@@ -411,7 +464,20 @@ pub enum HandleAnswer {
     BatchMintNft {
         token_ids: Vec<String>,
     },
+    /// Displays the token ids of the first minted NFT and the last minted NFT.  Because these
+    /// are serialized clones, the ids of all the tokens minted in between should be easily
+    /// inferred.  MintNftClones will also display the minted tokens' IDs in the log attributes
+    /// under the keys `first_minted` and `last_minted` in case minting was done as a callback message
+    MintNftClones {
+        /// token id of the first minted clone
+        first_minted: String,
+        /// token id of the last minted clone
+        last_minted: String,
+    },
     SetMetadata {
+        status: ResponseStatus,
+    },
+    SetRoyaltyInfo {
         status: ResponseStatus,
     },
     MakeOwnershipPrivate {
@@ -679,6 +745,13 @@ pub enum QueryMsg {
         /// the contract whose receive registration info you want to view
         contract: HumanAddr,
     },
+    /// display the royalty information of a token if a token ID is specified, or display the
+    /// contract's default royalty information in no token ID is provided
+    RoyaltyInfo {
+        /// optional ID of the token whose royalty information should be displayed.  If not
+        /// provided, display the contract's default royalty information
+        token_id: Option<String>,
+    },
 }
 
 /// SNIP721 Approval
@@ -774,6 +847,8 @@ pub enum QueryAnswer {
         public_metadata: Option<Metadata>,
         private_metadata: Option<Metadata>,
         display_private_metadata_error: Option<String>,
+        royalty_info: Option<RoyaltyInfo>,
+        mint_run_info: Option<MintRunInfo>,
         owner_is_public: bool,
         public_ownership_expiration: Option<Expiration>,
         private_metadata_is_public: bool,
@@ -799,6 +874,9 @@ pub enum QueryAnswer {
     RegisteredCodeHash {
         code_hash: Option<String>,
         also_implements_batch_receive_nft: bool,
+    },
+    RoyaltyInfo {
+        royalty_info: Option<RoyaltyInfo>,
     },
 }
 

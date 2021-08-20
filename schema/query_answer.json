@@ -378,6 +378,16 @@
                 "$ref": "#/definitions/Snip721Approval"
               }
             },
+            "mint_run_info": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/MintRunInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "owner": {
               "anyOf": [
                 {
@@ -428,6 +438,16 @@
               "anyOf": [
                 {
                   "$ref": "#/definitions/Expiration"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "royalty_info": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/RoyaltyInfo"
                 },
                 {
                   "type": "null"
@@ -566,6 +586,29 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "royalty_info"
+      ],
+      "properties": {
+        "royalty_info": {
+          "type": "object",
+          "properties": {
+            "royalty_info": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/RoyaltyInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {
@@ -688,6 +731,117 @@
             "string",
             "null"
           ]
+        }
+      }
+    },
+    "MintRunInfo": {
+      "description": "information about the minting of the NFT",
+      "type": "object",
+      "properties": {
+        "collection_creator": {
+          "description": "optional address of the SNIP-721 contract creator",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mint_run": {
+          "description": "optional number of the mint run this token was minted in.  This is used to serialize identical NFTs",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "quantity_minted_this_run": {
+          "description": "optional total number of NFTs minted on this run.  This is used to represent that this token is number m of n",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "serial_number": {
+          "description": "optional serial number in this mint run.  This is used to serialize identical NFTs",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "time_of_minting": {
+          "description": "optional time of minting (in seconds since 01/01/1970)",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "token_creator": {
+          "description": "optional address of this NFT's creator",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Royalty": {
+      "description": "data for a single royalty",
+      "type": "object",
+      "required": [
+        "rate",
+        "recipient"
+      ],
+      "properties": {
+        "rate": {
+          "description": "royalty rate",
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "recipient": {
+          "description": "address to send royalties to",
+          "allOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            }
+          ]
+        }
+      }
+    },
+    "RoyaltyInfo": {
+      "description": "all royalty information",
+      "type": "object",
+      "required": [
+        "decimal_places_in_rates",
+        "royalties"
+      ],
+      "properties": {
+        "decimal_places_in_rates": {
+          "description": "decimal places in royalty rates",
+          "type": "integer",
+          "format": "uint8",
+          "minimum": 0.0
+        },
+        "royalties": {
+          "description": "list of royalties",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Royalty"
+          }
         }
       }
     },

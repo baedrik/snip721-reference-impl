@@ -21,6 +21,10 @@ pub const BLOCK_KEY: &[u8] = b"blockinfo";
 pub const MINTERS_KEY: &[u8] = b"minters";
 /// storage key for prng seed
 pub const PRNG_SEED_KEY: &[u8] = b"prngseed";
+/// storage key for the contract instantiator
+pub const CREATOR_KEY: &[u8] = b"creator";
+/// storage key for the default RoyaltyInfo to use if none is supplied when minting
+pub const DEFAULT_ROYALTY_KEY: &[u8] = b"defaultroy";
 /// prefix for storage of the token ids
 pub const PREFIX_TOKENS: &[u8] = b"tokens";
 /// prefix for storage that maps ids to indices
@@ -33,6 +37,10 @@ pub const PREFIX_INFOS: &[u8] = b"infos";
 pub const PREFIX_PUB_META: &[u8] = b"publicmeta";
 /// prefix for the storage of private metadata
 pub const PREFIX_PRIV_META: &[u8] = b"privatemeta";
+/// prefix for the storage of royalty information
+pub const PREFIX_ROYALTY_INFO: &[u8] = b"royalty";
+/// prefix for the storage of mint run information
+pub const PREFIX_MINT_RUN: &[u8] = b"mintrun";
 /// prefix for storage of txs
 pub const PREFIX_TXS: &[u8] = b"rawtxs";
 /// prefix for storage of tx ids
@@ -49,6 +57,8 @@ pub const PREFIX_OWNER_PRIV: &[u8] = b"ownerpriv";
 pub const PREFIX_VIEW_KEY: &[u8] = b"viewkeys";
 /// prefix for the storage of the code hashes of contract's that have implemented ReceiveNft
 pub const PREFIX_RECEIVERS: &[u8] = b"receivers";
+/// prefix for the storage of mint run numbers
+pub const PREFIX_MINT_RUN_NUM: &[u8] = b"runnum";
 
 /// Token contract config
 #[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
