@@ -11,8 +11,11 @@ pub struct MintRunInfo {
     pub token_creator: Option<HumanAddr>,
     /// optional time of minting (in seconds since 01/01/1970)
     pub time_of_minting: Option<u64>,
-    /// optional number of the mint run this token was minted in.  This is
-    /// used to serialize identical NFTs
+    /// optional number of the mint run this token was minted in.  A mint run represents a
+    /// batch of NFTs released at the same time.  So if a creator decided to make 100 copies
+    /// of an NFT, they would all be part of mint run number 1.  If they sold quickly, and
+    /// the creator wanted to rerelease that NFT, he could make 100 more copies which would all
+    /// be part of mint run number 2.
     pub mint_run: Option<u32>,
     /// optional serial number in this mint run.  This is used to serialize
     /// identical NFTs
@@ -29,8 +32,11 @@ pub struct StoredMintRunInfo {
     pub token_creator: CanonicalAddr,
     /// optional time of minting (in seconds since 01/01/1970)
     pub time_of_minting: u64,
-    /// optional number of the mint run this token was minted in.  This is
-    /// used to serialize identical NFTs
+    /// optional number of the mint run this token was minted in.  A mint run represents a
+    /// batch of NFTs released at the same time.  So if a creator decided to make 100 copies
+    /// of an NFT, they would all be part of mint run number 1.  If they sold quickly, and
+    /// the creator wanted to rerelease that NFT, he could make 100 more copies which would all
+    /// be part of mint run number 2.
     pub mint_run: Option<u32>,
     /// optional serial number in this mint run.  This is used to serialize
     /// identical NFTs
@@ -66,8 +72,11 @@ impl StoredMintRunInfo {
 /// Serial number to give an NFT when minting
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct SerialNumber {
-    /// optional number of the mint run this token will be minted in.  This is
-    /// used to serialize identical NFTs
+    /// optional number of the mint run this token will be minted in.  A mint run represents a
+    /// batch of NFTs released at the same time.  So if a creator decided to make 100 copies
+    /// of an NFT, they would all be part of mint run number 1.  If they sold quickly, and
+    /// the creator wanted to rerelease that NFT, he could make 100 more copies which would all
+    /// be part of mint run number 2.
     pub mint_run: Option<u32>,
     /// serial number (in this mint run).  This is used to serialize
     /// identical NFTs

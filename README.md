@@ -263,11 +263,11 @@ SerialNumber is used to serialize identical NFTs.
 ```
 | Name                     | Type         | Description                                                                                         | Optional | Value If Omitted     |
 |--------------------------|--------------|-----------------------------------------------------------------------------------------------------|----------|----------------------|
-| mint_run                 | number (u32) | The mint run this token was minted in.  This is analogous to book printing editions                 | yes      | nothing              |
+| mint_run                 | number (u32) | The mint run this token was minted in.  This represents batches of NFTs released at the same time   | yes      | nothing              |
 | serial_number            | number (u32) | The serial number of this token                                                                     | no       |                      |
 | quantity_minted_this_run | number (u32) | The number of tokens minted in this mint run.                                                       | yes      | nothing              |
 
-The combination of the above data is used to indicate, for example, that this token was number 67 of 1000 minted in mint run number 3.
+A mint run is a group of NFTs released at the same time.  So, for example, if a creator decided to make 100 copies, they would all be part of mint run number 1.  If they sell well and the creator wants to rerelease that NFT, he could make 100 more copies that would all be part of mint run number 2.  The combination of mint_run, serial_number, and quantity_minted_this_run is used to indicate, for example, that this token was number 67 of 1000 minted in mint run number 3.
 
 ## BatchMintNft
 BatchMintNft mints a list of tokens.  Only an authorized minting address my execute BatchMintNft.
@@ -1774,16 +1774,16 @@ MintRunInfo contains information aout the minting of this token.
 	"quantity_minted_this_run": 1000,
 }
 ```
-| Name                     | Type               | Description                                                                                 | Optional | 
-|--------------------------|--------------------|---------------------------------------------------------------------------------------------|----------|
-| collection_creator       | string (HumanAddr) | The address that instantiated this contract                                                 | yes      |
-| token_creator            | string (HumanAddr) | The address that minted this token                                                          | yes      |
-| time_of_minting          | number (u64)       | The number of seconds since 01/01/1970 that this token was minted                           | yes      |
-| mint_run                 | number (u32)       | The mint run this token was minted in.  This is analogous to book printing editions         | yes      |
-| serial_number            | number (u32)       | The serial number of this token                                                             | yes      |
-| quantity_minted_this_run | number (u32)       | The number of tokens minted in this mint run.                                               | yes      |
+| Name                     | Type               | Description                                                                                               | Optional | 
+|--------------------------|--------------------|-----------------------------------------------------------------------------------------------------------|----------|
+| collection_creator       | string (HumanAddr) | The address that instantiated this contract                                                               | yes      |
+| token_creator            | string (HumanAddr) | The address that minted this token                                                                        | yes      |
+| time_of_minting          | number (u64)       | The number of seconds since 01/01/1970 that this token was minted                                         | yes      |
+| mint_run                 | number (u32)       | The mint run this token was minted in.  This represents batches of NFTs released at the same time         | yes      |
+| serial_number            | number (u32)       | The serial number of this token                                                                           | yes      |
+| quantity_minted_this_run | number (u32)       | The number of tokens minted in this mint run.                                                             | yes      |
 
-The combination of mint_run, serial_number, and quantity_minted_this_run is used to indicate, for example, that this token was number 67 of 1000 minted in mint run number 3.
+A mint run is a group of NFTs released at the same time.  So, for example, if a creator decided to make 100 copies, they would all be part of mint run number 1.  If they sell well and the creator wants to rerelease that NFT, he could make 100 more copies that would all be part of mint run number 2.  The combination of mint_run, serial_number, and quantity_minted_this_run is used to indicate, for example, that this token was number 67 of 1000 minted in mint run number 3.
 
 ### <a name="snipapproval"></a> Snip721Approval
 The Snip721Approval object is used to display all the approvals (and their expirations) that have been granted to a whitelisted address.  The expiration field will be null if the whitelisted address does not have that corresponding permission type.
