@@ -590,13 +590,13 @@
     {
       "type": "object",
       "required": [
-        "default_royalty_info"
+        "royalty_info"
       ],
       "properties": {
-        "default_royalty_info": {
+        "royalty_info": {
           "type": "object",
           "properties": {
-            "default_royalty_info": {
+            "royalty_info": {
               "anyOf": [
                 {
                   "$ref": "#/definitions/RoyaltyInfo"

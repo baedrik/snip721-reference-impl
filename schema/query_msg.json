@@ -548,14 +548,23 @@
       }
     },
     {
-      "description": "display the default royalty info that is used whenever any token is minted without specifying its own royalty information",
+      "description": "display the royalty information of a token if a token ID is specified, or display the contract's default royalty information in no token ID is provided",
       "type": "object",
       "required": [
-        "default_royalty_info"
+        "royalty_info"
       ],
       "properties": {
-        "default_royalty_info": {
-          "type": "object"
+        "royalty_info": {
+          "type": "object",
+          "properties": {
+            "token_id": {
+              "description": "optional ID of the token whose royalty information should be displayed.  If not provided, display the contract's default royalty information",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
         }
       }
     }

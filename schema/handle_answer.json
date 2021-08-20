@@ -46,7 +46,7 @@
       }
     },
     {
-      "description": "MintNftClones will also display the minted tokens' IDs in the log attributes under the key `minted` in case minting was done as a callback message",
+      "description": "Displays the token ids of the first minted NFT and the last minted NFT.  Because these are serialized clones, the ids of all the tokens minted in between should be easily inferred.  MintNftClones will also display the minted tokens' IDs in the log attributes under the keys `first_minted` and `last_minted` in case minting was done as a callback message",
       "type": "object",
       "required": [
         "mint_nft_clones"
@@ -55,14 +55,17 @@
         "mint_nft_clones": {
           "type": "object",
           "required": [
-            "token_ids"
+            "first_minted",
+            "last_minted"
           ],
           "properties": {
-            "token_ids": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
+            "first_minted": {
+              "description": "token id of the first minted clone",
+              "type": "string"
+            },
+            "last_minted": {
+              "description": "token id of the last minted clone",
+              "type": "string"
             }
           }
         }

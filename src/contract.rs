@@ -604,12 +604,25 @@ pub fn mint_clones<S: Storage, A: Api, Q: Querier>(
         });
         serial_number.serial_number += 1;
     }
-    let minted = mint_list(deps, &env, config, &sender_raw, &mut mints)?;
+    let mut minted = mint_list(deps, &env, config, &sender_raw, &mut mints)?;
+    // if mint_list did not error, there must be at least one token id
+    let first_minted = minted
+        .first()
+        .ok_or_else(|| StdError::generic_err("List of minted tokens is empty"))?
+        .clone();
+    let last_minted = minted
+        .pop()
+        .ok_or_else(|| StdError::generic_err("List of minted tokens is empty"))?;
+
     Ok(HandleResponse {
         messages: vec![],
-        log: vec![log("minted", format!("{:?}", &minted))],
+        log: vec![
+            log("first_minted", &first_minted),
+            log("last_minted", &last_minted),
+        ],
         data: Some(to_binary(&HandleAnswer::MintNftClones {
-            token_ids: minted,
+            first_minted,
+            last_minted,
         })?),
     })
 }
@@ -1681,7 +1694,7 @@ pub fn set_contract_status<S: Storage, A: Api, Q: Querier>(
 pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryMsg) -> QueryResult {
     let response = match msg {
         QueryMsg::ContractInfo {} => query_contract_info(&deps.storage),
-        QueryMsg::DefaultRoyaltyInfo {} => query_default_royalty(deps),
+        QueryMsg::RoyaltyInfo { token_id } => query_royalty(deps, token_id.as_deref()),
         QueryMsg::ContractConfig {} => query_config(&deps.storage),
         QueryMsg::Minters {} => query_minters(deps),
         QueryMsg::NumTokens { viewer } => query_num_tokens(deps, viewer),
@@ -1762,17 +1775,41 @@ pub fn query_contract_info<S: ReadonlyStorage>(storage: &S) -> QueryResult {
     })
 }
 
-/// Returns QueryResult displaying the contract's default royalty info if present
+/// Returns QueryResult displaying either a token's royalty information or the contract's
+/// default royalty information if no token_id is specified
 ///
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
-pub fn query_default_royalty<S: Storage, A: Api, Q: Querier>(
+/// * `token_id` - optional token id whose RoyaltyInfo is being requested
+pub fn query_royalty<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
+    token_id: Option<&str>,
 ) -> QueryResult {
-    let default: Option<StoredRoyaltyInfo> = may_load(&deps.storage, DEFAULT_ROYALTY_KEY)?;
-    to_binary(&QueryAnswer::DefaultRoyaltyInfo {
-        default_royalty_info: default.map(|d| d.to_human(&deps.api)).transpose()?,
+    let royalty = token_id.map_or_else(
+        || may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY),
+        |i| {
+            let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
+            // if token id was found
+            if let Some(idx) = may_load::<u32, _>(&map2idx, i.as_bytes())? {
+                // get the royalty information if present
+                let roy_store = ReadonlyPrefixedStorage::new(PREFIX_ROYALTY_INFO, &deps.storage);
+                may_load::<StoredRoyaltyInfo, _>(&roy_store, &idx.to_le_bytes())
+            // token id not found
+            } else {
+                let config: Config = load(&deps.storage, CONFIG_KEY)?;
+                // if the token supply is public, let them know the token does not exist
+                if config.token_supply_is_public {
+                    Err(StdError::generic_err(format!("Token ID: {} not found", i)))
+                // token supply is private so just say it has the default
+                } else {
+                    may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)
+                }
+            }
+        },
+    )?;
+    to_binary(&QueryAnswer::RoyaltyInfo {
+        royalty_info: royalty.map(|s| s.to_human(&deps.api)).transpose()?,
     })
 }
 
@@ -1906,7 +1943,6 @@ pub fn query_owner_of<S: Storage, A: Api, Q: Querier>(
 /// * `storage` - a reference to the contract's storage
 /// * `token_id` - string slice of the token id
 pub fn query_nft_info<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryResult {
-    let config: Config = load(storage, CONFIG_KEY)?;
     let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, storage);
     let may_idx: Option<u32> = may_load(&map2idx, token_id.as_bytes())?;
     // if token id was found
@@ -1923,6 +1959,7 @@ pub fn query_nft_info<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryR
             image: meta.image,
         });
     }
+    let config: Config = load(storage, CONFIG_KEY)?;
     // token id wasn't found
     // if the token supply is public, let them know the token does not exist
     if config.token_supply_is_public {

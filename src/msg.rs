@@ -464,10 +464,15 @@ pub enum HandleAnswer {
     BatchMintNft {
         token_ids: Vec<String>,
     },
-    /// MintNftClones will also display the minted tokens' IDs in the log attributes under the
-    /// key `minted` in case minting was done as a callback message
+    /// Displays the token ids of the first minted NFT and the last minted NFT.  Because these
+    /// are serialized clones, the ids of all the tokens minted in between should be easily
+    /// inferred.  MintNftClones will also display the minted tokens' IDs in the log attributes
+    /// under the keys `first_minted` and `last_minted` in case minting was done as a callback message
     MintNftClones {
-        token_ids: Vec<String>,
+        /// token id of the first minted clone
+        first_minted: String,
+        /// token id of the last minted clone
+        last_minted: String,
     },
     SetMetadata {
         status: ResponseStatus,
@@ -740,9 +745,13 @@ pub enum QueryMsg {
         /// the contract whose receive registration info you want to view
         contract: HumanAddr,
     },
-    /// display the default royalty info that is used whenever any token is minted without
-    /// specifying its own royalty information
-    DefaultRoyaltyInfo {},
+    /// display the royalty information of a token if a token ID is specified, or display the
+    /// contract's default royalty information in no token ID is provided
+    RoyaltyInfo {
+        /// optional ID of the token whose royalty information should be displayed.  If not
+        /// provided, display the contract's default royalty information
+        token_id: Option<String>,
+    },
 }
 
 /// SNIP721 Approval
@@ -837,9 +846,9 @@ pub enum QueryAnswer {
         owner: Option<HumanAddr>,
         public_metadata: Option<Metadata>,
         private_metadata: Option<Metadata>,
+        display_private_metadata_error: Option<String>,
         royalty_info: Option<RoyaltyInfo>,
         mint_run_info: Option<MintRunInfo>,
-        display_private_metadata_error: Option<String>,
         owner_is_public: bool,
         public_ownership_expiration: Option<Expiration>,
         private_metadata_is_public: bool,
@@ -866,8 +875,8 @@ pub enum QueryAnswer {
         code_hash: Option<String>,
         also_implements_batch_receive_nft: bool,
     },
-    DefaultRoyaltyInfo {
-        default_royalty_info: Option<RoyaltyInfo>,
+    RoyaltyInfo {
+        royalty_info: Option<RoyaltyInfo>,
     },
 }
 
