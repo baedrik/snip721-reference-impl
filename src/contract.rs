@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use secret_toolkit::utils::{pad_handle_result, pad_query_result};
 
 use crate::expiration::Expiration;
+use crate::inventory::{Inventory, InventoryIter};
 use crate::mint_run::{SerialNumber, StoredMintRunInfo};
 use crate::msg::{
     AccessLevel, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse, HandleAnswer,
@@ -26,8 +27,8 @@ use crate::state::{
     store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, BLOCK_KEY,
     CONFIG_KEY, CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS,
     PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN,
-    PREFIX_MINT_RUN_NUM, PREFIX_OWNED, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META,
-    PREFIX_RECEIVERS, PREFIX_ROYALTY_INFO, PREFIX_TOKENS, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
+    PREFIX_MINT_RUN_NUM, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS,
+    PREFIX_ROYALTY_INFO, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
 };
 use crate::token::{Metadata, Token};
 use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -69,6 +70,7 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
         admin: admin_raw.clone(),
         mint_cnt: 0,
         tx_cnt: 0,
+        token_cnt: 0,
         status: ContractStatus::Normal.to_u8(),
         token_supply_is_public: init_config.public_token_supply.unwrap_or(false),
         owner_is_public: init_config.public_owner.unwrap_or(false),
@@ -1862,15 +1864,9 @@ pub fn query_num_tokens<S: Storage, A: Api, Q: Querier>(
     // authenticate permission to view token supply
     check_view_supply(deps, viewer)?;
     let config: Config = load(&deps.storage, CONFIG_KEY)?;
-    let last_block = config.mint_cnt.saturating_sub(1) / ID_BLOCK_SIZE;
-    let mut count = 0u32;
-    let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-    for i in 0..=last_block {
-        let tokens: HashSet<String> =
-            may_load(&token_store, &i.to_le_bytes())?.unwrap_or_else(HashSet::new);
-        count += tokens.len() as u32;
-    }
-    to_binary(&QueryAnswer::NumTokens { count })
+    to_binary(&QueryAnswer::NumTokens {
+        count: config.token_cnt,
+    })
 }
 
 /// Returns QueryResult displaying the list of tokens that the contract controls
@@ -1879,8 +1875,7 @@ pub fn query_num_tokens<S: Storage, A: Api, Q: Querier>(
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 /// * `viewer` - optional address and key making an authenticated query request
-/// * `start_after` - optionally only display token ids that come after this String in
-///                   lexicographical order
+/// * `start_after` - optionally only display token ids that come after this one
 /// * `limit` - optional max number of tokens to display
 pub fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
@@ -1890,23 +1885,31 @@ pub fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
 ) -> QueryResult {
     // authenticate permission to view token supply
     check_view_supply(deps, viewer)?;
-    let after = start_after.unwrap_or_else(String::new);
-    let size = limit.unwrap_or(300) as usize;
+    let mut i = start_after.map_or_else(
+        || Ok(0),
+        |id| {
+            let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
+            let idx: u32 = may_load(&map2idx, id.as_bytes())?
+                .ok_or_else(|| StdError::generic_err(format!("Token ID: {} not found", id)))?;
+            idx.checked_add(1).ok_or_else(|| {
+                StdError::generic_err("This token was the last one the contract could mint")
+            })
+        },
+    )?;
+    let cut_off = limit.unwrap_or(300);
     let config: Config = load(&deps.storage, CONFIG_KEY)?;
-    let last_block = config.mint_cnt.saturating_sub(1) / ID_BLOCK_SIZE;
-    let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
     let mut tokens = Vec::new();
-    for i in 0..=last_block {
-        let token_list: HashSet<String> =
-            may_load(&token_store, &i.to_le_bytes())?.unwrap_or_else(HashSet::new);
-        for id in token_list {
-            if id > after {
-                tokens.push(id.to_string());
-            }
+    let mut count = 0u32;
+    let map2id = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_ID, &deps.storage);
+    while count < cut_off && i < config.mint_cnt {
+        if let Some(id) = may_load::<String, _>(&map2id, &i.to_le_bytes())? {
+            tokens.push(id);
+            // will hit gas ceiling before the count overflows
+            count += 1;
         }
+        // i can't overflow if it was less than a u32
+        i += 1;
     }
-    tokens.sort_unstable();
-    tokens.truncate(size);
     to_binary(&QueryAnswer::TokenList { tokens })
 }
 
@@ -1990,17 +1993,12 @@ pub fn query_private_meta<S: Storage, A: Api, Q: Querier>(
     viewer: Option<ViewerInfo>,
 ) -> QueryResult {
     let prep_info = query_token_prep(deps, token_id, viewer)?;
-    let opt_viewer = if prep_info.viewer_given {
-        Some(&prep_info.viewer_raw)
-    } else {
-        None
-    };
     check_perm_core(
         deps,
         &prep_info.block,
         &prep_info.token,
         token_id,
-        opt_viewer,
+        prep_info.viewer_raw.as_ref(),
         prep_info.token.owner.as_slice(),
         PermissionType::ViewMetadata.to_usize(),
         &mut Vec::new(),
@@ -2065,11 +2063,7 @@ pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
     let mut prep_info = query_token_prep(deps, token_id, viewer)?;
     let incl_exp = include_expired.unwrap_or(false);
     let owner_slice = prep_info.token.owner.as_slice();
-    let opt_viewer = if prep_info.viewer_given {
-        Some(&prep_info.viewer_raw)
-    } else {
-        None
-    };
+    let opt_viewer = prep_info.viewer_raw.as_ref();
     let own_priv_store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
     let global_pass: bool =
         may_load(&own_priv_store, owner_slice)?.unwrap_or(prep_info.owner_is_public);
@@ -2171,12 +2165,13 @@ pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
             (all_meta_exp, all_meta_exp.is_some())
         };
     // if the viewer is the owner, display the approvals
-    let (token_approvals, inventory_approvals) =
-        if prep_info.viewer_given && prep_info.token.owner == prep_info.viewer_raw {
+    let (token_approvals, inventory_approvals) = opt_viewer.map_or((None, None), |v| {
+        if prep_info.token.owner == *v {
             (Some(token_approv), Some(inventory_approv))
         } else {
             (None, None)
-        };
+        }
+    });
     to_binary(&QueryAnswer::NftDossier {
         owner,
         public_metadata,
@@ -2406,41 +2401,45 @@ pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
     let mut is_viewer = false;
     let mut is_owner = false;
     let owner_raw = deps.api.canonical_address(owner)?;
-    let owner_slice = owner_raw.as_slice();
-    let after = start_after.unwrap_or_else(String::new);
-    let size = limit.unwrap_or(30) as usize;
-    let (viewer_raw, vwr_given) = if let Some(vwr) = viewer {
-        (deps.api.canonical_address(&vwr)?, true)
-    } else {
-        (CanonicalAddr(Binary::from(b"notused")), false)
-    };
+    let cut_off = limit.unwrap_or(30);
+    let viewer_raw = viewer.map(|h| deps.api.canonical_address(&h)).transpose()?;
     // if we need to validate an address
     if let Some(key) = viewing_key {
         // if a viewer was supplied, they're saying they aren't the owner so check
         // if the key matches the viewer address first
-        if vwr_given && check_key(&deps.storage, &viewer_raw, key.clone()).is_ok() {
-            is_viewer = true;
+        if let Some(vwr) = viewer_raw.as_ref() {
+            if check_key(&deps.storage, vwr, key.clone()).is_ok() {
+                is_viewer = true;
+            }
+        }
         // check if this is the owner's key if we need to
-        } else {
+        if !is_viewer {
             check_key(&deps.storage, &owner_raw, key)?;
             is_owner = true;
         }
     }
+    // exit early if the limit is 0
+    if cut_off == 0 {
+        return to_binary(&QueryAnswer::TokenList { tokens: Vec::new() });
+    }
+    // get list of owner's tokens
+    let own_inv = Inventory::new(&deps.storage, owner_raw)?;
+    let owner_slice = own_inv.owner.as_slice();
+
     let querier = if is_viewer {
-        Some(&viewer_raw)
+        viewer_raw.as_ref()
     } else if is_owner {
-        Some(&owner_raw)
+        Some(&own_inv.owner)
     } else {
         None
     };
-    // get list of owner's tokens
-    let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-    let owned: HashSet<u32> = may_load(&owned_store, owner_slice)?.unwrap_or_else(HashSet::new);
     // if querier is different than the owner, check if ownership is public
+    let mut may_config: Option<Config> = None;
     let mut known_pass = if !is_owner {
         let config: Config = load(&deps.storage, CONFIG_KEY)?;
         let own_priv_store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
         let pass: bool = may_load(&own_priv_store, owner_slice)?.unwrap_or(config.owner_is_public);
+        may_config = Some(config);
         pass
     } else {
         true
@@ -2466,42 +2465,95 @@ pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
     let mut oper_for: Vec<CanonicalAddr> = Vec::new();
     let mut tokens: Vec<String> = Vec::new();
     let map2id = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_ID, &deps.storage);
-    for idx in owned.iter() {
-        let may_id: Option<String> = may_load(&map2id, &idx.to_le_bytes())?;
-        if let Some(id) = may_id {
-            // filter out ids before start_after
-            if id > after {
-                list_it = known_pass;
-                // only check permissions if not public or owner
-                if !known_pass {
-                    let may_token: Option<Token> = json_may_load(&info_store, &idx.to_le_bytes())?;
-                    if let Some(token) = may_token {
-                        list_it = check_perm_core(
-                            deps,
-                            &block,
-                            &token,
-                            &id,
-                            querier,
-                            owner_slice,
-                            exp_idx,
-                            &mut oper_for,
-                            "",
-                        )
-                        .is_ok();
-                        // if querier is found to have ALL permission, no need to check permission ever again
-                        if !oper_for.is_empty() {
-                            known_pass = true;
-                        }
+    let mut inv_iter = if let Some(after) = start_after.as_ref() {
+        // load the config if we haven't already
+        let config = may_config.map_or_else(|| load::<Config, _>(&deps.storage, CONFIG_KEY), Ok)?;
+        // if the querier is allowed to view all of the owner's tokens, let them know if the token
+        // does not belong to the owner
+        let inv_err = format!("Token ID: {} is not in the specified inventory", after);
+        // or tell any other viewer that they are not authorized
+        let unauth_err = format!(
+            "You are not authorized to perform this action on token {}",
+            after
+        );
+        let public_err = format!("Token ID: {} not found", after);
+        // if token supply is public let them know if the token id does not exist
+        let not_found_err = if config.token_supply_is_public {
+            &public_err
+        } else if known_pass {
+            &inv_err
+        } else {
+            &unauth_err
+        };
+        let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
+        let idx: u32 = may_load(&map2idx, after.as_bytes())?
+            .ok_or_else(|| StdError::generic_err(not_found_err))?;
+        // make sure querier is allowed to know if the supplied token belongs to owner
+        if !known_pass {
+            let token: Token = json_may_load(&info_store, &idx.to_le_bytes())?
+                .ok_or_else(|| StdError::generic_err("Token info storage is corrupt"))?;
+            // if the specified token belongs to the specified owner, save if the querier is an operator
+            let mut may_oper_vec = if own_inv.owner == token.owner {
+                None
+            } else {
+                Some(Vec::new())
+            };
+            check_perm_core(
+                deps,
+                &block,
+                &token,
+                after,
+                querier,
+                token.owner.as_slice(),
+                exp_idx,
+                may_oper_vec.as_mut().unwrap_or(&mut oper_for),
+                &unauth_err,
+            )?;
+            // if querier is found to have ALL permission for the specified owner, no need to check permission ever again
+            if !oper_for.is_empty() {
+                known_pass = true;
+            }
+        }
+        InventoryIter::start_after(&deps.storage, &own_inv, idx, &inv_err)?
+    } else {
+        InventoryIter::new(&own_inv)
+    };
+    let mut count = 0u32;
+    while let Some(idx) = inv_iter.next(&deps.storage)? {
+        if let Some(id) = may_load::<String, _>(&map2id, &idx.to_le_bytes())? {
+            list_it = known_pass;
+            // only check permissions if not public or owner
+            if !known_pass {
+                if let Some(token) = json_may_load::<Token, _>(&info_store, &idx.to_le_bytes())? {
+                    list_it = check_perm_core(
+                        deps,
+                        &block,
+                        &token,
+                        &id,
+                        querier,
+                        owner_slice,
+                        exp_idx,
+                        &mut oper_for,
+                        "",
+                    )
+                    .is_ok();
+                    // if querier is found to have ALL permission, no need to check permission ever again
+                    if !oper_for.is_empty() {
+                        known_pass = true;
                     }
                 }
-                if list_it {
-                    tokens.push(id);
+            }
+            if list_it {
+                tokens.push(id);
+                // it'll hit the gas ceiling before overflowing the count
+                count += 1;
+                // exit if we hit the limit
+                if count >= cut_off {
+                    break;
                 }
             }
         }
     }
-    tokens.sort_unstable();
-    tokens.truncate(size);
     to_binary(&QueryAnswer::TokenList { tokens })
 }
 
@@ -2641,9 +2693,7 @@ pub fn query_code_hash<S: Storage, A: Api, Q: Querier>(
 // bundled info when prepping an authenticated token query
 pub struct TokenQueryInfo {
     // querier's address
-    viewer_raw: CanonicalAddr,
-    // true if a viewer address was provided
-    viewer_given: bool,
+    viewer_raw: Option<CanonicalAddr>,
     // TODO remove this when BlockInfo becomes available to queries
     block: BlockInfo,
     // error message String
@@ -2669,13 +2719,13 @@ fn query_token_prep<S: Storage, A: Api, Q: Querier>(
     token_id: &str,
     viewer: Option<ViewerInfo>,
 ) -> StdResult<TokenQueryInfo> {
-    let (viewer_raw, viewer_given) = if let Some(vwr) = viewer {
-        let viewer_raw = deps.api.canonical_address(&vwr.address)?;
-        check_key(&deps.storage, &viewer_raw, vwr.viewing_key)?;
-        (viewer_raw, true)
-    } else {
-        (CanonicalAddr(Binary::from(b"notused")), false)
-    };
+    let viewer_raw = viewer
+        .map(|v| {
+            let raw = deps.api.canonical_address(&v.address)?;
+            check_key(&deps.storage, &raw, v.viewing_key)?;
+            Ok(raw)
+        })
+        .transpose()?;
     let config: Config = load(&deps.storage, CONFIG_KEY)?;
     // TODO remove this when BlockInfo becomes available to queries
     let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
@@ -2697,7 +2747,6 @@ fn query_token_prep<S: Storage, A: Api, Q: Querier>(
     let (token, idx) = get_token(&deps.storage, token_id, opt_err)?;
     Ok(TokenQueryInfo {
         viewer_raw,
-        viewer_given,
         block,
         err_msg,
         token,
@@ -2722,11 +2771,7 @@ fn process_cw721_owner_of<S: Storage, A: Api, Q: Querier>(
     include_expired: Option<bool>,
 ) -> StdResult<(Option<HumanAddr>, Vec<Cw721Approval>, u32)> {
     let prep_info = query_token_prep(deps, token_id, viewer)?;
-    let opt_viewer = if prep_info.viewer_given {
-        Some(&prep_info.viewer_raw)
-    } else {
-        None
-    };
+    let opt_viewer = prep_info.viewer_raw.as_ref();
     if check_permission(
         deps,
         &prep_info.block,
@@ -3555,29 +3600,29 @@ fn process_accesses<S: Storage>(
             } else {
                 (&mut new_auth, false, 0usize)
             };
-        let mut load_list: HashSet<u32> = HashSet::new();
-        // if we need to load other tokens create the load list
-        if alt_load_tok_perm.has_update {
+        let load_list: HashSet<u32> = if alt_load_tok_perm.has_update {
+            // if we need to load other tokens create the load list
             // if we are loading all the owner's other tokens
-            if load_all {
-                let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, storage);
-                let owned: HashSet<u32> =
-                    may_load(&owned_store, owner_slice)?.unwrap_or_else(HashSet::new);
-                load_list.extend(owned);
+            let list = if load_all {
+                let inv = Inventory::new(storage, owner.clone())?;
+                let mut set = inv.to_set(storage)?;
                 // above, we already processed the input token, so remove it from the load list
-                load_list.remove(&proc_info.idx);
+                set.remove(&proc_info.idx);
+                set
             // just loading the tokens in the appropriate AuthList
             } else {
+                let mut set: HashSet<u32> = HashSet::new();
                 for l in add_load_list {
-                    load_list.extend(auth.tokens[l].iter());
+                    set.extend(auth.tokens[l].iter());
                 }
                 // don't load the input token if given
                 if proc_info.token_given {
-                    load_list.remove(&proc_info.idx);
+                    set.remove(&proc_info.idx);
                 }
-            }
+                set
+            };
             let mut info_store = PrefixedStorage::new(PREFIX_INFOS, storage);
-            for t_i in &load_list {
+            for t_i in &list {
                 let tok_key = t_i.to_le_bytes();
                 let may_tok: Option<Token> = json_may_load(&info_store, &tok_key)?;
                 if let Some(mut load_tok) = may_tok {
@@ -3595,7 +3640,10 @@ fn process_accesses<S: Storage>(
                     }
                 }
             }
-        }
+            list
+        } else {
+            HashSet::new()
+        };
         let mut updated = false;
         // do for each PermissionType
         for i in 0..num_perm_types {
@@ -3818,12 +3866,10 @@ fn receiver_callback_msgs<S: ReadonlyStorage>(
     Ok(callbacks)
 }
 
-// information about how an owner's token inventory has changed
+// an owner's inventory and the tokens they lost in this tx
 pub struct InventoryUpdate {
-    // token owner
-    pub owner: CanonicalAddr,
-    // the list of remaining tokens
-    pub retain: HashSet<u32>,
+    // owner's inventory
+    pub inventory: Inventory,
     // the list of lost tokens
     pub remove: HashSet<u32>,
 }
@@ -3843,21 +3889,16 @@ fn update_owner_inventory<S: Storage>(
     num_perm_types: usize,
 ) -> StdResult<()> {
     for update in updates {
-        let owner_slice = update.owner.as_slice();
+        let owner_slice = update.inventory.owner.as_slice();
         // update the inventories
-        let mut owned_store = PrefixedStorage::new(PREFIX_OWNED, storage);
-        if update.retain.is_empty() {
-            remove(&mut owned_store, owner_slice);
-        } else {
-            save(&mut owned_store, owner_slice, &update.retain)?;
-        }
+        update.inventory.save(storage)?;
         // update the AuthLists if tokens were lost
         if !update.remove.is_empty() {
             let mut auth_store = PrefixedStorage::new(PREFIX_AUTHLIST, storage);
             let may_list: Option<Vec<AuthList>> = may_load(&auth_store, owner_slice)?;
-            if let Some(mut list) = may_list {
+            if let Some(list) = may_list {
                 let mut new_list = Vec::new();
-                for mut auth in list.drain(..) {
+                for mut auth in list.into_iter() {
                     for i in 0..num_perm_types {
                         auth.tokens[i].retain(|t| !update.remove.contains(t));
                     }
@@ -3926,33 +3967,27 @@ fn transfer_impl<S: Storage, A: Api, Q: Querier>(
     json_save(&mut info_store, &idx.to_le_bytes(), &token)?;
     // log the inventory changes
     for addr in update_addrs.into_iter() {
-        if let Some(inv) = inv_updates.iter_mut().find(|i| i.owner == addr) {
-            // if updating the recipient's inventory
-            if inv.owner == recipient {
-                inv.retain.insert(idx);
-            // otherwise updating the old owner's inventory
-            } else {
-                inv.retain.remove(&idx);
-                inv.remove.insert(idx);
-            }
+        let inv_upd = if let Some(inv) = inv_updates.iter_mut().find(|i| i.inventory.owner == addr)
+        {
+            inv
         } else {
-            let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-            let retain: HashSet<u32> =
-                may_load(&owned_store, addr.as_slice())?.unwrap_or_else(HashSet::new);
-            let mut new_inv = InventoryUpdate {
-                owner: addr,
-                retain,
+            let inventory = Inventory::new(&deps.storage, addr)?;
+            let new_inv = InventoryUpdate {
+                inventory,
                 remove: HashSet::new(),
             };
-            // if updating the recipient's inventory
-            if new_inv.owner == recipient {
-                new_inv.retain.insert(idx);
-            // otherwise updating the old owner's inventory
-            } else {
-                new_inv.retain.remove(&idx);
-                new_inv.remove.insert(idx);
-            }
             inv_updates.push(new_inv);
+            inv_updates.last_mut().ok_or_else(|| {
+                StdError::generic_err("Just pushed an InventoryUpdate so this can not happen")
+            })?
+        };
+        // if updating the recipient's inventory
+        if inv_upd.inventory.owner == recipient {
+            inv_upd.inventory.insert(&mut deps.storage, idx, false)?;
+        // else updating the old owner's inventory
+        } else {
+            inv_upd.inventory.remove(&mut deps.storage, idx, false)?;
+            inv_upd.remove.insert(idx);
         }
     }
 
@@ -4070,14 +4105,6 @@ fn send_list<S: Storage, A: Api, Q: Querier>(
     Ok(messages)
 }
 
-// a block of token ids and its index
-pub struct IdBlock {
-    // block number
-    pub index: u32,
-    // token ids
-    pub tokens: HashSet<String>,
-}
-
 /// Returns StdResult<()>
 ///
 /// burns a list of tokens
@@ -4099,7 +4126,6 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
     let mut oper_for: Vec<CanonicalAddr> = Vec::new();
     let mut inv_updates: Vec<InventoryUpdate> = Vec::new();
     let num_perm_types = PermissionType::ViewOwner.num_types();
-    let mut id_blocks: Vec<IdBlock> = Vec::new();
     for burn in burns.drain(..) {
         for token_id in burn.token_ids.into_iter() {
             let (token, idx) = get_token_if_permitted(
@@ -4112,39 +4138,27 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
                 &config,
             )?;
             // log the inventory change
-            if let Some(inv) = inv_updates.iter_mut().find(|i| i.owner == token.owner) {
-                inv.retain.remove(&idx);
-                inv.remove.insert(idx);
+            let inv_upd = if let Some(inv) = inv_updates
+                .iter_mut()
+                .find(|i| i.inventory.owner == token.owner)
+            {
+                inv
             } else {
-                let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-                let retain: HashSet<u32> =
-                    may_load(&owned_store, token.owner.as_slice())?.unwrap_or_else(HashSet::new);
-                let mut new_inv = InventoryUpdate {
-                    owner: token.owner.clone(),
-                    retain,
+                let inventory = Inventory::new(&deps.storage, token.owner.clone())?;
+                let new_inv = InventoryUpdate {
+                    inventory,
                     remove: HashSet::new(),
                 };
-                new_inv.retain.remove(&idx);
-                new_inv.remove.insert(idx);
                 inv_updates.push(new_inv);
-            }
+                inv_updates.last_mut().ok_or_else(|| {
+                    StdError::generic_err("Just pushed an InventoryUpdate so this can not happen")
+                })?
+            };
+            inv_upd.inventory.remove(&mut deps.storage, idx, false)?;
+            inv_upd.remove.insert(idx);
             let token_key = idx.to_le_bytes();
-            // remove from block of token ids
-            let this_block = idx / ID_BLOCK_SIZE;
-            // if already burned a token in the same block
-            if let Some(id_block) = id_blocks.iter_mut().find(|i| i.index == this_block) {
-                id_block.tokens.remove(&token_id);
-            // otherwise first time removing from this block
-            } else {
-                let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-                let mut tokens =
-                    may_load(&token_store, &this_block.to_le_bytes())?.unwrap_or_else(HashSet::new);
-                tokens.remove(&token_id);
-                id_blocks.push(IdBlock {
-                    index: this_block,
-                    tokens,
-                });
-            }
+            // decrement token count
+            config.token_cnt = config.token_cnt.saturating_sub(1);
             // remove from maps
             let mut map2idx = PrefixedStorage::new(PREFIX_MAP_TO_INDEX, &mut deps.storage);
             remove(&mut map2idx, token_id.as_bytes());
@@ -4183,24 +4197,8 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
         }
     }
     save(&mut deps.storage, CONFIG_KEY, &config)?;
-    let mut token_store = PrefixedStorage::new(PREFIX_TOKENS, &mut deps.storage);
-    for id_block in id_blocks.iter() {
-        save(
-            &mut token_store,
-            &id_block.index.to_le_bytes(),
-            &id_block.tokens,
-        )?;
-    }
     update_owner_inventory(&mut deps.storage, &inv_updates, num_perm_types)?;
     Ok(())
-}
-
-// an owner and their list of tokens
-pub struct Inventory {
-    // the owner's address
-    pub owner: CanonicalAddr,
-    // the owner's tokens
-    pub tokens: HashSet<u32>,
 }
 
 /// Returns <Vec<String>>
@@ -4223,9 +4221,6 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Vec<String>> {
     let mut inventories: Vec<Inventory> = Vec::new();
     let mut minted: Vec<String> = Vec::new();
-    let mut old_block = u64::MAX;
-    let mut tokens: HashSet<String> = HashSet::new();
-    let save_tokens = !mints.is_empty();
     let default_roy: Option<StoredRoyaltyInfo> = may_load(&deps.storage, DEFAULT_ROYALTY_KEY)?;
     for mint in mints.drain(..) {
         let id = mint.token_id.unwrap_or(format!("{}", config.mint_cnt));
@@ -4238,6 +4233,10 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
                 id
             )));
         }
+        // increment token count
+        config.token_cnt = config.token_cnt.checked_add(1).ok_or_else(|| {
+            StdError::generic_err("Attempting to mint more tokens than the implementation limit")
+        })?;
         // map new token id to its index
         save(&mut map2idx, id.as_bytes(), &config.mint_cnt)?;
         let recipient = if let Some(o) = mint.owner {
@@ -4264,41 +4263,17 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
         let mut info_store = PrefixedStorage::new(PREFIX_INFOS, &mut deps.storage);
         json_save(&mut info_store, &token_key, &token)?;
         // add token to owner's list
-        let mut new_inv = Inventory {
-            owner: token.owner.clone(),
-            tokens: HashSet::new(),
-        };
-        let (inventory, found) =
-            if let Some(inv) = inventories.iter_mut().find(|i| i.owner == new_inv.owner) {
-                (inv, true)
-            } else {
-                let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-                new_inv.tokens =
-                    may_load(&owned_store, new_inv.owner.as_slice())?.unwrap_or_else(HashSet::new);
-                (&mut new_inv, false)
-            };
-        inventory.tokens.insert(config.mint_cnt);
-        if !found {
+        let inventory = if let Some(inv) = inventories.iter_mut().find(|i| i.owner == token.owner) {
+            inv
+        } else {
+            let new_inv = Inventory::new(&deps.storage, token.owner.clone())?;
             inventories.push(new_inv);
-        }
-        // add to block of token ids
-        let this_block = config.mint_cnt / ID_BLOCK_SIZE;
-        // if first in mint list or filled last block
-        if this_block as u64 != old_block {
-            let mut token_store = PrefixedStorage::new(PREFIX_TOKENS, &mut deps.storage);
-            // if first in mint list, just load the block
-            if old_block == u64::MAX {
-                tokens =
-                    may_load(&token_store, &this_block.to_le_bytes())?.unwrap_or_else(HashSet::new);
-            // else filled last block so save it
-            } else {
-                save(&mut token_store, &(old_block as u32).to_le_bytes(), &tokens)?;
-                tokens.clear();
-            }
-        }
-        // add new token id
-        tokens.insert(id.clone());
-        old_block = this_block as u64;
+            inventories.last_mut().ok_or_else(|| {
+                StdError::generic_err("Just pushed an Inventory so this can not happen")
+            })?
+        };
+        inventory.insert(&mut deps.storage, config.mint_cnt, false)?;
+
         // map index to id
         let mut map2id = PrefixedStorage::new(PREFIX_MAP_TO_ID, &mut deps.storage);
         save(&mut map2id, &token_key, &id)?;
@@ -4360,20 +4335,13 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
         )?;
         minted.push(id);
         // increment index for next mint
-        config.mint_cnt += 1;
+        config.mint_cnt = config.mint_cnt.checked_add(1).ok_or_else(|| {
+            StdError::generic_err("Attempting to mint more times than the implementation limit")
+        })?;
     }
-    // save all the updated owners' token lists
-    let mut owned_store = PrefixedStorage::new(PREFIX_OWNED, &mut deps.storage);
-    for inventory in inventories {
-        save(
-            &mut owned_store,
-            inventory.owner.as_slice(),
-            &inventory.tokens,
-        )?;
-    }
-    if save_tokens {
-        let mut token_store = PrefixedStorage::new(PREFIX_TOKENS, &mut deps.storage);
-        save(&mut token_store, &(old_block as u32).to_le_bytes(), &tokens)?;
+    // save all the updated inventories
+    for inventory in inventories.iter() {
+        inventory.save(&mut deps.storage)?;
     }
     save(&mut deps.storage, CONFIG_KEY, &config)?;
     Ok(minted)

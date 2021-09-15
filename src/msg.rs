@@ -623,8 +623,7 @@ pub enum QueryMsg {
     AllTokens {
         /// optional address and key requesting to view the list of tokens
         viewer: Option<ViewerInfo>,
-        /// optionally display only token ids that come after the input String in
-        /// lexicographical order
+        /// paginate by providing the last token_id received in the previous query
         start_after: Option<String>,
         /// optional number of token ids to display
         limit: Option<u32>,
@@ -711,8 +710,7 @@ pub enum QueryMsg {
         viewer: Option<HumanAddr>,
         /// optional viewing key
         viewing_key: Option<String>,
-        /// optionally display only token ids that come after the input String in
-        /// lexicographical order
+        /// paginate by providing the last token_id received in the previous query
         start_after: Option<String>,
         /// optional number of token ids to display
         limit: Option<u32>,

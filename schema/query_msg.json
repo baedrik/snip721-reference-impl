@@ -83,7 +83,7 @@
               "minimum": 0.0
             },
             "start_after": {
-              "description": "optionally display only token ids that come after the input String in lexicographical order",
+              "description": "paginate by providing the last token_id received in the previous query",
               "type": [
                 "string",
                 "null"
@@ -393,7 +393,7 @@
               "$ref": "#/definitions/HumanAddr"
             },
             "start_after": {
-              "description": "optionally display only token ids that come after the input String in lexicographical order",
+              "description": "paginate by providing the last token_id received in the previous query",
               "type": [
                 "string",
                 "null"

@@ -406,7 +406,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -421,7 +421,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         // test non-minter attempt
         let alice = HumanAddr("alice".to_string());
@@ -528,7 +528,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -543,7 +543,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT5".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -558,7 +558,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT4".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
@@ -573,7 +573,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let viewer = ViewerInfo {
             address: alice.clone(),
             viewing_key: "key".to_string(),
@@ -592,11 +592,21 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
-                let expected = vec!["NFT3".to_string(), "NFT4".to_string(), "NFT5".to_string()];
+                let expected = vec!["NFT3".to_string(), "NFT5".to_string(), "NFT4".to_string()];
                 assert_eq!(tokens, expected);
             }
             _ => panic!("unexpected"),
         }
+
+        // test start after token not found
+        let query_msg = QueryMsg::AllTokens {
+            viewer: Some(viewer.clone()),
+            start_after: Some("NFT21".to_string()),
+            limit: Some(10),
+        };
+        let query_result = query(&deps, query_msg);
+        let error = extract_error_msg(query_result);
+        assert!(error.contains("Token ID: NFT21 not found"));
     }
 
     // test NftDossier query
@@ -1351,6 +1361,28 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT7".to_string()),
+            owner: Some(HumanAddr("bob".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT8".to_string()),
+            owner: Some(HumanAddr("charlie".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
         // test contract has public ownership
         let query_msg = QueryMsg::Tokens {
@@ -1372,6 +1404,65 @@ mod tests {
                     "NFT5".to_string(),
                     "NFT6".to_string(),
                 ];
+                assert_eq!(tokens, expected);
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // test a public inventory but not found
+        let query_msg = QueryMsg::Tokens {
+            owner: alice.clone(),
+            viewer: None,
+            viewing_key: None,
+            start_after: Some("NFT10".to_string()),
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let error = extract_error_msg(query_result);
+        assert!(error.contains("Token ID: NFT10 is not in the specified inventory"));
+
+        // test not in a public inventory
+        let query_msg = QueryMsg::Tokens {
+            owner: alice.clone(),
+            viewer: None,
+            viewing_key: None,
+            start_after: Some("NFT7".to_string()),
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let error = extract_error_msg(query_result);
+        assert!(error.contains("Token ID: NFT7 is not in the specified inventory"));
+
+        // test limit 0
+        let query_msg = QueryMsg::Tokens {
+            owner: alice.clone(),
+            viewer: None,
+            viewing_key: None,
+            start_after: None,
+            limit: Some(0),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TokenList { tokens } => {
+                assert!(tokens.is_empty());
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // test limit 1, paginated
+        let query_msg = QueryMsg::Tokens {
+            owner: alice.clone(),
+            viewer: None,
+            viewing_key: None,
+            start_after: Some("NFT3".to_string()),
+            limit: Some(1),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TokenList { tokens } => {
+                let expected = vec!["NFT4".to_string()];
                 assert_eq!(tokens, expected);
             }
             _ => panic!("unexpected"),
@@ -1467,14 +1558,8 @@ mod tests {
             limit: Some(30),
         };
         let query_result = query(&deps, query_msg);
-        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
-        match query_answer {
-            QueryAnswer::TokenList { tokens } => {
-                let expected = vec!["NFT4".to_string(), "NFT5".to_string(), "NFT6".to_string()];
-                assert_eq!(tokens, expected);
-            }
-            _ => panic!("unexpected"),
-        }
+        let error = extract_error_msg(query_result);
+        assert!(error.contains("Token ID: NFT34 is not in the specified inventory"));
 
         // test setting all tokens public
         let handle_msg = HandleMsg::SetGlobalApproval {
@@ -1508,6 +1593,259 @@ mod tests {
             }
             _ => panic!("unexpected"),
         }
+
+        // contract with private ownership
+        let (init_result, mut deps) = init_helper_default();
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+        let charlie = HumanAddr("charlie".to_string());
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: "akey".to_string(),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: "bkey".to_string(),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: "ckey".to_string(),
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT1".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT2".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT3".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT4".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT5".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT6".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT7".to_string()),
+            owner: Some(HumanAddr("bob".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT8".to_string()),
+            owner: Some(HumanAddr("charlie".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFT9".to_string()),
+            owner: Some(HumanAddr("charlie".to_string())),
+            public_metadata: None,
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: bob.clone(),
+            token_id: Some("NFT8".to_string()),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: None,
+            transfer: None,
+            expires: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: alice.clone(),
+            token_id: None,
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: None,
+            transfer: None,
+            expires: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: charlie.clone(),
+            token_id: Some("NFT5".to_string()),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: None,
+            transfer: None,
+            expires: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+
+        // test a start after that is not in the inventory, but the viewer has permission on that token
+        let query_msg = QueryMsg::Tokens {
+            owner: alice.clone(),
+            viewer: Some(bob.clone()),
+            viewing_key: Some("bkey".to_string()),
+            start_after: Some("NFT8".to_string()),
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let error = extract_error_msg(query_result);
+        assert!(error.contains("Token ID: NFT8 is not in the specified inventory"));
+
+        // test a start after that is not in the inventory, but viewer has token permission to view owner
+        let query_msg = QueryMsg::Tokens {
+            owner: charlie.clone(),
+            viewer: Some(alice.clone()),
+            viewing_key: Some("akey".to_string()),
+            start_after: Some("NFT7".to_string()),
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let error = extract_error_msg(query_result);
+        assert!(error.contains("You are not authorized to perform this action on token NFT7"));
+
+        // test viewer has permission on start after token (but no other) does not error
+        let query_msg = QueryMsg::Tokens {
+            owner: charlie.clone(),
+            viewer: Some(bob.clone()),
+            viewing_key: Some("bkey".to_string()),
+            start_after: Some("NFT8".to_string()),
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TokenList { tokens } => {
+                assert!(tokens.is_empty());
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // test viewer has operator permission on start after token
+        let query_msg = QueryMsg::Tokens {
+            owner: charlie.clone(),
+            viewer: Some(alice.clone()),
+            viewing_key: Some("akey".to_string()),
+            start_after: Some("NFT8".to_string()),
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TokenList { tokens } => {
+                let expected = vec!["NFT9".to_string()];
+                assert_eq!(tokens, expected);
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // test a start after that viewer does not have permission on, although he does have permission
+        // on other tokens in the inventory
+        let query_msg = QueryMsg::Tokens {
+            owner: alice.clone(),
+            viewer: Some(charlie.clone()),
+            viewing_key: Some("ckey".to_string()),
+            start_after: Some("NFT3".to_string()),
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let error = extract_error_msg(query_result);
+        assert!(error.contains("You are not authorized to perform this action on token NFT3"));
+
+        // test a bad viewing key
+        let query_msg = QueryMsg::Tokens {
+            owner: alice.clone(),
+            viewer: None,
+            viewing_key: Some("ckey".to_string()),
+            start_after: Some("NFT3".to_string()),
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let error = extract_error_msg(query_result);
+        assert!(error.contains("Wrong viewing key for this address or viewing key not set"));
+
+        // test token not found with private supply and private ownership
+        let query_msg = QueryMsg::Tokens {
+            owner: alice.clone(),
+            viewer: Some(charlie.clone()),
+            viewing_key: Some("ckey".to_string()),
+            start_after: Some("NFT34".to_string()),
+            limit: Some(30),
+        };
+        let query_result = query(&deps, query_msg);
+        let error = extract_error_msg(query_result);
+        assert!(error.contains("You are not authorized to perform this action on token NFT34"));
     }
 
     // test IsUnwrapped query

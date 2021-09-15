@@ -25,8 +25,6 @@ pub const PRNG_SEED_KEY: &[u8] = b"prngseed";
 pub const CREATOR_KEY: &[u8] = b"creator";
 /// storage key for the default RoyaltyInfo to use if none is supplied when minting
 pub const DEFAULT_ROYALTY_KEY: &[u8] = b"defaultroy";
-/// prefix for storage of the token ids
-pub const PREFIX_TOKENS: &[u8] = b"tokens";
 /// prefix for storage that maps ids to indices
 pub const PREFIX_MAP_TO_INDEX: &[u8] = b"map2idx";
 /// prefix for storage that maps indices to ids
@@ -45,8 +43,6 @@ pub const PREFIX_MINT_RUN: &[u8] = b"mintrun";
 pub const PREFIX_TXS: &[u8] = b"rawtxs";
 /// prefix for storage of tx ids
 pub const PREFIX_TX_IDS: &[u8] = b"txids";
-/// prefix for storage of an owner's list of tokens
-pub const PREFIX_OWNED: &[u8] = b"owned";
 /// prefix for storage of owner's list of "all" permissions
 pub const PREFIX_ALL_PERMISSIONS: &[u8] = b"allpermissions";
 /// prefix for storage of owner's list of tokens permitted to addresses
@@ -73,6 +69,8 @@ pub struct Config {
     pub mint_cnt: u32,
     /// count of tx
     pub tx_cnt: u64,
+    /// token count
+    pub token_cnt: u32,
     /// contract status
     pub status: u8,
     /// are token IDs/count public

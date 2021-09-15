@@ -2,6 +2,7 @@
 mod tests {
     use crate::contract::{check_permission, handle, init, query};
     use crate::expiration::Expiration;
+    use crate::inventory::Inventory;
     use crate::msg::{
         AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg, Mint,
         PostInitCallback, QueryAnswer, QueryMsg, Send, Transfer, Tx, TxAction,
@@ -10,8 +11,8 @@ mod tests {
     use crate::state::{
         get_txs, json_load, json_may_load, load, may_load, AuthList, Config, Permission,
         PermissionType, CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
-        PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_OWNED, PREFIX_OWNER_PRIV,
-        PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_TOKENS, PREFIX_VIEW_KEY,
+        PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_OWNER_PRIV, PREFIX_PRIV_META,
+        PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY,
     };
     use crate::token::{Metadata, Token};
     use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -24,7 +25,6 @@ mod tests {
     use cosmwasm_storage::ReadonlyPrefixedStorage;
     use secret_toolkit::utils::space_pad;
     use std::any::Any;
-    use std::collections::HashSet;
 
     // Helper functions
 
@@ -319,13 +319,6 @@ mod tests {
         }
 
         // verify the tokens are in the id and index maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert_eq!(tokens.len(), 4);
-        assert!(tokens.contains("0"));
-        assert!(tokens.contains("NFT2"));
-        assert!(tokens.contains("NFT3"));
-        assert!(tokens.contains("3"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index1: u32 = load(&map2idx, "0".as_bytes()).unwrap();
         let token_key1 = index1.to_le_bytes();
@@ -366,14 +359,10 @@ mod tests {
         let priv_meta2: Metadata = load(&priv_store, &token_key2).unwrap();
         assert_eq!(priv_meta2, priv2);
         // verify owner lists
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let owned: HashSet<u32> = load(&owned_store, alice_raw.as_slice()).unwrap();
-        assert!(owned.contains(&0));
-        assert!(owned.contains(&2));
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let owned: HashSet<u32> = load(&owned_store, admin_raw.as_slice()).unwrap();
-        assert!(owned.contains(&1));
-        assert!(owned.contains(&3));
+        assert!(Inventory::owns(&deps.storage, &alice_raw, 0).unwrap());
+        assert!(Inventory::owns(&deps.storage, &alice_raw, 2).unwrap());
+        assert!(Inventory::owns(&deps.storage, &admin_raw, 1).unwrap());
+        assert!(Inventory::owns(&deps.storage, &admin_raw, 3).unwrap());
         // verify mint tx was logged
         let (txs, total) = get_txs(&deps.api, &deps.storage, &admin_raw, 0, 4).unwrap();
         assert_eq!(total, 4);
@@ -484,9 +473,6 @@ mod tests {
         let minted = extract_log(handle_result);
         assert!(minted.contains("MyNFT"));
         // verify the token is in the id and index maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -519,9 +505,7 @@ mod tests {
         assert_eq!(priv_meta.description, Some("Nifty".to_string()));
         assert_eq!(priv_meta.image, Some("privuri".to_string()));
         // verify token is in owner list
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let owned: HashSet<u32> = load(&owned_store, alice_raw.as_slice()).unwrap();
-        assert!(owned.contains(&0));
+        assert!(Inventory::owns(&deps.storage, &alice_raw, 0).unwrap());
         // verify mint tx was logged to both parties
         let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
         assert_eq!(total, 1);
@@ -588,9 +572,6 @@ mod tests {
         }
 
         // verify token is in the token list
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("1"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "1".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -617,9 +598,7 @@ mod tests {
         let priv_meta: Option<Metadata> = may_load(&priv_store, &token_key).unwrap();
         assert!(priv_meta.is_none());
         // verify token is in the owner list
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let owned: HashSet<u32> = load(&owned_store, admin_raw.as_slice()).unwrap();
-        assert!(owned.contains(&1));
+        assert!(Inventory::owns(&deps.storage, &admin_raw, 1).unwrap());
         // verify mint tx was logged
         let (txs, total) = get_txs(&deps.api, &deps.storage, &admin_raw, 0, 10).unwrap();
         assert_eq!(total, 2);
@@ -955,9 +934,6 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -1218,9 +1194,6 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -4575,9 +4548,6 @@ mod tests {
             handle_msg,
         );
         // confirm token was removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(!tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: Option<u32> = may_load(&map2idx, "MyNFT".as_bytes()).unwrap();
         assert!(index.is_none());
@@ -4615,10 +4585,10 @@ mod tests {
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let auth_list: Option<Vec<AuthList>> = may_load(&auth_store, alice_key).unwrap();
         assert!(auth_list.is_none());
-        // confirm the token was removed form the owner's list
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let owned: Option<HashSet<u32>> = may_load(&owned_store, alice_key).unwrap();
-        assert!(owned.is_none());
+        // confirm the token was removed from the owner's list
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 0);
+        assert!(!inventory.contains(&deps.storage, 0).unwrap());
 
         let transfer_idx = PermissionType::Transfer.to_usize();
 
@@ -4701,9 +4671,6 @@ mod tests {
             handle_msg,
         );
         // confirm token was removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(!tokens.contains("MyNFT2"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: Option<u32> = may_load(&map2idx, "MyNFT2".as_bytes()).unwrap();
         assert!(index.is_none());
@@ -4761,11 +4728,9 @@ mod tests {
         let david_auth = auth_list.iter().find(|a| a.address == david_raw).unwrap();
         assert_eq!(david_auth.tokens[transfer_idx].len(), 1);
         assert!(david_auth.tokens[transfer_idx].contains(&2u32));
-        // confirm the token was removed form the owner's list
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let owned: HashSet<u32> = load(&owned_store, alice_key).unwrap();
-        assert!(!owned.contains(&1u32));
-        assert!(owned.contains(&2u32));
+        // confirm the token was removed from the owner's list
+        assert!(!Inventory::owns(&deps.storage, &alice_raw, 1).unwrap());
+        assert!(Inventory::owns(&deps.storage, &alice_raw, 2).unwrap());
 
         // sanity check: owner burns
         let handle_msg = HandleMsg::BurnNft {
@@ -4775,9 +4740,6 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         // confirm token was removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.is_empty());
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: Option<u32> = may_load(&map2idx, "MyNFT3".as_bytes()).unwrap();
         assert!(index.is_none());
@@ -4811,10 +4773,10 @@ mod tests {
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let auth_list: Option<Vec<AuthList>> = may_load(&auth_store, alice_key).unwrap();
         assert!(auth_list.is_none());
-        // confirm the token was removed form the owner's list
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let owned: Option<HashSet<u32>> = may_load(&owned_store, alice_key).unwrap();
-        assert!(owned.is_none());
+        // confirm the token was removed from the owner's list
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 0);
+        assert!(!inventory.contains(&deps.storage, 2).unwrap());
     }
 
     // test batch burn
@@ -5592,17 +5554,6 @@ mod tests {
             .unwrap();
         let charlie_key = charlie_raw.as_slice();
         // confirm correct tokens were removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert_eq!(tokens.len(), 3);
-        assert!(!tokens.contains("NFT1"));
-        assert!(tokens.contains("NFT2"));
-        assert!(!tokens.contains("NFT3"));
-        assert!(tokens.contains("NFT4"));
-        assert!(tokens.contains("NFT5"));
-        assert!(!tokens.contains("NFT6"));
-        assert!(!tokens.contains("NFT7"));
-        assert!(!tokens.contains("NFT8"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: Option<u32> = may_load(&map2idx, "NFT1".as_bytes()).unwrap();
         assert!(index.is_none());
@@ -5673,19 +5624,18 @@ mod tests {
         assert_eq!(token.owner, alice_raw);
         assert!(!token.unwrapped);
         // confirm owner lists are correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
         // alice only owns NFT2
-        let alice_owns: HashSet<u32> = load(&owned_store, alice_key).unwrap();
-        assert_eq!(alice_owns.len(), 1);
-        assert!(alice_owns.contains(&1u32));
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 1).unwrap());
         // bob owns NFT4 and NFT5
-        let bob_owns: HashSet<u32> = load(&owned_store, bob_key).unwrap();
-        assert_eq!(bob_owns.len(), 2);
-        assert!(bob_owns.contains(&3u32));
-        assert!(bob_owns.contains(&4u32));
+        let inventory = Inventory::new(&deps.storage, bob_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 2);
+        assert!(inventory.contains(&deps.storage, 3).unwrap());
+        assert!(inventory.contains(&deps.storage, 4).unwrap());
         // charlie does not own any
-        let charlie_owns: Option<HashSet<u32>> = may_load(&owned_store, charlie_key).unwrap();
-        assert!(charlie_owns.is_none());
+        let inventory = Inventory::new(&deps.storage, charlie_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 0);
         // confirm AuthLists are correct
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         // alice gave charlie view metadata permission on NFT2
@@ -5994,9 +5944,6 @@ mod tests {
             handle_msg,
         );
         // confirm token was not removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -6042,10 +5989,9 @@ mod tests {
             }
         );
         // confirm the owner list is correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let alice_owns: HashSet<u32> = load(&owned_store, alice_key).unwrap();
-        assert_eq!(alice_owns.len(), 1);
-        assert!(alice_owns.contains(&0u32));
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
         // confirm charlie's and bob's AuthList were not changed
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let alice_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
@@ -6092,9 +6038,6 @@ mod tests {
             handle_msg,
         );
         // confirm token was not removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -6139,12 +6082,12 @@ mod tests {
         assert_eq!(txs, tx2);
         assert_eq!(tx2, tx3);
         // confirm both owner lists are correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let alice_owns: Option<HashSet<u32>> = may_load(&owned_store, alice_key).unwrap();
-        assert!(alice_owns.is_none());
-        let david_owns: HashSet<u32> = load(&owned_store, david_key).unwrap();
-        assert_eq!(david_owns.len(), 1);
-        assert!(david_owns.contains(&0u32));
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 0);
+        assert!(!inventory.contains(&deps.storage, 0).unwrap());
+        let inventory = Inventory::new(&deps.storage, david_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
         // confirm charlie's and bob's AuthList were removed because the only token was xferred
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let auth_list: Option<Vec<AuthList>> = may_load(&auth_store, alice_key).unwrap();
@@ -6188,9 +6131,6 @@ mod tests {
             handle_msg,
         );
         // confirm token was not removed from the list
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -6232,12 +6172,12 @@ mod tests {
         assert_eq!(total, 2);
         assert_eq!(txs, tx2);
         // confirm both owner lists are correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let david_owns: Option<HashSet<u32>> = may_load(&owned_store, david_key).unwrap();
-        assert!(david_owns.is_none());
-        let charlie_owns: HashSet<u32> = load(&owned_store, charlie_key).unwrap();
-        assert_eq!(charlie_owns.len(), 1);
-        assert!(charlie_owns.contains(&0u32));
+        let inventory = Inventory::new(&deps.storage, david_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 0);
+        assert!(!inventory.contains(&deps.storage, 0).unwrap());
+        let inventory = Inventory::new(&deps.storage, charlie_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
         // confirm charlie's AuthList was removed because the only token was xferred
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let auth_list: Option<Vec<AuthList>> = may_load(&auth_store, david_key).unwrap();
@@ -6255,9 +6195,6 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
         // confirm token was not removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -6287,12 +6224,12 @@ mod tests {
         assert_eq!(total, 3);
         assert_eq!(txs, tx2);
         // confirm both owner lists are correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let charlie_owns: Option<HashSet<u32>> = may_load(&owned_store, charlie_key).unwrap();
-        assert!(charlie_owns.is_none());
-        let alice_owns: HashSet<u32> = load(&owned_store, alice_key).unwrap();
-        assert_eq!(alice_owns.len(), 1);
-        assert!(alice_owns.contains(&0u32));
+        let inventory = Inventory::new(&deps.storage, charlie_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 0);
+        assert!(!inventory.contains(&deps.storage, 0).unwrap());
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
         // confirm charlie's AuthList was removed because the only token was xferred
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let auth_list: Option<Vec<AuthList>> = may_load(&auth_store, alice_key).unwrap();
@@ -6828,9 +6765,6 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("david", &[]), handle_msg);
         // confirm token was not removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("NFT1"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "NFT1".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -6872,20 +6806,19 @@ mod tests {
             }
         );
         // confirm the owner list is correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let alice_owns: HashSet<u32> = load(&owned_store, alice_key).unwrap();
-        assert_eq!(alice_owns.len(), 2);
-        assert!(!alice_owns.contains(&0u32));
-        assert!(alice_owns.contains(&1u32));
-        assert!(alice_owns.contains(&2u32));
-        let bob_owns: HashSet<u32> = load(&owned_store, bob_key).unwrap();
-        assert_eq!(bob_owns.len(), 3);
-        assert!(bob_owns.contains(&0u32));
-        assert!(bob_owns.contains(&3u32));
-        assert!(bob_owns.contains(&4u32));
-        let charlie_owns: HashSet<u32> = load(&owned_store, charlie_key).unwrap();
-        assert_eq!(charlie_owns.len(), 1);
-        assert!(charlie_owns.contains(&5u32));
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 2);
+        assert!(!inventory.contains(&deps.storage, 0).unwrap());
+        assert!(inventory.contains(&deps.storage, 1).unwrap());
+        assert!(inventory.contains(&deps.storage, 2).unwrap());
+        let inventory = Inventory::new(&deps.storage, bob_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 3);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
+        assert!(inventory.contains(&deps.storage, 3).unwrap());
+        assert!(inventory.contains(&deps.storage, 4).unwrap());
+        let inventory = Inventory::new(&deps.storage, charlie_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 5).unwrap());
         // confirm authLists were updated correctly
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let alice_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
@@ -6957,19 +6890,18 @@ mod tests {
         assert_eq!(token.owner, alice_raw);
         assert!(token.permissions.is_empty());
         // confirm the owner list is correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let alice_owns: HashSet<u32> = load(&owned_store, alice_key).unwrap();
-        assert_eq!(alice_owns.len(), 2);
-        assert!(alice_owns.contains(&1u32));
-        assert!(alice_owns.contains(&4u32));
-        let bob_owns: HashSet<u32> = load(&owned_store, bob_key).unwrap();
-        assert_eq!(bob_owns.len(), 2);
-        assert!(bob_owns.contains(&2u32));
-        assert!(bob_owns.contains(&3u32));
-        let charlie_owns: HashSet<u32> = load(&owned_store, charlie_key).unwrap();
-        assert_eq!(charlie_owns.len(), 2);
-        assert!(charlie_owns.contains(&0u32));
-        assert!(charlie_owns.contains(&5u32));
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 2);
+        assert!(inventory.contains(&deps.storage, 1).unwrap());
+        assert!(inventory.contains(&deps.storage, 4).unwrap());
+        let inventory = Inventory::new(&deps.storage, bob_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 2);
+        assert!(inventory.contains(&deps.storage, 2).unwrap());
+        assert!(inventory.contains(&deps.storage, 3).unwrap());
+        let inventory = Inventory::new(&deps.storage, charlie_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 2);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
+        assert!(inventory.contains(&deps.storage, 5).unwrap());
         // confirm authLists were updated correctly
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let alice_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
@@ -7119,12 +7051,12 @@ mod tests {
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
                 let expected = vec![
-                    "NFT1".to_string(),
+                    "NFT6".to_string(),
                     "NFT2".to_string(),
                     "NFT3".to_string(),
                     "NFT4".to_string(),
+                    "NFT1".to_string(),
                     "NFT5".to_string(),
-                    "NFT6".to_string(),
                 ];
                 assert_eq!(tokens, expected);
             }
@@ -7477,9 +7409,6 @@ mod tests {
         assert_eq!(messages[0], msg_fr_al);
 
         // confirm token was not removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -7525,10 +7454,9 @@ mod tests {
             }
         );
         // confirm the owner list is correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let alice_owns: HashSet<u32> = load(&owned_store, alice_key).unwrap();
-        assert_eq!(alice_owns.len(), 1);
-        assert!(alice_owns.contains(&0u32));
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
         // confirm charlie's and bob's AuthList were not changed
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let alice_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
@@ -7608,9 +7536,6 @@ mod tests {
         });
         assert_eq!(messages[0], msg_fr_al);
         // confirm token was not removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -7655,12 +7580,12 @@ mod tests {
         assert_eq!(txs, tx2);
         assert_eq!(tx2, tx3);
         // confirm both owner lists are correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let alice_owns: Option<HashSet<u32>> = may_load(&owned_store, alice_key).unwrap();
-        assert!(alice_owns.is_none());
-        let david_owns: HashSet<u32> = load(&owned_store, david_key).unwrap();
-        assert_eq!(david_owns.len(), 1);
-        assert!(david_owns.contains(&0u32));
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 0);
+        assert!(!inventory.contains(&deps.storage, 0).unwrap());
+        let inventory = Inventory::new(&deps.storage, david_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
         // confirm charlie's and bob's AuthList were removed because the only token was xferred
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let auth_list: Option<Vec<AuthList>> = may_load(&auth_store, alice_key).unwrap();
@@ -7729,9 +7654,6 @@ mod tests {
         });
         assert_eq!(messages[0], msg_fr_dv);
         // confirm token was not removed from the list
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -7773,12 +7695,12 @@ mod tests {
         assert_eq!(total, 2);
         assert_eq!(txs, tx2);
         // confirm both owner lists are correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let david_owns: Option<HashSet<u32>> = may_load(&owned_store, david_key).unwrap();
-        assert!(david_owns.is_none());
-        let charlie_owns: HashSet<u32> = load(&owned_store, charlie_key).unwrap();
-        assert_eq!(charlie_owns.len(), 1);
-        assert!(charlie_owns.contains(&0u32));
+        let inventory = Inventory::new(&deps.storage, david_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 0);
+        assert!(!inventory.contains(&deps.storage, 0).unwrap());
+        let inventory = Inventory::new(&deps.storage, charlie_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
         // confirm charlie's AuthList was removed because the only token was xferred
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let auth_list: Option<Vec<AuthList>> = may_load(&auth_store, david_key).unwrap();
@@ -7814,9 +7736,6 @@ mod tests {
         });
         assert_eq!(messages[0], msg_fr_ch);
         // confirm token was not removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("MyNFT"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -7846,12 +7765,12 @@ mod tests {
         assert_eq!(total, 3);
         assert_eq!(txs, tx2);
         // confirm both owner lists are correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let charlie_owns: Option<HashSet<u32>> = may_load(&owned_store, charlie_key).unwrap();
-        assert!(charlie_owns.is_none());
-        let alice_owns: HashSet<u32> = load(&owned_store, alice_key).unwrap();
-        assert_eq!(alice_owns.len(), 1);
-        assert!(alice_owns.contains(&0u32));
+        let inventory = Inventory::new(&deps.storage, charlie_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 0);
+        assert!(!inventory.contains(&deps.storage, 0).unwrap());
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
         // confirm charlie's AuthList was removed because the only token was xferred
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let auth_list: Option<Vec<AuthList>> = may_load(&auth_store, alice_key).unwrap();
@@ -8229,9 +8148,6 @@ mod tests {
         });
         assert_eq!(messages[1], msg_fr_al);
         // confirm token was not removed from the maps
-        let token_store = ReadonlyPrefixedStorage::new(PREFIX_TOKENS, &deps.storage);
-        let tokens: HashSet<String> = load(&token_store, &0u32.to_le_bytes()).unwrap();
-        assert!(tokens.contains("NFT1"));
         let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
         let index: u32 = load(&map2idx, "NFT1".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -8273,20 +8189,19 @@ mod tests {
             }
         );
         // confirm the owner list is correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let alice_owns: HashSet<u32> = load(&owned_store, alice_key).unwrap();
-        assert_eq!(alice_owns.len(), 2);
-        assert!(!alice_owns.contains(&0u32));
-        assert!(alice_owns.contains(&1u32));
-        assert!(alice_owns.contains(&2u32));
-        let bob_owns: HashSet<u32> = load(&owned_store, bob_key).unwrap();
-        assert_eq!(bob_owns.len(), 3);
-        assert!(bob_owns.contains(&0u32));
-        assert!(bob_owns.contains(&3u32));
-        assert!(bob_owns.contains(&4u32));
-        let charlie_owns: HashSet<u32> = load(&owned_store, charlie_key).unwrap();
-        assert_eq!(charlie_owns.len(), 1);
-        assert!(charlie_owns.contains(&5u32));
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 2);
+        assert!(!inventory.contains(&deps.storage, 0).unwrap());
+        assert!(inventory.contains(&deps.storage, 1).unwrap());
+        assert!(inventory.contains(&deps.storage, 2).unwrap());
+        let inventory = Inventory::new(&deps.storage, bob_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 3);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
+        assert!(inventory.contains(&deps.storage, 3).unwrap());
+        assert!(inventory.contains(&deps.storage, 4).unwrap());
+        let inventory = Inventory::new(&deps.storage, charlie_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 1);
+        assert!(inventory.contains(&deps.storage, 5).unwrap());
         // confirm authLists were updated correctly
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let alice_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
@@ -8393,19 +8308,18 @@ mod tests {
         assert_eq!(token.owner, alice_raw);
         assert!(token.permissions.is_empty());
         // confirm the owner list is correct
-        let owned_store = ReadonlyPrefixedStorage::new(PREFIX_OWNED, &deps.storage);
-        let alice_owns: HashSet<u32> = load(&owned_store, alice_key).unwrap();
-        assert_eq!(alice_owns.len(), 2);
-        assert!(alice_owns.contains(&1u32));
-        assert!(alice_owns.contains(&4u32));
-        let bob_owns: HashSet<u32> = load(&owned_store, bob_key).unwrap();
-        assert_eq!(bob_owns.len(), 2);
-        assert!(bob_owns.contains(&2u32));
-        assert!(bob_owns.contains(&3u32));
-        let charlie_owns: HashSet<u32> = load(&owned_store, charlie_key).unwrap();
-        assert_eq!(charlie_owns.len(), 2);
-        assert!(charlie_owns.contains(&0u32));
-        assert!(charlie_owns.contains(&5u32));
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 2);
+        assert!(inventory.contains(&deps.storage, 1).unwrap());
+        assert!(inventory.contains(&deps.storage, 4).unwrap());
+        let inventory = Inventory::new(&deps.storage, bob_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 2);
+        assert!(inventory.contains(&deps.storage, 2).unwrap());
+        assert!(inventory.contains(&deps.storage, 3).unwrap());
+        let inventory = Inventory::new(&deps.storage, charlie_raw.clone()).unwrap();
+        assert_eq!(inventory.info.count, 2);
+        assert!(inventory.contains(&deps.storage, 0).unwrap());
+        assert!(inventory.contains(&deps.storage, 5).unwrap());
         // confirm authLists were updated correctly
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
         let alice_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
@@ -8652,8 +8566,8 @@ mod tests {
             QueryAnswer::TokenList { tokens } => {
                 let expected = vec![
                     "NFT1".to_string(),
-                    "NFT3".to_string(),
                     "NFT4".to_string(),
+                    "NFT3".to_string(),
                     "NFT6".to_string(),
                 ];
                 assert_eq!(tokens, expected);
