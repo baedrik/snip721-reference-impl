@@ -607,6 +607,39 @@ mod tests {
         let query_result = query(&deps, query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT21 not found"));
+
+        // test burned token does not show
+        let handle_msg = HandleMsg::BurnNft {
+            token_id: "NFT3".to_string(),
+            memo: None,
+            padding: None,
+        };
+        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+
+        let query_msg = QueryMsg::AllTokens {
+            viewer: Some(viewer.clone()),
+            start_after: None,
+            limit: Some(10),
+        };
+        let query_result = query(&deps, query_msg);
+        assert!(
+            query_result.is_ok(),
+            "query failed: {}",
+            query_result.err().unwrap()
+        );
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::TokenList { tokens } => {
+                let expected = vec![
+                    "NFT1".to_string(),
+                    "NFT2".to_string(),
+                    "NFT5".to_string(),
+                    "NFT4".to_string(),
+                ];
+                assert_eq!(tokens, expected);
+            }
+            _ => panic!("unexpected"),
+        }
     }
 
     // test NftDossier query
