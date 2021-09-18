@@ -662,30 +662,18 @@ pub fn set_metadata<S: Storage, A: Api, Q: Querier>(
     };
     let (token, idx) = get_token(&deps.storage, token_id, opt_err)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-
+    if !(token.owner == sender_raw && config.owner_may_update_metadata) {
+        let minters: Vec<CanonicalAddr> =
+            may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+        if !(minters.contains(&sender_raw) && config.minter_may_update_metadata) {
+            return Err(StdError::generic_err(custom_err));
+        }
+    }
     if let Some(public) = public_metadata {
-        set_metadata_impl(
-            &mut deps.storage,
-            &sender_raw,
-            &token,
-            idx,
-            PREFIX_PUB_META,
-            &public,
-            config,
-            &custom_err,
-        )?;
+        set_metadata_impl(&mut deps.storage, &token, idx, PREFIX_PUB_META, &public)?;
     }
     if let Some(private) = private_metadata {
-        set_metadata_impl(
-            &mut deps.storage,
-            &sender_raw,
-            &token,
-            idx,
-            PREFIX_PRIV_META,
-            &private,
-            config,
-            &custom_err,
-        )?;
+        set_metadata_impl(&mut deps.storage, &token, idx, PREFIX_PRIV_META, &private)?;
     }
     Ok(HandleResponse {
         messages: vec![],
@@ -3281,35 +3269,23 @@ fn check_status(contract_status: u8, priority: u8) -> StdResult<()> {
 /// # Arguments
 ///
 /// * `storage` - a mutable reference to the contract's storage
-/// * `sender` - a reference to the message sender address
 /// * `token` - a reference to the token whose metadata should be updated
 /// * `idx` - the token identifier index
 /// * `prefix` - storage prefix for the type of metadata being updated
 /// * `metadata` - a reference to the new metadata
-/// * `config` - a reference to the Config
-/// * `custom_err` - a reference to the error message to use if unauthorized
 #[allow(clippy::too_many_arguments)]
 fn set_metadata_impl<S: Storage>(
     storage: &mut S,
-    sender: &CanonicalAddr,
     token: &Token,
     idx: u32,
     prefix: &[u8],
     metadata: &Metadata,
-    config: &Config,
-    custom_err: &str,
 ) -> StdResult<()> {
     // do not allow the altering of sealed metadata
     if !token.unwrapped && prefix == PREFIX_PRIV_META {
         return Err(StdError::generic_err(
             "The private metadata of a sealed token can not be modified",
         ));
-    }
-    if !(token.owner == *sender && config.owner_may_update_metadata) {
-        let minters: Vec<CanonicalAddr> = may_load(storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
-        if !(minters.contains(sender) && config.minter_may_update_metadata) {
-            return Err(StdError::generic_err(custom_err));
-        }
     }
     let mut meta_store = PrefixedStorage::new(prefix, storage);
     save(&mut meta_store, &idx.to_le_bytes(), metadata)?;
