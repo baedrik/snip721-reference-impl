@@ -16,7 +16,7 @@ use crate::inventory::{Inventory, InventoryIter};
 use crate::mint_run::{SerialNumber, StoredMintRunInfo};
 use crate::msg::{
     AccessLevel, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse, HandleAnswer,
-    HandleMsg, InitMsg, Mint, QueryAnswer, QueryMsg, ResponseStatus::Success, Send,
+    HandleMsg, InitMsg, Mint, QueryAnswer, QueryMsg, ReceiverInfo, ResponseStatus::Success, Send,
     Snip721Approval, Transfer, ViewerInfo,
 };
 use crate::rand::sha_256;
@@ -336,6 +336,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         ),
         HandleMsg::SendNft {
             contract,
+            receiver_info,
             token_id,
             msg,
             memo,
@@ -346,6 +347,7 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
             &mut config,
             ContractStatus::Normal.to_u8(),
             contract,
+            receiver_info,
             token_id,
             msg,
             memo,
@@ -1325,6 +1327,8 @@ fn batch_send_nft<S: Storage, A: Api, Q: Querier>(
 /// * `config` - a mutable reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `contract` - the address of the contract receiving the token
+/// * `receiver_info` - optional code hash and BatchReceiveNft implementation status of
+///                     the recipient contract
 /// * `token_id` - ID String of the token that was sent
 /// * `msg` - optional msg used to control ReceiveNft logic
 /// * `memo` - optional memo for the mint tx
@@ -1335,6 +1339,7 @@ fn send_nft<S: Storage, A: Api, Q: Querier>(
     config: &mut Config,
     priority: u8,
     contract: HumanAddr,
+    receiver_info: Option<ReceiverInfo>,
     token_id: String,
     msg: Option<Binary>,
     memo: Option<String>,
@@ -1343,6 +1348,7 @@ fn send_nft<S: Storage, A: Api, Q: Querier>(
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     let sends = Some(vec![Send {
         contract,
+        receiver_info,
         token_ids: vec![token_id],
         msg,
         memo,
@@ -3762,7 +3768,7 @@ fn alter_perm_list(
 }
 
 // a receiver, their code hash, and whether they implement BatchReceiveNft
-pub struct ReceiverInfo {
+pub struct CacheReceiverInfo {
     // the contract address
     pub contract: CanonicalAddr,
     // the contract's registration info
@@ -3777,40 +3783,47 @@ pub struct ReceiverInfo {
 /// * `storage` - a reference to this contract's storage
 /// * `contract_human` - a reference to the human address of the contract receiving the tokens
 /// * `contract` - a reference to the canonical address of the contract receiving the tokens
+/// * `receiver_info` - optional code hash and BatchReceiveNft implementation status of recipient contract
 /// * `send_from_list` - list of SendFroms containing all the owners and their tokens being sent
 /// * `msg` - a reference to the optional msg used to control ReceiveNft logic
 /// * `sender` - a reference to the address that is sending the tokens
 /// * `receivers` - a mutable reference the list of receiver contracts and their registration
 ///                 info
+#[allow(clippy::too_many_arguments)]
 fn receiver_callback_msgs<S: ReadonlyStorage>(
     storage: &S,
     contract_human: &HumanAddr,
     contract: &CanonicalAddr,
+    receiver_info: Option<ReceiverInfo>,
     send_from_list: Vec<SendFrom>,
     msg: &Option<Binary>,
     sender: &HumanAddr,
-    receivers: &mut Vec<ReceiverInfo>,
+    receivers: &mut Vec<CacheReceiverInfo>,
 ) -> StdResult<Vec<CosmosMsg>> {
-    let (code_hash, impl_batch) =
-        if let Some(receiver) = receivers.iter().find(|&r| r.contract == *contract) {
-            (
-                receiver.registration.code_hash.clone(),
-                receiver.registration.impl_batch,
-            )
-        } else {
-            let store = ReadonlyPrefixedStorage::new(PREFIX_RECEIVERS, storage);
-            let registration: ReceiveRegistration = may_load(&store, contract.as_slice())?
-                .unwrap_or(ReceiveRegistration {
-                    code_hash: String::new(),
-                    impl_batch: false,
-                });
-            let receiver = ReceiverInfo {
-                contract: contract.clone(),
-                registration: registration.clone(),
-            };
-            receivers.push(receiver);
-            (registration.code_hash, registration.impl_batch)
+    let (code_hash, impl_batch) = if let Some(supplied) = receiver_info {
+        (
+            supplied.recipient_code_hash,
+            supplied.also_implements_batch_receive_nft.unwrap_or(false),
+        )
+    } else if let Some(receiver) = receivers.iter().find(|&r| r.contract == *contract) {
+        (
+            receiver.registration.code_hash.clone(),
+            receiver.registration.impl_batch,
+        )
+    } else {
+        let store = ReadonlyPrefixedStorage::new(PREFIX_RECEIVERS, storage);
+        let registration: ReceiveRegistration =
+            may_load(&store, contract.as_slice())?.unwrap_or(ReceiveRegistration {
+                code_hash: String::new(),
+                impl_batch: false,
+            });
+        let receiver = CacheReceiverInfo {
+            contract: contract.clone(),
+            registration: registration.clone(),
         };
+        receivers.push(receiver);
+        (registration.code_hash, registration.impl_batch)
+    };
     if code_hash.is_empty() {
         return Ok(Vec::new());
     }
@@ -4069,6 +4082,7 @@ fn send_list<S: Storage, A: Api, Q: Querier>(
                 &deps.storage,
                 &send.contract,
                 &contract_raw,
+                send.receiver_info,
                 send_from_list,
                 &send.msg,
                 &env.message.sender,

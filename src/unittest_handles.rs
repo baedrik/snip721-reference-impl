@@ -5,7 +5,7 @@ mod tests {
     use crate::inventory::Inventory;
     use crate::msg::{
         AccessLevel, Burn, ContractStatus, HandleAnswer, HandleMsg, InitConfig, InitMsg, Mint,
-        PostInitCallback, QueryAnswer, QueryMsg, Send, Transfer, Tx, TxAction,
+        PostInitCallback, QueryAnswer, QueryMsg, ReceiverInfo, Send, Transfer, Tx, TxAction,
     };
     use crate::receiver::Snip721ReceiveMsg;
     use crate::state::{
@@ -7159,6 +7159,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("bob".to_string()),
+            receiver_info: None,
             token_id: "MyNFT".to_string(),
             msg: None,
             memo: None,
@@ -7185,6 +7186,7 @@ mod tests {
         // test token not found when supply is public
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("bob".to_string()),
+            receiver_info: None,
             token_id: "MyNFT".to_string(),
             msg: None,
             memo: None,
@@ -7205,6 +7207,7 @@ mod tests {
         // test token not found when supply is private
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("bob".to_string()),
+            receiver_info: None,
             token_id: "MyNFT".to_string(),
             msg: None,
             memo: None,
@@ -7247,6 +7250,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("bob".to_string()),
+            receiver_info: None,
             token_id: "MyNFT".to_string(),
             msg: None,
             memo: None,
@@ -7266,6 +7270,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("bob".to_string()),
+            receiver_info: None,
             token_id: "MyNFT".to_string(),
             msg: None,
             memo: None,
@@ -7303,6 +7308,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("charlie".to_string()),
+            receiver_info: None,
             token_id: "MyNFT".to_string(),
             msg: None,
             memo: None,
@@ -7365,6 +7371,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("alice".to_string()),
+            receiver_info: None,
             token_id: "MyNFT".to_string(),
             msg: None,
             memo: Some("Xfer it".to_string()),
@@ -7493,6 +7500,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("david", &[]), handle_msg);
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("david".to_string()),
+            receiver_info: None,
             token_id: "MyNFT".to_string(),
             msg: send_msg.clone(),
             memo: Some("Xfer it".to_string()),
@@ -7594,7 +7602,8 @@ mod tests {
         let auth_list: Option<Vec<AuthList>> = may_load(&auth_store, david_key).unwrap();
         assert!(auth_list.is_none());
 
-        // sanity check: address with token permission xfers it to itself
+        // sanity check: address with token permission xfers it to itself and specifies its
+        // code hash and that it implements BatchReceiveNft in the SendNft msg
         let handle_msg = HandleMsg::Approve {
             spender: HumanAddr("charlie".to_string()),
             token_id: "MyNFT".to_string(),
@@ -7602,15 +7611,12 @@ mod tests {
             padding: None,
         };
         let _handle_result = handle(&mut deps, mock_env("david", &[]), handle_msg);
-        // register charlie's ReceiveNft
-        let handle_msg = HandleMsg::RegisterReceiveNft {
-            code_hash: "charlie code hash".to_string(),
-            also_implements_batch_receive_nft: None,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("charlie".to_string()),
+            receiver_info: Some(ReceiverInfo {
+                recipient_code_hash: "supplied in the send".to_string(),
+                also_implements_batch_receive_nft: Some(true),
+            }),
             token_id: "MyNFT".to_string(),
             msg: send_msg.clone(),
             memo: None,
@@ -7636,19 +7642,20 @@ mod tests {
             },
             handle_msg,
         );
-        // confirm the receive nft msg was created
+        // confirm the batch receive nft msg was created
         let handle_resp = handle_result.unwrap();
         let messages = handle_resp.messages;
-        let mut msg_fr_dv = to_binary(&Snip721ReceiveMsg::ReceiveNft {
-            sender: HumanAddr("david".to_string()),
-            token_id: "MyNFT".to_string(),
+        let mut msg_fr_dv = to_binary(&Snip721ReceiveMsg::BatchReceiveNft {
+            sender: HumanAddr("charlie".to_string()),
+            from: HumanAddr("david".to_string()),
+            token_ids: vec!["MyNFT".to_string()],
             msg: send_msg.clone(),
         })
         .unwrap();
         let msg_fr_dv = space_pad(&mut msg_fr_dv.0, 256usize);
         let msg_fr_dv = CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: HumanAddr("charlie".to_string()),
-            callback_code_hash: "charlie code hash".to_string(),
+            callback_code_hash: "supplied in the send".to_string(),
             msg: Binary(msg_fr_dv.to_vec()),
             send: vec![],
         });
@@ -7709,9 +7716,13 @@ mod tests {
         let auth_list: Option<Vec<AuthList>> = may_load(&auth_store, charlie_key).unwrap();
         assert!(auth_list.is_none());
 
-        // sanity check: owner sends
+        // sanity check: owner sends and specifies a code hash in the send
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("alice".to_string()),
+            receiver_info: Some(ReceiverInfo {
+                recipient_code_hash: "supplied in the send".to_string(),
+                also_implements_batch_receive_nft: None,
+            }),
             token_id: "MyNFT".to_string(),
             msg: send_msg.clone(),
             memo: None,
@@ -7730,7 +7741,7 @@ mod tests {
         let msg_fr_ch = space_pad(&mut msg_fr_ch.0, 256usize);
         let msg_fr_ch = CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: HumanAddr("alice".to_string()),
-            callback_code_hash: "alice code hash".to_string(),
+            callback_code_hash: "supplied in the send".to_string(),
             msg: Binary(msg_fr_ch.to_vec()),
             send: vec![],
         });
@@ -7815,6 +7826,7 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
         let sends = vec![Send {
             contract: HumanAddr("bob".to_string()),
+            receiver_info: None,
             token_ids: vec!["MyNFT".to_string()],
             msg: None,
             memo: None,
@@ -7842,6 +7854,7 @@ mod tests {
         );
         let sends = vec![Send {
             contract: HumanAddr("bob".to_string()),
+            receiver_info: None,
             token_ids: vec!["MyNFT".to_string()],
             msg: None,
             memo: None,
@@ -8068,12 +8081,6 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
         let handle_msg = HandleMsg::RegisterReceiveNft {
-            code_hash: "bob code hash".to_string(),
-            also_implements_batch_receive_nft: None,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::RegisterReceiveNft {
             code_hash: "charlie code hash".to_string(),
             also_implements_batch_receive_nft: None,
             padding: None,
@@ -8090,18 +8097,24 @@ mod tests {
         let sends = vec![
             Send {
                 contract: HumanAddr("charlie".to_string()),
+                receiver_info: None,
                 token_ids: vec!["NFT1".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
             Send {
                 contract: HumanAddr("alice".to_string()),
+                receiver_info: None,
                 token_ids: vec!["NFT1".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
             Send {
                 contract: HumanAddr("bob".to_string()),
+                receiver_info: Some(ReceiverInfo {
+                    recipient_code_hash: "supplied in the send".to_string(),
+                    also_implements_batch_receive_nft: None,
+                }),
                 token_ids: vec!["NFT1".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
@@ -8142,7 +8155,7 @@ mod tests {
         let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
         let msg_fr_al = CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: HumanAddr("bob".to_string()),
-            callback_code_hash: "bob code hash".to_string(),
+            callback_code_hash: "supplied in the send".to_string(),
             msg: Binary(msg_fr_al.to_vec()),
             send: vec![],
         });
@@ -8240,25 +8253,31 @@ mod tests {
         let sends = vec![
             Send {
                 contract: HumanAddr("charlie".to_string()),
+                receiver_info: None,
                 token_ids: vec!["NFT1".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
             Send {
                 contract: HumanAddr("alice".to_string()),
+                receiver_info: None,
                 token_ids: vec!["NFT5".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
             Send {
                 contract: HumanAddr("bob".to_string()),
+                receiver_info: Some(ReceiverInfo {
+                    recipient_code_hash: "supplied in the send".to_string(),
+                    also_implements_batch_receive_nft: Some(true),
+                }),
                 token_ids: vec!["NFT3".to_string()],
                 msg: send_msg.clone(),
                 memo: None,
             },
         ];
 
-        // test bobs trnsfer two of his tokens and one of alice's
+        // test bob transfers two of his tokens and one of alice's
         let handle_msg = HandleMsg::BatchSendNft {
             sends,
             padding: None,
@@ -8282,16 +8301,17 @@ mod tests {
         });
         assert_eq!(messages[0], msg_fr_b);
         assert_eq!(messages.len(), 2);
-        let mut msg_fr_al = to_binary(&Snip721ReceiveMsg::ReceiveNft {
-            sender: HumanAddr("alice".to_string()),
-            token_id: "NFT3".to_string(),
+        let mut msg_fr_al = to_binary(&Snip721ReceiveMsg::BatchReceiveNft {
+            sender: HumanAddr("bob".to_string()),
+            from: HumanAddr("alice".to_string()),
+            token_ids: vec!["NFT3".to_string()],
             msg: send_msg.clone(),
         })
         .unwrap();
         let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
         let msg_fr_al = CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: HumanAddr("bob".to_string()),
-            callback_code_hash: "bob code hash".to_string(),
+            callback_code_hash: "supplied in the send".to_string(),
             msg: Binary(msg_fr_al.to_vec()),
             send: vec![],
         });
@@ -8457,12 +8477,14 @@ mod tests {
             sends: vec![
                 Send {
                     contract: HumanAddr("charlie".to_string()),
+                    receiver_info: None,
                     token_ids: vec!["NFT2".to_string(), "NFT3".to_string(), "NFT4".to_string()],
                     msg: send_msg.clone(),
                     memo: Some("test memo".to_string()),
                 },
                 Send {
                     contract: HumanAddr("alice".to_string()),
+                    receiver_info: None,
                     token_ids: vec!["NFT3".to_string(), "NFT4".to_string(), "NFT6".to_string()],
                     msg: None,
                     memo: None,

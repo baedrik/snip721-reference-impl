@@ -288,6 +288,8 @@ pub enum HandleMsg {
     SendNft {
         /// address to send the token to
         contract: HumanAddr,
+        /// optional code hash and BatchReceiveNft implementation status of the recipient contract
+        receiver_info: Option<ReceiverInfo>,
         /// id of the token to send
         token_id: String,
         /// optional message to send with the (Batch)RecieveNft callback
@@ -443,6 +445,8 @@ pub struct Transfer {
 pub struct Send {
     /// recipient of the sent tokens
     pub contract: HumanAddr,
+    /// optional code hash and BatchReceiveNft implementation status of the recipient contract
+    pub receiver_info: Option<ReceiverInfo>,
     /// tokens being sent
     pub token_ids: Vec<String>,
     /// optional message to send with the (Batch)RecieveNft callback
@@ -553,6 +557,16 @@ pub struct ViewerInfo {
     pub address: HumanAddr,
     /// authentication key string
     pub viewing_key: String,
+}
+
+/// a recipient contract's code hash and whether it implements BatchReceiveNft
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ReceiverInfo {
+    /// recipient's code hash
+    pub recipient_code_hash: String,
+    /// true if the contract also implements BacthReceiveNft.  Defaults to false
+    /// if not specified
+    pub also_implements_batch_receive_nft: Option<bool>,
 }
 
 /// tx type and specifics

@@ -775,6 +775,17 @@
                 "null"
               ]
             },
+            "receiver_info": {
+              "description": "optional code hash and BatchReceiveNft implementation status of the recipient contract",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ReceiverInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "token_id": {
               "description": "id of the token to send",
               "type": "string"
@@ -1319,6 +1330,26 @@
         }
       }
     },
+    "ReceiverInfo": {
+      "description": "a recipient contract's code hash and whether it implements BatchReceiveNft",
+      "type": "object",
+      "required": [
+        "recipient_code_hash"
+      ],
+      "properties": {
+        "also_implements_batch_receive_nft": {
+          "description": "true if the contract also implements BacthReceiveNft.  Defaults to false if not specified",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "recipient_code_hash": {
+          "description": "recipient's code hash",
+          "type": "string"
+        }
+      }
+    },
     "Royalty": {
       "description": "data for a single royalty",
       "type": "object",
@@ -1394,6 +1425,17 @@
           "anyOf": [
             {
               "$ref": "#/definitions/Binary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receiver_info": {
+          "description": "optional code hash and BatchReceiveNft implementation status of the recipient contract",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReceiverInfo"
             },
             {
               "type": "null"
