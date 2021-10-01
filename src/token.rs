@@ -73,7 +73,7 @@ pub struct Trait {
 #[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug, Default)]
 pub struct MediaFile {
     /// file type
-    /// Stassh currently uses: "image", "video", "audio", "text", "font", "application"
+    /// Stashh currently uses: "image", "video", "audio", "text", "font", "application"
     pub file_type: Option<String>,
     /// file extension
     pub extension: Option<String>,
