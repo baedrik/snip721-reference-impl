@@ -6,7 +6,7 @@ mod tests {
         AccessLevel, Cw721Approval, HandleMsg, InitConfig, InitMsg, QueryAnswer, QueryMsg,
         Snip721Approval, Tx, TxAction, ViewerInfo,
     };
-    use crate::token::Metadata;
+    use crate::token::{Extension, Metadata};
     use cosmwasm_std::testing::*;
     use cosmwasm_std::{
         from_binary, Binary, BlockInfo, Env, Extern, HumanAddr, InitResponse, MessageInfo,
@@ -220,9 +220,13 @@ mod tests {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My1".to_string()),
-                description: Some("Public 1".to_string()),
-                image: Some("URI 1".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My1".to_string()),
+                    description: Some("Public 1".to_string()),
+                    image: Some("URI 1".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -235,9 +239,13 @@ mod tests {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My2".to_string()),
-                description: Some("Public 2".to_string()),
-                image: Some("URI 2".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My2".to_string()),
+                    description: Some("Public 2".to_string()),
+                    image: Some("URI 2".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -318,9 +326,13 @@ mod tests {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My1".to_string()),
-                description: Some("Public 1".to_string()),
-                image: Some("URI 1".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My1".to_string()),
+                    description: Some("Public 1".to_string()),
+                    image: Some("URI 1".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -333,9 +345,13 @@ mod tests {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My2".to_string()),
-                description: Some("Public 2".to_string()),
-                image: Some("URI 2".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My2".to_string()),
+                    description: Some("Public 2".to_string()),
+                    image: Some("URI 2".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -381,9 +397,13 @@ mod tests {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My1".to_string()),
-                description: Some("Public 1".to_string()),
-                image: Some("URI 1".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My1".to_string()),
+                    description: Some("Public 1".to_string()),
+                    image: Some("URI 1".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -396,9 +416,13 @@ mod tests {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My2".to_string()),
-                description: Some("Public 2".to_string()),
-                image: Some("URI 2".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My2".to_string()),
+                    description: Some("Public 2".to_string()),
+                    image: Some("URI 2".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -411,9 +435,13 @@ mod tests {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My3".to_string()),
-                description: Some("Public 3".to_string()),
-                image: Some("URI 3".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My3".to_string()),
+                    description: Some("Public 3".to_string()),
+                    image: Some("URI 3".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -503,9 +531,13 @@ mod tests {
             token_id: Some("NFT1".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My1".to_string()),
-                description: Some("Public 1".to_string()),
-                image: Some("URI 1".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My1".to_string()),
+                    description: Some("Public 1".to_string()),
+                    image: Some("URI 1".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -518,9 +550,13 @@ mod tests {
             token_id: Some("NFT2".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My2".to_string()),
-                description: Some("Public 2".to_string()),
-                image: Some("URI 2".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My2".to_string()),
+                    description: Some("Public 2".to_string()),
+                    image: Some("URI 2".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -533,9 +569,13 @@ mod tests {
             token_id: Some("NFT3".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My3".to_string()),
-                description: Some("Public 3".to_string()),
-                image: Some("URI 3".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My3".to_string()),
+                    description: Some("Public 3".to_string()),
+                    image: Some("URI 3".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -548,9 +588,13 @@ mod tests {
             token_id: Some("NFT5".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My5".to_string()),
-                description: Some("Public 5".to_string()),
-                image: Some("URI 5".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My5".to_string()),
+                    description: Some("Public 5".to_string()),
+                    image: Some("URI 5".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -563,9 +607,13 @@ mod tests {
             token_id: Some("NFT4".to_string()),
             owner: Some(HumanAddr("alice".to_string())),
             public_metadata: Some(Metadata {
-                name: Some("My4".to_string()),
-                description: Some("Public 4".to_string()),
-                image: Some("URI 4".to_string()),
+                token_uri: None,
+                extension: Some(Extension {
+                    name: Some("My4".to_string()),
+                    description: Some("Public 4".to_string()),
+                    image: Some("URI 4".to_string()),
+                    ..Extension::default()
+                }),
             }),
             private_metadata: None,
             royalty_info: None,
@@ -682,14 +730,22 @@ mod tests {
         assert!(error.contains("You are not authorized to perform this action on token NFT1"));
 
         let public_meta = Metadata {
-            name: Some("Name1".to_string()),
-            description: Some("PubDesc1".to_string()),
-            image: Some("PubUri1".to_string()),
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("Name1".to_string()),
+                description: Some("PubDesc1".to_string()),
+                image: Some("PubUri1".to_string()),
+                ..Extension::default()
+            }),
         };
         let private_meta = Metadata {
-            name: Some("PrivName1".to_string()),
-            description: Some("PrivDesc1".to_string()),
-            image: Some("PrivUri1".to_string()),
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("PrivName1".to_string()),
+                description: Some("PrivDesc1".to_string()),
+                image: Some("PrivUri1".to_string()),
+                ..Extension::default()
+            }),
         };
         let alice = HumanAddr("alice".to_string());
         let bob = HumanAddr("bob".to_string());
@@ -2306,21 +2362,23 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftInfo {
-                name,
-                description,
-                image,
+                token_uri,
+                extension,
             } => {
-                assert!(name.is_none());
-                assert!(description.is_none());
-                assert!(image.is_none());
+                assert!(token_uri.is_none());
+                assert!(extension.is_none());
             }
             _ => panic!("unexpected"),
         }
         let alice = HumanAddr("alice".to_string());
         let public_meta = Metadata {
-            name: Some("Name1".to_string()),
-            description: Some("PubDesc1".to_string()),
-            image: Some("PubUri1".to_string()),
+            token_uri: Some("uri".to_string()),
+            extension: Some(Extension {
+                name: Some("Name1".to_string()),
+                description: Some("PubDesc1".to_string()),
+                image: Some("PubUri1".to_string()),
+                ..Extension::default()
+            }),
         };
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
@@ -2342,13 +2400,11 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftInfo {
-                name,
-                description,
-                image,
+                token_uri,
+                extension,
             } => {
-                assert_eq!(name, public_meta.name);
-                assert_eq!(description, public_meta.description);
-                assert_eq!(image, public_meta.image);
+                assert_eq!(token_uri, public_meta.token_uri);
+                assert_eq!(extension, public_meta.extension);
             }
             _ => panic!("unexpected"),
         }
@@ -2373,9 +2429,13 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
 
         let public_meta = Metadata {
-            name: Some("Name1".to_string()),
-            description: Some("PubDesc1".to_string()),
-            image: Some("PubUri1".to_string()),
+            token_uri: Some("uri".to_string()),
+            extension: Some(Extension {
+                name: Some("Name1".to_string()),
+                description: Some("PubDesc1".to_string()),
+                image: Some("PubUri1".to_string()),
+                ..Extension::default()
+            }),
         };
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
@@ -2478,9 +2538,13 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
 
         let private_meta = Metadata {
-            name: Some("Name1".to_string()),
-            description: Some("PrivDesc1".to_string()),
-            image: Some("PrivUri1".to_string()),
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("Name1".to_string()),
+                description: Some("PrivDesc1".to_string()),
+                image: Some("PrivUri1".to_string()),
+                ..Extension::default()
+            }),
         };
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
@@ -2512,13 +2576,11 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::PrivateMetadata {
-                name,
-                description,
-                image,
+                token_uri,
+                extension,
             } => {
-                assert_eq!(name, private_meta.name);
-                assert_eq!(description, private_meta.description);
-                assert_eq!(image, private_meta.image);
+                assert_eq!(token_uri, private_meta.token_uri);
+                assert_eq!(extension, private_meta.extension);
             }
             _ => panic!("unexpected"),
         }
@@ -2541,13 +2603,11 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::PrivateMetadata {
-                name,
-                description,
-                image,
+                token_uri,
+                extension,
             } => {
-                assert_eq!(name, private_meta.name);
-                assert_eq!(description, private_meta.description);
-                assert_eq!(image, private_meta.image);
+                assert_eq!(token_uri, private_meta.token_uri);
+                assert_eq!(extension, private_meta.extension);
             }
             _ => panic!("unexpected"),
         }
@@ -2573,9 +2633,13 @@ mod tests {
         let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
 
         let private_meta = Metadata {
-            name: Some("Name1".to_string()),
-            description: Some("PrivDesc1".to_string()),
-            image: Some("PrivUri1".to_string()),
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("Name1".to_string()),
+                description: Some("PrivDesc1".to_string()),
+                image: Some("PrivUri1".to_string()),
+                ..Extension::default()
+            }),
         };
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
@@ -2620,13 +2684,11 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::PrivateMetadata {
-                name,
-                description,
-                image,
+                token_uri,
+                extension,
             } => {
-                assert!(name.is_none());
-                assert!(description.is_none());
-                assert!(image.is_none());
+                assert!(token_uri.is_none());
+                assert!(extension.is_none());
             }
             _ => panic!("unexpected"),
         }

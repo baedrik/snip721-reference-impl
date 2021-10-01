@@ -765,7 +765,7 @@ pub fn set_royalty_info<S: Storage, A: Api, Q: Querier>(
 
 /// Returns HandleResult
 ///
-/// makes the sealed private metadata poublic
+/// makes the sealed private metadata public
 ///
 /// # Arguments
 ///
@@ -1946,14 +1946,12 @@ pub fn query_nft_info<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryR
     if let Some(idx) = may_idx {
         let meta_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, storage);
         let meta: Metadata = may_load(&meta_store, &idx.to_le_bytes())?.unwrap_or(Metadata {
-            name: None,
-            description: None,
-            image: None,
+            token_uri: None,
+            extension: None,
         });
         return to_binary(&QueryAnswer::NftInfo {
-            name: meta.name,
-            description: meta.description,
-            image: meta.image,
+            token_uri: meta.token_uri,
+            extension: meta.extension,
         });
     }
     let config: Config = load(storage, CONFIG_KEY)?;
@@ -1967,9 +1965,8 @@ pub fn query_nft_info<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryR
     }
     // otherwise, just return empty metadata
     to_binary(&QueryAnswer::NftInfo {
-        name: None,
-        description: None,
-        image: None,
+        token_uri: None,
+        extension: None,
     })
 }
 
@@ -2006,14 +2003,12 @@ pub fn query_private_meta<S: Storage, A: Api, Q: Querier>(
     }
     let meta_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
     let meta: Metadata = may_load(&meta_store, &prep_info.idx.to_le_bytes())?.unwrap_or(Metadata {
-        name: None,
-        description: None,
-        image: None,
+        token_uri: None,
+        extension: None,
     });
     to_binary(&QueryAnswer::PrivateMetadata {
-        name: meta.name,
-        description: meta.description,
-        image: meta.image,
+        token_uri: meta.token_uri,
+        extension: meta.extension,
     })
 }
 
@@ -4235,18 +4230,11 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
             sender_raw.clone()
         };
 
-        // if you are modifying the base contract to include other data fields on-chain in
-        // the Token struct (see token.rs), this is where you may populate those additional
-        // fields.  Conversely, you could also store the additional fields as a struct with
-        // its own storage prefix, similar to how the metadata is handled below
-
         let token = Token {
             owner: recipient.clone(),
             permissions: Vec::new(),
             unwrapped: !config.sealed_metadata_is_enabled,
         };
-        //
-        //
 
         // save new token info
         let token_key = config.mint_cnt.to_le_bytes();

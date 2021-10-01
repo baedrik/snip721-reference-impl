@@ -7,7 +7,7 @@ use cosmwasm_std::{Binary, Coin, HumanAddr};
 use crate::expiration::Expiration;
 use crate::mint_run::{MintRunInfo, SerialNumber};
 use crate::royalties::RoyaltyInfo;
-use crate::token::Metadata;
+use crate::token::{Extension, Metadata};
 
 /// Instantiation message
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -841,14 +841,12 @@ pub enum QueryAnswer {
         inventory_approvals: Vec<Snip721Approval>,
     },
     NftInfo {
-        name: Option<String>,
-        description: Option<String>,
-        image: Option<String>,
+        token_uri: Option<String>,
+        extension: Option<Extension>,
     },
     PrivateMetadata {
-        name: Option<String>,
-        description: Option<String>,
-        image: Option<String>,
+        token_uri: Option<String>,
+        extension: Option<Extension>,
     },
     AllNftInfo {
         access: Cw721OwnerOfResponse,

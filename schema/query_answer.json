@@ -268,19 +268,17 @@
         "nft_info": {
           "type": "object",
           "properties": {
-            "description": {
-              "type": [
-                "string",
-                "null"
+            "extension": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Extension"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
-            "image": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "name": {
+            "token_uri": {
               "type": [
                 "string",
                 "null"
@@ -299,19 +297,17 @@
         "private_metadata": {
           "type": "object",
           "properties": {
-            "description": {
-              "type": [
-                "string",
-                "null"
+            "extension": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Extension"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
-            "image": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "name": {
+            "token_uri": {
               "type": [
                 "string",
                 "null"
@@ -612,6 +608,26 @@
     }
   ],
   "definitions": {
+    "Authentication": {
+      "description": "media file authentication",
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "either a decryption key for encrypted files or a password for basic authentication",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "user": {
+          "description": "username used in basic authentication",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
     "Cw721Approval": {
       "description": "CW721 Approval",
       "type": "object",
@@ -704,29 +720,156 @@
         }
       ]
     },
-    "HumanAddr": {
-      "type": "string"
-    },
-    "Metadata": {
-      "description": "token metadata",
+    "Extension": {
+      "description": "metadata extension You can add any metadata fields you need here.  These fields are based on https://docs.opensea.io/docs/metadata-standards and are the metadata fields that Stashh uses for robust NFT display",
       "type": "object",
       "properties": {
+        "animation_url": {
+          "description": "url to a multimedia attachment",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "attributes": {
+          "description": "item attributes",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Trait"
+          }
+        },
+        "background_color": {
+          "description": "background color represented as a six-character hexadecimal without a pre-pended #",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "description": {
-          "description": "optional description",
+          "description": "item description",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "external_url": {
+          "description": "url to allow users to view the item on your site",
           "type": [
             "string",
             "null"
           ]
         },
         "image": {
-          "description": "optional uri to contain an image, additional data fields, etc...",
+          "description": "url to the image",
           "type": [
             "string",
             "null"
           ]
         },
+        "image_data": {
+          "description": "raw SVG image data (not recommended). Only use this if you're not including the image parameter",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "media": {
+          "description": "media files as specified on Stashh that allows for basic authenticatiion and decryption keys. Most of the above is used for bridging public eth NFT metadata easily, whereas `media` will be used when minting NFTs on Stashh",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/MediaFile"
+          }
+        },
         "name": {
-          "description": "optional indentifier",
+          "description": "name of the item",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "protected_attributes": {
+          "description": "list of attributes whose types are public but whose values are private",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "youtube_url": {
+          "description": "url to a YouTube video",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "HumanAddr": {
+      "type": "string"
+    },
+    "MediaFile": {
+      "description": "media file",
+      "type": "object",
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "authentication": {
+          "description": "authentication information",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Authentication"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "extension": {
+          "description": "file extension",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file_type": {
+          "description": "file type",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "description": "url to the file",
+          "type": "string"
+        }
+      }
+    },
+    "Metadata": {
+      "description": "token metadata",
+      "type": "object",
+      "properties": {
+        "extension": {
+          "description": "optional on-chain metadata",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Extension"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "token_uri": {
+          "description": "optional uri for off-chain metadata",
           "type": [
             "string",
             "null"
@@ -892,6 +1035,33 @@
               "type": "null"
             }
           ]
+        }
+      }
+    },
+    "Trait": {
+      "description": "attribute trait",
+      "type": "object",
+      "required": [
+        "value"
+      ],
+      "properties": {
+        "display_type": {
+          "description": "indicates how a trait should be displayed",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trait_type": {
+          "description": "name of the trait",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "description": "trait value",
+          "type": "string"
         }
       }
     },
