@@ -238,7 +238,7 @@ MintNft mints a single token.  Only an authorized minting address my execute Min
 The ID of the minted token will also be returned in a LogAttribute with the key `minted`.
 
 ### <a name="metadata"></a>Metadata
-Metadata for a token that follows CW-721 metadata specification, which is based on ERC721 Metadata JSON Schema.
+This is the metadata for a token that follows CW-721 metadata specification, which is based on ERC721 Metadata JSON Schema.
 ```
 {
 	"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
