@@ -1246,7 +1246,7 @@
       ]
     },
     "Extension": {
-      "description": "metadata extension You can add any metadata fields you need here.  These fields are based on https://docs.opensea.io/docs/metadata-standards and are the metadata fields that Stashh uses for robust NFT display",
+      "description": "metadata extension You can add any metadata fields you need here.  These fields are based on https://docs.opensea.io/docs/metadata-standards and are the metadata fields that Stashh uses for robust NFT display.  Urls should be prefixed with `http://`, `https://`, `ipfs://`, or `ar://`",
       "type": "object",
       "properties": {
         "animation_url": {
@@ -1366,14 +1366,14 @@
           ]
         },
         "file_type": {
-          "description": "file type",
+          "description": "file type Stashh currently uses: \"image\", \"video\", \"audio\", \"text\", \"font\", \"application\"",
           "type": [
             "string",
             "null"
           ]
         },
         "url": {
-          "description": "url to the file",
+          "description": "url to the file.  Urls should be prefixed with `http://`, `https://`, `ipfs://`, or `ar://`",
           "type": "string"
         }
       }
@@ -1394,7 +1394,7 @@
           ]
         },
         "token_uri": {
-          "description": "optional uri for off-chain metadata",
+          "description": "optional uri for off-chain metadata.  This should be prefixed with `http://`, `https://`, `ipfs://`, or `ar://`",
           "type": [
             "string",
             "null"
@@ -1640,6 +1640,13 @@
       "properties": {
         "display_type": {
           "description": "indicates how a trait should be displayed",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max_value": {
+          "description": "optional max value for numerical traits",
           "type": [
             "string",
             "null"

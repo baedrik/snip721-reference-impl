@@ -20,7 +20,8 @@ pub struct Token {
 /// token metadata
 #[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug, Default)]
 pub struct Metadata {
-    /// optional uri for off-chain metadata
+    /// optional uri for off-chain metadata.  This should be prefixed with `http://`, `https://`, `ipfs://`, or 
+    /// `ar://`
     pub token_uri: Option<String>,
     /// optional on-chain metadata
     pub extension: Option<Extension>,
@@ -29,7 +30,8 @@ pub struct Metadata {
 /// metadata extension
 /// You can add any metadata fields you need here.  These fields are based on
 /// https://docs.opensea.io/docs/metadata-standards and are the metadata fields that
-/// Stashh uses for robust NFT display
+/// Stashh uses for robust NFT display.  Urls should be prefixed with `http://`, `https://`, `ipfs://`, or 
+/// `ar://`
 #[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug, Default)]
 pub struct Extension {
     /// url to the image
@@ -67,6 +69,8 @@ pub struct Trait {
     pub trait_type: Option<String>,
     /// trait value
     pub value: String,
+    /// optional max value for numerical traits
+    pub max_value: Option<String>,
 }
 
 /// media file
@@ -79,7 +83,7 @@ pub struct MediaFile {
     pub extension: Option<String>,
     /// authentication information
     pub authentication: Option<Authentication>,
-    /// url to the file
+    /// url to the file.  Urls should be prefixed with `http://`, `https://`, `ipfs://`, or `ar://`
     pub url: String,
 }
 

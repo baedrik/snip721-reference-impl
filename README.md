@@ -241,16 +241,120 @@ The ID of the minted token will also be returned in a LogAttribute with the key 
 Metadata for a token that follows CW-721 metadata specification, which is based on ERC721 Metadata JSON Schema.
 ```
 {
-	"name": "optional_name",
-	"description": "optional_text_description",
-	"image": "optional_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+	"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+	"extension": {
+		"...": "..."
+	}
 }
 ```
-| Name        | Type   | Description                                                           | Optional | Value If Omitted     |
-|-------------|--------|-----------------------------------------------------------------------|----------|----------------------|
-| name        | string | String that can be used to identify an asset's name                   | yes      | nothing              |
-| description | string | String that can be used to describe an asset                          | yes      | nothing              |
-| image       | string | String that can hold a link to additional off-chain metadata or image | yes      | nothing              |
+| Name      | Type                                | Description                                                                          | Optional | Value If Omitted     |
+|-----------|-------------------------------------|--------------------------------------------------------------------------------------|----------|----------------------|
+| token_uri | string                              | Uri pointing to off-chain JSON metadata                                              | yes      | nothing              |
+| extension | [Extension (see below)](#extension) | Data structure defining on-chain metadata                                            | yes      | nothing              |
+
+### <a name="extension"></a>Extension
+This is an on-chain metadata extension struct that conforms to the Stashh metadata standard (which in turn implements https://docs.opensea.io/docs/metadata-standards).  Urls should be prefixed with `http://`, `https://`, `ipfs://`, or `ar://`.  Feel free to add/delete any fields as necessary.
+```
+{
+	"image": "optional_image_url",
+	"image_data": "optional_raw_svg_image_data",
+	"external_url": "optional_url_to_view_token_on_your_site",
+	"description": "optional_token_description",
+	"name": "optional_token_name",
+	"attributes": [
+		{
+			"display_type": "optional_display_format_for_numerical_traits",
+			"trait_type": "optional_name_of_the_trait",
+			"value": "trait value",
+			"max_value": "optional_max_value_for_numerical_traits"
+		},
+		{
+			"...": "...",
+		},
+	],
+	"background_color": "optional_six-character_hexadecimal_background_color_(without_pre-pended_`#`)",
+	"animation_url": "optional_url_to_multimedia_file",
+	"youtube_url": "optional_url_to_a_YouTube_video",
+	"media": [
+		{
+			"file_type": "optional_file_type",
+			"extension": "optional_file_extension",
+			"authentication": {
+				"key": "optional_decryption_key_or_password",
+				"user": "optional_username_for_authentication"
+			},
+			"url": "url_pointing_to_the_multimedia_file"
+		},
+		{
+			"...": "...",
+		},
+	],
+	"protected_attributes": [ "list", "of_attributes", "whose_types", "are_public", "but_values", "are_private" ]
+}
+```
+| Name                 | Type                                         | Description                                                                          | Optional | Value If Omitted     |
+|----------------------|----------------------------------------------|--------------------------------------------------------------------------------------|----------|----------------------|
+| image                | string                                       | Url to the token's image                                                             | yes      | nothing              |
+| image_data           | string                                       | Raw SVG image data that should only be used if there is no `image` field             | yes      | nothing              |
+| external_url         | string                                       | Url to view the token on your site                                                   | yes      | nothing              |
+| description          | string                                       | Text description of the token                                                        | yes      | nothing              |
+| name                 | string                                       | Name of the token                                                                    | yes      | nothing              |
+| attributes           | array of [Trait (see below)](#trait)         | Token's attributes                                                                   | yes      | nothing              |
+| background_color     | string                                       | Background color represented as a six-character hexadecimal without a pre-pended #   | yes      | nothing              |
+| animation_url        | string                                       | Url to a multimedia file                                                             | yes      | nothing              |
+| youtube_url          | string                                       | Url to a YouTube video                                                               | yes      | nothing              |
+| media                | array of [MediaFile (see below)](#mediafile) | List of multimedia files using Stashh specifications                                 | yes      | nothing              |
+| protected_attributes | array of string                              | List of attributes whose types are public but whose values are private               | yes      | nothing              |
+
+### <a name="trait"></a>Trait
+Trait describes a token attribute as defined in https://docs.opensea.io/docs/metadata-standards.
+```
+{
+	"display_type": "optional_display_format_for_numerical_traits",
+	"trait_type": "optional_name_of_the_trait",
+	"value": "trait value",
+	"max_value": "optional_max_value_for_numerical_traits"
+}
+```
+| Name         | Type   | Description                                                                          | Optional | Value If Omitted     |
+|--------------|--------|--------------------------------------------------------------------------------------|----------|----------------------|
+| display_type | string | Display format for numerical traits                                                  | yes      | nothing              |
+| trait_type   | string | Name of the trait                                                                    | yes      | nothing              |
+| value        | string | Trait value                                                                          | no       |                      |
+| max_value    | string | Maximum value for this numerical trait                                               | yes      | nothing              |
+
+### <a name="mediafile"></a>MediaFile
+MediaFile is the data structure used by Stashh to reference off-chain multimedia files.  It allows for hosted files to be encrypted or authenticated with basic authentication, and for the decryption key or username/password to also be included in the on-chain private metadata.  Urls should be prefixed with `http://`, `https://`, `ipfs://`, or `ar://`.
+```
+{
+	"file_type": "optional_file_type",
+	"extension": "optional_file_extension",
+	"authentication": {
+		"key": "optional_decryption_key_or_password",
+		"user": "optional_username_for_authentication"
+	},
+	"url": "url_pointing_to_the_multimedia_file"
+}
+```
+| Name           | Type                                          | Description                                                                                 | Optional | Value If Omitted     |
+|----------------|-----------------------------------------------|---------------------------------------------------------------------------------------------|----------|----------------------|
+| file_type      | string                                        | File type.  Stashh currently uses: "image", "video", "audio", "text", "font", "application" | yes      | nothing              |
+| extension      | string                                        | File extension                                                                              | yes      | nothing              |
+| authentication | [Authentication (see below)](#authentication) | Credentials or decryption key for a protected file                                          | yes      | nothing              |
+| url            | string                                        | Url to the multimedia file                                                                  | no       |                      |
+
+### <a name="authentication"></a>Authentication
+Authentication is used to provide the decryption key or username/password for protected files.
+```
+{
+	"key": "optional_decryption_key_or_password",
+	"user": "optional_username_for_authentication"
+}
+```
+| Name | Type   | Description                                                                          | Optional | Value If Omitted     |
+|------|--------|--------------------------------------------------------------------------------------|----------|----------------------|
+| key  | string | Decryption key or password                                                           | yes      | nothing              |
+| user | string | Username for basic authentication                                                    | yes      | nothing              |
 
 ### <a name="serialnumber"></a>SerialNumber
 SerialNumber is used to serialize identical NFTs.
