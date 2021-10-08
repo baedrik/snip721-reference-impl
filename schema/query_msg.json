@@ -563,6 +563,17 @@
                 "string",
                 "null"
               ]
+            },
+            "viewer": {
+              "description": "optional address and key requesting to view the royalty information",
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/ViewerInfo"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         }

@@ -437,6 +437,29 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
 
+        // test setting both token_uri and extension
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("MyNFT".to_string()),
+            owner: Some(HumanAddr("alice".to_string())),
+            public_metadata: Some(Metadata {
+                token_uri: Some("uri".to_string()),
+                extension: Some(Extension {
+                    name: Some("MyNFT".to_string()),
+                    description: None,
+                    image: Some("uri".to_string()),
+                    ..Extension::default()
+                }),
+            }),
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Metadata can not have BOTH token_uri AND extension"));
+
         // test non-minter attempt
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("MyNFT".to_string()),
@@ -1017,7 +1040,6 @@ mod tests {
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: SNIP20 not found"));
 
-        // sanity check, minter changing metadata after owner unwrapped
         let handle_msg = HandleMsg::Reveal {
             token_id: "MyNFT".to_string(),
             padding: None,
@@ -1032,6 +1054,27 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
         let token: Token = json_load(&info_store, &token_key).unwrap();
         assert!(token.unwrapped);
+
+        // test setting both token_uri and extension
+        let handle_msg = HandleMsg::SetMetadata {
+            token_id: "MyNFT".to_string(),
+            private_metadata: Some(Metadata {
+                token_uri: Some("uri".to_string()),
+                extension: Some(Extension {
+                    name: Some("MyNFT".to_string()),
+                    description: None,
+                    image: Some("uri".to_string()),
+                    ..Extension::default()
+                }),
+            }),
+            public_metadata: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Metadata can not have BOTH token_uri AND extension"));
+
+        // sanity check, minter changing metadata after owner unwrapped
         let set_pub = Some(Metadata {
             token_uri: None,
             extension: Some(Extension {

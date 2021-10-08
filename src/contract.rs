@@ -1690,7 +1690,9 @@ pub fn set_contract_status<S: Storage, A: Api, Q: Querier>(
 pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryMsg) -> QueryResult {
     let response = match msg {
         QueryMsg::ContractInfo {} => query_contract_info(&deps.storage),
-        QueryMsg::RoyaltyInfo { token_id } => query_royalty(deps, token_id.as_deref()),
+        QueryMsg::RoyaltyInfo { token_id, viewer } => {
+            query_royalty(deps, token_id.as_deref(), viewer)
+        }
         QueryMsg::ContractConfig {} => query_config(&deps.storage),
         QueryMsg::Minters {} => query_minters(deps),
         QueryMsg::NumTokens { viewer } => query_num_tokens(deps, viewer),
@@ -1778,34 +1780,76 @@ pub fn query_contract_info<S: ReadonlyStorage>(storage: &S) -> QueryResult {
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 /// * `token_id` - optional token id whose RoyaltyInfo is being requested
+/// * `viewer` - optional address and key making an authenticated query request
 pub fn query_royalty<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: Option<&str>,
+    viewer: Option<ViewerInfo>,
 ) -> QueryResult {
-    let royalty = token_id.map_or_else(
-        || may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY),
-        |i| {
-            let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
-            // if token id was found
-            if let Some(idx) = may_load::<u32, _>(&map2idx, i.as_bytes())? {
-                // get the royalty information if present
-                let roy_store = ReadonlyPrefixedStorage::new(PREFIX_ROYALTY_INFO, &deps.storage);
-                may_load::<StoredRoyaltyInfo, _>(&roy_store, &idx.to_le_bytes())
-            // token id not found
-            } else {
-                let config: Config = load(&deps.storage, CONFIG_KEY)?;
-                // if the token supply is public, let them know the token does not exist
-                if config.token_supply_is_public {
-                    Err(StdError::generic_err(format!("Token ID: {} not found", i)))
-                // token supply is private so just say it has the default
-                } else {
-                    may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)
-                }
+    let viewer_raw = viewer
+        .map(|v| {
+            let raw = deps.api.canonical_address(&v.address)?;
+            check_key(&deps.storage, &raw, v.viewing_key)?;
+            Ok(raw)
+        })
+        .transpose()?;
+    let (royalty, hide_addr) = if let Some(id) = token_id {
+        // TODO remove this when BlockInfo becomes available to queries
+        let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
+            height: 1,
+            time: 1,
+            chain_id: "secret-3".to_string(),
+        });
+        // if the token id was found
+        if let Ok((token, idx)) = get_token(&deps.storage, id, None) {
+            let hide_addr = check_perm_core(
+                deps,
+                &block,
+                &token,
+                id,
+                viewer_raw.as_ref(),
+                token.owner.as_slice(),
+                PermissionType::Transfer.to_usize(),
+                &mut Vec::new(),
+                &"",
+            )
+            .is_err();
+            // get the royalty information if present
+            let roy_store = ReadonlyPrefixedStorage::new(PREFIX_ROYALTY_INFO, &deps.storage);
+            (
+                may_load::<StoredRoyaltyInfo, _>(&roy_store, &idx.to_le_bytes())?,
+                hide_addr,
+            )
+        // token id not found
+        } else {
+            let config: Config = load(&deps.storage, CONFIG_KEY)?;
+            let minters: Vec<CanonicalAddr> =
+                may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+            let is_minter = viewer_raw.map(|v| minters.contains(&v)).unwrap_or(false);
+            // if minter querying or the token supply is public, let them know the token does not exist
+            if config.token_supply_is_public || is_minter {
+                return Err(StdError::generic_err(format!("Token ID: {} not found", id)));
             }
-        },
-    )?;
+            // token supply is private and querier is not a minter so just show the default without addresses
+            (
+                may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?,
+                true,
+            )
+        }
+    // no id specified, so get the default
+    } else {
+        let minters: Vec<CanonicalAddr> =
+            may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+        // only let minters view default royalty addresses
+        (
+            may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?,
+            viewer_raw.map(|v| !minters.contains(&v)).unwrap_or(true),
+        )
+    };
     to_binary(&QueryAnswer::RoyaltyInfo {
-        royalty_info: royalty.map(|s| s.to_human(&deps.api)).transpose()?,
+        royalty_info: royalty
+            .map(|s| s.to_human(&deps.api, hide_addr))
+            .transpose()?,
     })
 }
 
@@ -2116,6 +2160,23 @@ pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
     // get the royalty information if present
     let roy_store = ReadonlyPrefixedStorage::new(PREFIX_ROYALTY_INFO, &deps.storage);
     let may_roy_inf: Option<StoredRoyaltyInfo> = may_load(&roy_store, &token_key)?;
+    let royalty_info = may_roy_inf
+        .map(|r| {
+            let hide_addr = check_perm_core(
+                deps,
+                &prep_info.block,
+                &prep_info.token,
+                token_id,
+                opt_viewer,
+                owner_slice,
+                perm_type_info.transfer_idx,
+                &mut Vec::new(),
+                &prep_info.err_msg,
+            )
+            .is_err();
+            r.to_human(&deps.api, hide_addr)
+        })
+        .transpose()?;
     // get the mint run information
     let creator_raw: CanonicalAddr = load(&deps.storage, CREATOR_KEY)?;
     let run_store = ReadonlyPrefixedStorage::new(PREFIX_MINT_RUN, &deps.storage);
@@ -2165,7 +2226,7 @@ pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
         owner,
         public_metadata,
         private_metadata,
-        royalty_info: may_roy_inf.map(|r| r.to_human(&deps.api)).transpose()?,
+        royalty_info,
         mint_run_info: Some(mint_run.to_human(&deps.api, &creator_raw)?),
         display_private_metadata_error,
         owner_is_public,
@@ -3288,6 +3349,7 @@ fn set_metadata_impl<S: Storage>(
             "The private metadata of a sealed token can not be modified",
         ));
     }
+    enforce_metadata_field_exclusion(metadata)?;
     let mut meta_store = PrefixedStorage::new(prefix, storage);
     save(&mut meta_store, &idx.to_le_bytes(), metadata)?;
     Ok(())
@@ -4262,10 +4324,12 @@ fn mint_list<S: Storage, A: Api, Q: Querier>(
         //
         // save the metadata
         if let Some(pub_meta) = mint.public_metadata {
+            enforce_metadata_field_exclusion(&pub_meta)?;
             let mut pub_store = PrefixedStorage::new(PREFIX_PUB_META, &mut deps.storage);
             save(&mut pub_store, &token_key, &pub_meta)?;
         }
         if let Some(priv_meta) = mint.private_metadata {
+            enforce_metadata_field_exclusion(&priv_meta)?;
             let mut priv_store = PrefixedStorage::new(PREFIX_PRIV_META, &mut deps.storage);
             save(&mut priv_store, &token_key, &priv_meta)?;
         }
@@ -4369,4 +4433,20 @@ fn store_royalties<S: Storage, A: Api>(
         remove(storage, key);
         Ok(())
     }
+}
+
+/// Returns StdResult<()>
+///
+/// makes sure that Metadata does not have both `token_uri` and `extension`
+///
+/// # Arguments
+///
+/// * `metadata` - a reference to Metadata
+fn enforce_metadata_field_exclusion(metadata: &Metadata) -> StdResult<()> {
+    if metadata.token_uri.is_some() && metadata.extension.is_some() {
+        return Err(StdError::generic_err(
+            "Metadata can not have BOTH token_uri AND extension",
+        ));
+    }
+    Ok(())
 }

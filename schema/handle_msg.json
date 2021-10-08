@@ -1319,7 +1319,7 @@
           ]
         },
         "protected_attributes": {
-          "description": "list of attributes whose types are public but whose values are private",
+          "description": "a select list of trait_types that are in the private metadata.  This will only ever be used in public metadata",
           "type": [
             "array",
             "null"
@@ -1383,7 +1383,7 @@
       "type": "object",
       "properties": {
         "extension": {
-          "description": "optional on-chain metadata",
+          "description": "optional on-chain metadata.  Only use this if you are not using `token_uri`",
           "anyOf": [
             {
               "$ref": "#/definitions/Extension"
@@ -1394,7 +1394,7 @@
           ]
         },
         "token_uri": {
-          "description": "optional uri for off-chain metadata.  This should be prefixed with `http://`, `https://`, `ipfs://`, or `ar://`",
+          "description": "optional uri for off-chain metadata.  This should be prefixed with `http://`, `https://`, `ipfs://`, or `ar://`.  Only use this if you are not using `extension`",
           "type": [
             "string",
             "null"

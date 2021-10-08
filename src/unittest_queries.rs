@@ -2373,12 +2373,7 @@ mod tests {
         let alice = HumanAddr("alice".to_string());
         let public_meta = Metadata {
             token_uri: Some("uri".to_string()),
-            extension: Some(Extension {
-                name: Some("Name1".to_string()),
-                description: Some("PubDesc1".to_string()),
-                image: Some("PubUri1".to_string()),
-                ..Extension::default()
-            }),
+            extension: None,
         };
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
@@ -2428,7 +2423,7 @@ mod tests {
         };
         let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
 
-        let public_meta = Metadata {
+        let meta_for_fail = Metadata {
             token_uri: Some("uri".to_string()),
             extension: Some(Extension {
                 name: Some("Name1".to_string()),
@@ -2437,6 +2432,32 @@ mod tests {
                 ..Extension::default()
             }),
         };
+
+        let public_meta = Metadata {
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("Name1".to_string()),
+                description: Some("PubDesc1".to_string()),
+                image: Some("PubUri1".to_string()),
+                ..Extension::default()
+            }),
+        };
+
+        // test unable to have both token_uri and extension in the metadata
+        let handle_msg = HandleMsg::MintNft {
+            token_id: Some("NFTfail".to_string()),
+            owner: Some(alice.clone()),
+            public_metadata: Some(meta_for_fail.clone()),
+            private_metadata: None,
+            royalty_info: None,
+            serial_number: None,
+            memo: None,
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains("Metadata can not have BOTH token_uri AND extension"));
+
         let handle_msg = HandleMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),

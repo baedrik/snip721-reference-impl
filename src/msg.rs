@@ -6,7 +6,7 @@ use cosmwasm_std::{Binary, Coin, HumanAddr};
 
 use crate::expiration::Expiration;
 use crate::mint_run::{MintRunInfo, SerialNumber};
-use crate::royalties::RoyaltyInfo;
+use crate::royalties::{DisplayRoyaltyInfo, RoyaltyInfo};
 use crate::token::{Extension, Metadata};
 
 /// Instantiation message
@@ -763,6 +763,8 @@ pub enum QueryMsg {
         /// optional ID of the token whose royalty information should be displayed.  If not
         /// provided, display the contract's default royalty information
         token_id: Option<String>,
+        /// optional address and key requesting to view the royalty information
+        viewer: Option<ViewerInfo>,
     },
 }
 
@@ -857,7 +859,7 @@ pub enum QueryAnswer {
         public_metadata: Option<Metadata>,
         private_metadata: Option<Metadata>,
         display_private_metadata_error: Option<String>,
-        royalty_info: Option<RoyaltyInfo>,
+        royalty_info: Option<DisplayRoyaltyInfo>,
         mint_run_info: Option<MintRunInfo>,
         owner_is_public: bool,
         public_ownership_expiration: Option<Expiration>,
@@ -886,7 +888,7 @@ pub enum QueryAnswer {
         also_implements_batch_receive_nft: bool,
     },
     RoyaltyInfo {
-        royalty_info: Option<RoyaltyInfo>,
+        royalty_info: Option<DisplayRoyaltyInfo>,
     },
 }
 
