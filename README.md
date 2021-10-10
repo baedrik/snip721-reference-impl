@@ -73,13 +73,13 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 The contract's default RoyaltyInfo is the RoyaltyInfo that will be assigned to any token that is minted without explicitly defining its own RoyaltyInfo.  It should be noted that default RoyaltyInfo only applies to new tokens minted while the default is in effect, and will not alter the royalties for any existing NFTs.  This is because a token creator should not be able to sell a token with only 1% advertised royalty, and then change it to 100% once it is purchased.
 
 ### <a name="royaltyinfo"></a>RoyaltyInfo
-RoyaltyInfo is used to define royalties to be paid when an NFT is sold.
+RoyaltyInfo is used to define royalties to be paid when an NFT is sold.  This implementation will only display a token's royalty recipient addresses if the querier has permission to transfer the token, and it will only display the contract's default royalty recipient addresses if the querier is an authorized minter.
 ```
 {
 	"decimal_places_in_rates": 4,
 	"royalties": [
 		{
-			"recipient": "address_that_should_be_paid_this_royalty",
+			"recipient": "address_that_should_be_paid_this_royalty_(optional_in_query_responses)",
 			"rate": 100,
 		},
 		{
@@ -94,17 +94,17 @@ RoyaltyInfo is used to define royalties to be paid when an NFT is sold.
 | royalties               | array of [Royalty (see below)](#royalty) | List of royalties to be paid upon sale                                                              | no       |
 
 ### <a name="royalty"></a>Royalty
-Royalty defines a payment address and a royalty rate to be paid when an NFT is sold.
+Royalty defines a payment address and a royalty rate to be paid when an NFT is sold.  This implementation will only display a token's royalty recipient addresses if the querier has permission to transfer the token, and it will only display the contract's default royalty recipient addresses if the querier is an authorized minter.
 ```
 {
-	"recipient": "address_that_should_be_paid_this_royalty",
+	"recipient": "address_that_should_be_paid_this_royalty_(optional_in_query_responses)",
 	"rate": 100,
 }
 ```
-| Name      | Type               | Description                                                                                                        | Optional |
-|-----------|--------------------|--------------------------------------------------------------------------------------------------------------------|----------|
-| recipient | string (HumanAddr) | The address that should be paid this royalty                                                                       | no       |
-| rate      | number (u16)       | The royalty rate to be paid using the number of decimals specified in the `RoyaltyInfo` containing this `Royalty`  | no       |
+| Name      | Type               | Description                                                                                                      | Optional in Messages | Optional in Query Responses |
+|-----------|--------------------|------------------------------------------------------------------------------------------------------------------|----------------------|-----------------------------|
+| recipient | string (HumanAddr) | The address that should be paid this royalty                                                                     | no                   | yes                         |
+| rate      | number (u16)       | The royalty rate to be paid using the number of decimals specified in the `RoyaltyInfo` containing this `Royalty`| no                   | no                          |
 
 ### <a name="config"></a>Config
 Config is the privacy configuration for the contract.
@@ -185,14 +185,16 @@ MintNft mints a single token.  Only an authorized minting address my execute Min
 		"token_id": "optional_ID_of_new_token",
 		"owner": "optional_address_the_new_token_will_be_minted_to",
 		"public_metadata": {
-			"name": "optional_public_name",
-			"description": "optional_public_text_description",
-			"image": "optional_public_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+			"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+			"extension": {
+				"...": "..."
+			}
 		},
 		"private_metadata": {
-			"name": "optional_private_name",
-			"description": "optional_private_text_description",
-			"image": "optional_private_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+			"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+			"extension": {
+				"...": "..."
+			}
 		},
 		"serial_number": {
 			"mint_run": 3,
@@ -238,7 +240,7 @@ MintNft mints a single token.  Only an authorized minting address my execute Min
 The ID of the minted token will also be returned in a LogAttribute with the key `minted`.
 
 ### <a name="metadata"></a>Metadata
-This is the metadata for a token that follows CW-721 metadata specification, which is based on ERC721 Metadata JSON Schema.
+This is the metadata for a token that follows CW-721 metadata specification, which is based on ERC721 Metadata JSON Schema.  This implementation will throw an error if both `token_uri` and `extension` are provided. 
 ```
 {
 	"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
@@ -251,6 +253,7 @@ This is the metadata for a token that follows CW-721 metadata specification, whi
 |-----------|-------------------------------------|--------------------------------------------------------------------------------------|----------|----------------------|
 | token_uri | string                              | Uri pointing to off-chain JSON metadata                                              | yes      | nothing              |
 | extension | [Extension (see below)](#extension) | Data structure defining on-chain metadata                                            | yes      | nothing              |
+This implementation will throw an error if both `token_uri` and `extension` are provided.
 
 ### <a name="extension"></a>Extension
 This is an on-chain metadata extension struct that conforms to the Stashh metadata standard (which in turn implements https://docs.opensea.io/docs/metadata-standards).  Urls should be prefixed with `http://`, `https://`, `ipfs://`, or `ar://`.  Feel free to add/delete any fields as necessary.
@@ -385,14 +388,16 @@ BatchMintNft mints a list of tokens.  Only an authorized minting address my exec
 				"token_id": "optional_ID_of_new_token",
 				"owner": "optional_address_the_new_token_will_be_minted_to",
 				"public_metadata": {
-					"name": "optional_public_name",
-					"description": "optional_public_text_description",
-					"image": "optional_public_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+					"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+					"extension": {
+						"...": "..."
+					}
 				},
 				"private_metadata": {
-					"name": "optional_private_name",
-					"description": "optional_private_text_description",
-					"image": "optional_private_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+					"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+					"extension": {
+						"...": "..."
+					}
 				},
 				"serial_number": {
 					"mint_run": 3,
@@ -445,14 +450,16 @@ The Mint object defines the data necessary to mint one token.
 	"token_id": "optional_ID_of_new_token",
 	"owner": "optional_address_the_new_token_will_be_minted_to",
 	"public_metadata": {
-		"name": "optional_public_name",
-		"description": "optional_public_text_description",
-		"image": "optional_public_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+		"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+		"extension": {
+			"...": "..."
+		}
 	},
 	"private_metadata": {
-		"name": "optional_private_name",
-		"description": "optional_private_text_description",
-		"image": "optional_private_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+		"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+		"extension": {
+			"...": "..."
+		}
 	},
 	"serial_number": {
 		"mint_run": 3,
@@ -495,14 +502,16 @@ MintNftClones mints copies of an NFT, giving each one a [MintRunInfo](#mintrunin
 		"quantity": 100,
 		"owner": "optional_address_the_new_tokens_will_be_minted_to",
 		"public_metadata": {
-			"name": "optional_public_name",
-			"description": "optional_public_text_description",
-			"image": "optional_public_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+			"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+			"extension": {
+				"...": "..."
+			}
 		},
 		"private_metadata": {
-			"name": "optional_private_name",
-			"description": "optional_private_text_description",
-			"image": "optional_private_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+			"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+			"extension": {
+				"...": "..."
+			}
 		},
 		"royalty_info": {
 			"decimal_places_in_rates": 4,
@@ -552,14 +561,16 @@ SetMetadata will set the public and/or private metadata to the corresponding inp
 	"set_metadata": {
 		"token_id": "ID_of_token_whose_metadata_should_be_updated",
 		"public_metadata": {
-			"name": "optional_public_name",
-			"description": "optional_public_text_description",
-			"image": "optional_public_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+			"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+			"extension": {
+				"...": "..."
+			}
 		},
 		"private_metadata": {
-			"name": "optional_private_name",
-			"description": "optional_private_text_description",
-			"image": "optional_private_uri_pointing_to_an_image_or_additional_off-chain_metadata"
+			"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+			"extension": {
+				"...": "..."
+			}
 		},
 		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
@@ -1652,7 +1663,7 @@ The Cw721Approval object is used to display CW-721-style approvals which are lim
 | expires | [Expiration (see above)](#expiration) | The expiration of this transfer approval.  Can be a blockheight, time, or never | no       |
 
 ## <a name="nftinfo"></a>NftInfo
-NftInfo returns the public metadata of a token.  It follows CW-721 specification, which is based on ERC-721 Metadata JSON Schema.
+NftInfo returns the public metadata of a token.  It follows CW-721 specification, which is based on ERC-721 Metadata JSON Schema.  At most, one of the fields `token_uri` OR `extension` will be defined.
 
 ##### Request
 ```
@@ -1670,17 +1681,18 @@ NftInfo returns the public metadata of a token.  It follows CW-721 specification
 ```
 {
 	"nft_info": {
-		"name": "optional_name_of_the_token",
-		"description": "optional_description",
-		"image": "optional_uri_containing_an_image_or_additional_metadata"
+		"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+		"extension": {
+			"...": "..."
+		}
 	}
 }
 ```
-| Name        | Type   | Description                                              | Optional | 
-|-------------|--------|----------------------------------------------------------|----------|
-| name        | string | Name of the token                                        | yes      |
-| description | string | Token description                                        | yes      |
-| image       | string | Uri to an image or additional metadata                   | yes      |
+| Name      | Type                                | Description                                                                          | Optional |
+|-----------|-------------------------------------|--------------------------------------------------------------------------------------|----------|
+| token_uri | string                              | Uri pointing to off-chain JSON metadata                                              | yes      |
+| extension | [Extension (see above)](#extension) | Data structure defining on-chain metadata                                            | yes      |
+At most, one of the fields `token_uri` OR `extension` will be defined.
 
 ## AllNftInfo
 AllNftInfo displays the result of both [OwnerOf](#ownerof) and [NftInfo](#nftinfo) in a single query.  This is provided for CW-721 compliance, but for more complete information about a token, use [NftDossier](#nftdossier), which will include private metadata and view_owner and view_private_metadata approvals if the querier is permitted to view this information.
@@ -1721,9 +1733,10 @@ AllNftInfo displays the result of both [OwnerOf](#ownerof) and [NftInfo](#nftinf
 			]
 		},
 		"info": {
-			"name": "optional_name_of_the_token",
-			"description": "optional_description",
-			"image": "optional_uri_containing_an_image_or_additional_metadata"
+			"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+			"extension": {
+				"...": "..."
+			}
 		}
 	}
 }
@@ -1755,7 +1768,7 @@ The Cw721OwnerOfResponse object is used to display a token's owner if the querie
 | approvals | array of [Cw721Approval (see above)](#cw721approval) | List of approvals to transfer this token                 | no       |
 
 ## PrivateMetadata
-PrivateMetadata returns the private metadata of a token if the querier is permitted to view it.  It follows CW-721 metadata specification, which is based on ERC-721 Metadata JSON Schema.  If the metadata is [sealed](#enablesealed), no one is permitted to view it until it has been unwrapped with [Reveal](#reveal).  If no [viewer](#viewerinfo) is provided, PrivateMetadata will only display the private metadata if the private metadata is public for this token.
+PrivateMetadata returns the private metadata of a token if the querier is permitted to view it.  It follows CW-721 metadata specification, which is based on ERC-721 Metadata JSON Schema.  At most, one of the fields `token_uri` OR `extension` will be defined.  If the metadata is [sealed](#enablesealed), no one is permitted to view it until it has been unwrapped with [Reveal](#reveal).  If no [viewer](#viewerinfo) is provided, PrivateMetadata will only display the private metadata if the private metadata is public for this token.
 
 ##### Request
 ```
@@ -1778,20 +1791,21 @@ PrivateMetadata returns the private metadata of a token if the querier is permit
 ```
 {
 	"private_metadata": {
-		"name": "optional_private_name_of_the_token",
-		"description": "optional_private_description",
-		"image": "optional_private_uri_containing_an_image_or_additional_metadata"
+		"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+		"extension": {
+			"...": "..."
+		}
 	}
 }
 ```
-| Name        | Type   | Description                                                      | Optional | 
-|-------------|--------|------------------------------------------------------------------|----------|
-| name        | string | Private name of the token                                        | yes      |
-| description | string | Private token description                                        | yes      |
-| image       | string | Private uri to an image or additional metadata                   | yes      |
+| Name      | Type                                | Description                                                                          | Optional |
+|-----------|-------------------------------------|--------------------------------------------------------------------------------------|----------|
+| token_uri | string                              | Uri pointing to off-chain JSON metadata                                              | yes      |
+| extension | [Extension (see above)](#extension) | Data structure defining on-chain metadata                                            | yes      |
+At most, one of the fields `token_uri` OR `extension` will be defined.
 
 ## <a name="nftdossier"></a>NftDossier
-NftDossier returns all the information about a token that the viewer is permitted to view.  If no [viewer](#viewerinfo) is provided, NftDossier will only display the information that has been made public.  The response may include the owner, the public metadata, the private metadata, the reason the private metadata is not viewable, the royalty information, the mint run information, whether ownership is public, whether the private metadata is public, and (if the querier is the owner,) the approvals for this token as well as the inventory-wide approvals for the owner.
+NftDossier returns all the information about a token that the viewer is permitted to view.  If no [viewer](#viewerinfo) is provided, NftDossier will only display the information that has been made public.  The response may include the owner, the public metadata, the private metadata, the reason the private metadata is not viewable, the royalty information, the mint run information, whether ownership is public, whether the private metadata is public, and (if the querier is the owner,) the approvals for this token as well as the inventory-wide approvals for the owner.  This implementation will only display a token's royalty recipient addresses if the querier has permission to transfer the token.
 
 ##### Request
 ```
@@ -1818,21 +1832,23 @@ NftDossier returns all the information about a token that the viewer is permitte
 	"nft_dossier": {
 		"owner": "address_of_the_token_owner",
 		"public_metadata": {
-			"name": "optional_public_name_of_the_token",
-			"description": "optional_public_description",
-			"image": "optional_public_uri_containing_an_image_or_additional_metadata"
+			"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+			"extension": {
+				"...": "..."
+			}
 		},
 		"private_metadata": {
-			"name": "optional_private_name_of_the_token",
-			"description": "optional_private_description",
-			"image": "optional_private_uri_containing_an_image_or_additional_metadata"
+			"token_uri": "optional_uri_pointing_to_off-chain_JSON_metadata",
+			"extension": {
+				"...": "..."
+			}
 		},
 		"display_private_metadata_error": "optional_error_describing_why_private_metadata_is_not_viewable_if_applicable",
 		"royalty_info": {
 			"decimal_places_in_rates": 4,
 			"royalties": [
 				{
-					"recipient": "address_that_should_be_paid_this_royalty",
+					"recipient": "optional_address_that_should_be_paid_this_royalty",
 					"rate": 100,
 				},
 				{
@@ -1933,7 +1949,7 @@ The Snip721Approval object is used to display all the approvals (and their expir
 | transfer_expiration              | [Expiration (see above)](#expiration) | The expiration for transfer permission.  Can be a blockheight, time, or never               | yes      |
 
 ## <a name="royaltyquery"></a>RoyaltyInfo (query)
-If a `token_id` is provided in the request, RoyaltyInfo returns the royalty information for that token.  If no `token_id` is requested, RoyaltyInfo displays the default royalty information for the contract.
+If a `token_id` is provided in the request, RoyaltyInfo returns the royalty information for that token.  This implementation will only display a token's royalty recipient addresses if the querier has permission to transfer the token.  If no `token_id` is requested, RoyaltyInfo displays the default royalty information for the contract.  This implementation will only display the contract's default royalty recipient addresses if the querier is an authorized minter.
 
 ##### Request
 ```
@@ -1954,7 +1970,7 @@ If a `token_id` is provided in the request, RoyaltyInfo returns the royalty info
 		"decimal_places_in_rates": 4,
 		"royalties": [
 			{
-				"recipient": "address_that_should_be_paid_this_royalty",
+				"recipient": "optional_address_that_should_be_paid_this_royalty",
 				"rate": 100,
 			},
 			{
