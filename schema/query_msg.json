@@ -232,7 +232,7 @@
       }
     },
     {
-      "description": "displays all the information about a token that the viewer has permission to see.  This may include the owner, the public metadata, the private metadata, and the token and inventory approvals",
+      "description": "displays all the information about a token that the viewer has permission to see.  This may include the owner, the public metadata, the private metadata, royalty information, mint run information, and the token and inventory approvals",
       "type": "object",
       "required": [
         "nft_dossier"
@@ -578,11 +578,480 @@
           }
         }
       }
+    },
+    {
+      "description": "display the contract's creator",
+      "type": "object",
+      "required": [
+        "contract_creator"
+      ],
+      "properties": {
+        "contract_creator": {
+          "type": "object"
+        }
+      }
+    },
+    {
+      "description": "perform queries by passing permits instead of viewing keys",
+      "type": "object",
+      "required": [
+        "with_permit"
+      ],
+      "properties": {
+        "with_permit": {
+          "type": "object",
+          "required": [
+            "permit",
+            "query"
+          ],
+          "properties": {
+            "permit": {
+              "description": "permit used to verify querier identity",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Permit"
+                }
+              ]
+            },
+            "query": {
+              "description": "query to perform",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/QueryWithPermit"
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {
+    "Binary": {
+      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
+      "type": "string"
+    },
     "HumanAddr": {
       "type": "string"
+    },
+    "Permission": {
+      "type": "string",
+      "enum": [
+        "allowance",
+        "balance",
+        "history",
+        "owner"
+      ]
+    },
+    "Permit": {
+      "type": "object",
+      "required": [
+        "params",
+        "signature"
+      ],
+      "properties": {
+        "params": {
+          "$ref": "#/definitions/PermitParams"
+        },
+        "signature": {
+          "$ref": "#/definitions/PermitSignature"
+        }
+      }
+    },
+    "PermitParams": {
+      "type": "object",
+      "required": [
+        "allowed_tokens",
+        "chain_id",
+        "permissions",
+        "permit_name"
+      ],
+      "properties": {
+        "allowed_tokens": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HumanAddr"
+          }
+        },
+        "chain_id": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Permission"
+          }
+        },
+        "permit_name": {
+          "type": "string"
+        }
+      }
+    },
+    "PermitSignature": {
+      "type": "object",
+      "required": [
+        "pub_key",
+        "signature"
+      ],
+      "properties": {
+        "pub_key": {
+          "$ref": "#/definitions/PubKey"
+        },
+        "signature": {
+          "$ref": "#/definitions/Binary"
+        }
+      }
+    },
+    "PubKey": {
+      "type": "object",
+      "required": [
+        "type",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "description": "ignored, but must be \"tendermint/PubKeySecp256k1\" otherwise the verification will fail",
+          "type": "string"
+        },
+        "value": {
+          "description": "Secp256k1 PubKey",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Binary"
+            }
+          ]
+        }
+      }
+    },
+    "QueryWithPermit": {
+      "description": "queries using permits instead of viewing keys",
+      "anyOf": [
+        {
+          "description": "display the royalty information of a token if a token ID is specified, or display the contract's default royalty information in no token ID is provided",
+          "type": "object",
+          "required": [
+            "royalty_info"
+          ],
+          "properties": {
+            "royalty_info": {
+              "type": "object",
+              "properties": {
+                "token_id": {
+                  "description": "optional ID of the token whose royalty information should be displayed.  If not provided, display the contract's default royalty information",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "displays the private metadata if permitted to view it",
+          "type": "object",
+          "required": [
+            "private_metadata"
+          ],
+          "properties": {
+            "private_metadata": {
+              "type": "object",
+              "required": [
+                "token_id"
+              ],
+              "properties": {
+                "token_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "displays all the information about a token that the viewer has permission to see.  This may include the owner, the public metadata, the private metadata, royalty information, mint run information, and the token and inventory approvals",
+          "type": "object",
+          "required": [
+            "nft_dossier"
+          ],
+          "properties": {
+            "nft_dossier": {
+              "type": "object",
+              "required": [
+                "token_id"
+              ],
+              "properties": {
+                "include_expired": {
+                  "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "token_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "display the owner of the specified token if authorized to view it.  If the requester is also the token's owner, the response will also include a list of any addresses that can transfer this token.  The transfer approval list is for CW721 compliance, but the NftDossier query will be more complete by showing viewing approvals as well",
+          "type": "object",
+          "required": [
+            "owner_of"
+          ],
+          "properties": {
+            "owner_of": {
+              "type": "object",
+              "required": [
+                "token_id"
+              ],
+              "properties": {
+                "include_expired": {
+                  "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "token_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "displays all the information contained in the OwnerOf and NftInfo queries",
+          "type": "object",
+          "required": [
+            "all_nft_info"
+          ],
+          "properties": {
+            "all_nft_info": {
+              "type": "object",
+              "required": [
+                "token_id"
+              ],
+              "properties": {
+                "include_expired": {
+                  "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "token_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "list all the inventory-wide approvals in place for the permit creator",
+          "type": "object",
+          "required": [
+            "inventory_approvals"
+          ],
+          "properties": {
+            "inventory_approvals": {
+              "type": "object",
+              "properties": {
+                "include_expired": {
+                  "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "verify that the permit creator has approval to transfer every listed token",
+          "type": "object",
+          "required": [
+            "verify_transfer_approval"
+          ],
+          "properties": {
+            "verify_transfer_approval": {
+              "type": "object",
+              "required": [
+                "token_ids"
+              ],
+              "properties": {
+                "token_ids": {
+                  "description": "list of tokens to verify approval for",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "display the transaction history for the permit creator in reverse chronological order",
+          "type": "object",
+          "required": [
+            "transaction_history"
+          ],
+          "properties": {
+            "transaction_history": {
+              "type": "object",
+              "properties": {
+                "page": {
+                  "description": "optional page to display",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "page_size": {
+                  "description": "optional number of transactions per page",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "uint32",
+                  "minimum": 0.0
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "display the number of tokens controlled by the contract.  The token supply must either be public, or the querier must be an authenticated minter",
+          "type": "object",
+          "required": [
+            "num_tokens"
+          ],
+          "properties": {
+            "num_tokens": {
+              "type": "object"
+            }
+          }
+        },
+        {
+          "description": "display an optionally paginated list of all the tokens controlled by the contract. The token supply must either be public, or the querier must be an authenticated minter",
+          "type": "object",
+          "required": [
+            "all_tokens"
+          ],
+          "properties": {
+            "all_tokens": {
+              "type": "object",
+              "properties": {
+                "limit": {
+                  "description": "optional number of token ids to display",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "start_after": {
+                  "description": "paginate by providing the last token_id received in the previous query",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "list all the approvals in place for a specified token if given the owner's permit",
+          "type": "object",
+          "required": [
+            "token_approvals"
+          ],
+          "properties": {
+            "token_approvals": {
+              "type": "object",
+              "required": [
+                "token_id"
+              ],
+              "properties": {
+                "include_expired": {
+                  "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "token_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "displays a list of all the CW721-style operators (any address that was granted approval to transfer all of the owner's tokens).  This query is provided to maintain CW721 compliance",
+          "type": "object",
+          "required": [
+            "approved_for_all"
+          ],
+          "properties": {
+            "approved_for_all": {
+              "type": "object",
+              "properties": {
+                "include_expired": {
+                  "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "displays a list of all the tokens belonging to the input owner in which the permit creator has view_owner permission",
+          "type": "object",
+          "required": [
+            "tokens"
+          ],
+          "properties": {
+            "tokens": {
+              "type": "object",
+              "required": [
+                "owner"
+              ],
+              "properties": {
+                "limit": {
+                  "description": "optional number of token ids to display",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "uint32",
+                  "minimum": 0.0
+                },
+                "owner": {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                "start_after": {
+                  "description": "paginate by providing the last token_id received in the previous query",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "ViewerInfo": {
       "description": "the address and viewing key making an authenticated query request",

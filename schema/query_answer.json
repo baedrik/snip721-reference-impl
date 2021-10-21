@@ -605,6 +605,29 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "required": [
+        "contract_creator"
+      ],
+      "properties": {
+        "contract_creator": {
+          "type": "object",
+          "properties": {
+            "creator": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/HumanAddr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   ],
   "definitions": {

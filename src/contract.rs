@@ -9,15 +9,18 @@ use primitive_types::U256;
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
 use std::collections::HashSet;
 
-use secret_toolkit::utils::{pad_handle_result, pad_query_result};
+use secret_toolkit::{
+    permit::{validate, Permit, RevokedPermits},
+    utils::{pad_handle_result, pad_query_result},
+};
 
 use crate::expiration::Expiration;
 use crate::inventory::{Inventory, InventoryIter};
 use crate::mint_run::{SerialNumber, StoredMintRunInfo};
 use crate::msg::{
     AccessLevel, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse, HandleAnswer,
-    HandleMsg, InitMsg, Mint, QueryAnswer, QueryMsg, ReceiverInfo, ResponseStatus::Success, Send,
-    Snip721Approval, Transfer, ViewerInfo,
+    HandleMsg, InitMsg, Mint, QueryAnswer, QueryMsg, QueryWithPermit, ReceiverInfo,
+    ResponseStatus::Success, Send, Snip721Approval, Transfer, ViewerInfo,
 };
 use crate::rand::sha_256;
 use crate::receiver::{batch_receive_nft_msg, receive_nft_msg};
@@ -25,10 +28,10 @@ use crate::royalties::{RoyaltyInfo, StoredRoyaltyInfo};
 use crate::state::{
     get_txs, json_may_load, json_save, load, may_load, remove, save, store_burn, store_mint,
     store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, BLOCK_KEY,
-    CONFIG_KEY, CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS,
-    PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN,
-    PREFIX_MINT_RUN_NUM, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS,
-    PREFIX_ROYALTY_INFO, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
+    CONFIG_KEY, CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, MY_ADDRESS_KEY,
+    PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX,
+    PREFIX_MINT_RUN, PREFIX_MINT_RUN_NUM, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META,
+    PREFIX_RECEIVERS, PREFIX_REVOKED_PERMITS, PREFIX_ROYALTY_INFO, PREFIX_VIEW_KEY, PRNG_SEED_KEY,
 };
 use crate::token::{Metadata, Token};
 use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
@@ -56,6 +59,11 @@ pub fn init<S: Storage, A: Api, Q: Querier>(
 ) -> InitResult {
     let creator_raw = deps.api.canonical_address(&env.message.sender)?;
     save(&mut deps.storage, CREATOR_KEY, &creator_raw)?;
+    save(
+        &mut deps.storage,
+        MY_ADDRESS_KEY,
+        &deps.api.canonical_address(&env.contract.address)?,
+    )?;
     let admin_raw = msg
         .admin
         .map(|a| deps.api.canonical_address(&a))
@@ -430,6 +438,9 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
         ),
         HandleMsg::SetContractStatus { level, .. } => {
             set_contract_status(deps, env, &mut config, level)
+        }
+        HandleMsg::RevokePermit { permit_name, .. } => {
+            revoke_permit(&mut deps.storage, &env.message.sender, &permit_name)
         }
     };
     pad_handle_result(response, BLOCK_SIZE)
@@ -1680,6 +1691,29 @@ pub fn set_contract_status<S: Storage, A: Api, Q: Querier>(
     })
 }
 
+/// Returns HandleResult
+///
+/// revoke the ability to use a specified permit
+///
+/// # Arguments
+///
+/// * `storage` - mutable reference to the contract's storage
+/// * `sender` - a reference to the message sender
+/// * `permit_name` - string slice of the name of the permit to revoke
+fn revoke_permit<S: Storage>(
+    storage: &mut S,
+    sender: &HumanAddr,
+    permit_name: &str,
+) -> HandleResult {
+    RevokedPermits::revoke_permit(storage, PREFIX_REVOKED_PERMITS, sender, permit_name);
+
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: Some(to_binary(&HandleAnswer::RevokePermit { status: Success })?),
+    })
+}
+
 /////////////////////////////////////// Query /////////////////////////////////////
 /// Returns QueryResult
 ///
@@ -1690,73 +1724,184 @@ pub fn set_contract_status<S: Storage, A: Api, Q: Querier>(
 pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryMsg) -> QueryResult {
     let response = match msg {
         QueryMsg::ContractInfo {} => query_contract_info(&deps.storage),
+        QueryMsg::ContractCreator {} => query_contract_creator(deps),
         QueryMsg::RoyaltyInfo { token_id, viewer } => {
-            query_royalty(deps, token_id.as_deref(), viewer)
+            query_royalty(deps, token_id.as_deref(), viewer, None)
         }
         QueryMsg::ContractConfig {} => query_config(&deps.storage),
         QueryMsg::Minters {} => query_minters(deps),
-        QueryMsg::NumTokens { viewer } => query_num_tokens(deps, viewer),
+        QueryMsg::NumTokens { viewer } => query_num_tokens(deps, viewer, None),
         QueryMsg::AllTokens {
             viewer,
             start_after,
             limit,
-        } => query_all_tokens(deps, viewer, start_after, limit),
+        } => query_all_tokens(deps, viewer, start_after, limit, None),
         QueryMsg::OwnerOf {
             token_id,
             viewer,
             include_expired,
-        } => query_owner_of(deps, &token_id, viewer, include_expired),
+        } => query_owner_of(deps, &token_id, viewer, include_expired, None),
         QueryMsg::NftInfo { token_id } => query_nft_info(&deps.storage, &token_id),
         QueryMsg::PrivateMetadata { token_id, viewer } => {
-            query_private_meta(deps, &token_id, viewer)
+            query_private_meta(deps, &token_id, viewer, None)
         }
         QueryMsg::AllNftInfo {
             token_id,
             viewer,
             include_expired,
-        } => query_all_nft_info(deps, &token_id, viewer, include_expired),
+        } => query_all_nft_info(deps, &token_id, viewer, include_expired, None),
         QueryMsg::NftDossier {
             token_id,
             viewer,
             include_expired,
-        } => query_nft_dossier(deps, &token_id, viewer, include_expired),
+        } => query_nft_dossier(deps, &token_id, viewer, include_expired, None),
         QueryMsg::TokenApprovals {
             token_id,
             viewing_key,
             include_expired,
-        } => query_token_approvals(deps, &token_id, viewing_key, include_expired),
+        } => query_token_approvals(deps, &token_id, Some(viewing_key), include_expired, None),
         QueryMsg::InventoryApprovals {
             address,
             viewing_key,
             include_expired,
-        } => query_inventory_approvals(deps, &address, viewing_key, include_expired),
+        } => {
+            let viewer = Some(ViewerInfo {
+                address,
+                viewing_key,
+            });
+            query_inventory_approvals(deps, viewer, include_expired, None)
+        }
         QueryMsg::ApprovedForAll {
             owner,
             viewing_key,
             include_expired,
-        } => query_approved_for_all(deps, &owner, viewing_key, include_expired),
+        } => query_approved_for_all(deps, Some(&owner), viewing_key, include_expired, None),
         QueryMsg::Tokens {
             owner,
             viewer,
             viewing_key,
             start_after,
             limit,
-        } => query_tokens(deps, &owner, viewer, viewing_key, start_after, limit),
+        } => query_tokens(deps, &owner, viewer, viewing_key, start_after, limit, None),
         QueryMsg::VerifyTransferApproval {
             token_ids,
             address,
             viewing_key,
-        } => query_verify_approval(deps, &token_ids, &address, viewing_key),
+        } => {
+            let viewer = Some(ViewerInfo {
+                address,
+                viewing_key,
+            });
+            query_verify_approval(deps, &token_ids, viewer, None)
+        }
         QueryMsg::IsUnwrapped { token_id } => query_is_unwrapped(&deps.storage, &token_id),
         QueryMsg::TransactionHistory {
             address,
             viewing_key,
             page,
             page_size,
-        } => query_transactions(deps, &address, viewing_key, page, page_size),
+        } => {
+            let viewer = Some(ViewerInfo {
+                address,
+                viewing_key,
+            });
+            query_transactions(deps, viewer, page, page_size, None)
+        }
         QueryMsg::RegisteredCodeHash { contract } => query_code_hash(deps, &contract),
+        QueryMsg::WithPermit { permit, query } => permit_queries(deps, permit, query),
     };
     pad_query_result(response, BLOCK_SIZE)
+}
+
+/// Returns QueryResult from validating a permit and then using its creator's address when
+/// performing the specified query
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `permit` - the permit used to authentic the query
+/// * `query` - the query to perform
+pub fn permit_queries<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    permit: Permit,
+    query: QueryWithPermit,
+) -> QueryResult {
+    // Validate permit content
+    let my_address = deps
+        .api
+        .human_address(&load::<CanonicalAddr, _>(&deps.storage, MY_ADDRESS_KEY)?)?;
+    let querier = deps.api.canonical_address(&validate(
+        deps,
+        PREFIX_REVOKED_PERMITS,
+        &permit,
+        my_address,
+    )?)?;
+    if !permit.check_permission(&secret_toolkit::permit::Permission::Owner) {
+        return Err(StdError::generic_err(format!(
+            "Owner permission is required for SNIP-721 queries, got permissions {:?}",
+            permit.params.permissions
+        )));
+    }
+    // permit validated, process query
+    match query {
+        QueryWithPermit::RoyaltyInfo { token_id } => {
+            query_royalty(deps, token_id.as_deref(), None, Some(querier))
+        }
+        QueryWithPermit::PrivateMetadata { token_id } => {
+            query_private_meta(deps, &token_id, None, Some(querier))
+        }
+        QueryWithPermit::NftDossier {
+            token_id,
+            include_expired,
+        } => query_nft_dossier(deps, &token_id, None, include_expired, Some(querier)),
+        QueryWithPermit::OwnerOf {
+            token_id,
+            include_expired,
+        } => query_owner_of(deps, &token_id, None, include_expired, Some(querier)),
+        QueryWithPermit::AllNftInfo {
+            token_id,
+            include_expired,
+        } => query_all_nft_info(deps, &token_id, None, include_expired, Some(querier)),
+        QueryWithPermit::InventoryApprovals { include_expired } => {
+            query_inventory_approvals(deps, None, include_expired, Some(querier))
+        }
+        QueryWithPermit::VerifyTransferApproval { token_ids } => {
+            query_verify_approval(deps, &token_ids, None, Some(querier))
+        }
+        QueryWithPermit::TransactionHistory { page, page_size } => {
+            query_transactions(deps, None, page, page_size, Some(querier))
+        }
+        QueryWithPermit::NumTokens {} => query_num_tokens(deps, None, Some(querier)),
+        QueryWithPermit::AllTokens { start_after, limit } => {
+            query_all_tokens(deps, None, start_after, limit, Some(querier))
+        }
+        QueryWithPermit::TokenApprovals {
+            token_id,
+            include_expired,
+        } => query_token_approvals(deps, &token_id, None, include_expired, Some(querier)),
+        QueryWithPermit::ApprovedForAll { include_expired } => {
+            query_approved_for_all(deps, None, None, include_expired, Some(querier))
+        }
+        QueryWithPermit::Tokens {
+            owner,
+            start_after,
+            limit,
+        } => query_tokens(deps, &owner, None, None, start_after, limit, Some(querier)),
+    }
+}
+
+/// Returns QueryResult displaying the contract's creator
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+pub fn query_contract_creator<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> QueryResult {
+    let creator_raw: CanonicalAddr = load(&deps.storage, CREATOR_KEY)?;
+    to_binary(&QueryAnswer::ContractCreator {
+        creator: Some(deps.api.human_address(&creator_raw)?),
+    })
 }
 
 /// Returns QueryResult displaying the contract's name and symbol
@@ -1781,18 +1926,14 @@ pub fn query_contract_info<S: ReadonlyStorage>(storage: &S) -> QueryResult {
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 /// * `token_id` - optional token id whose RoyaltyInfo is being requested
 /// * `viewer` - optional address and key making an authenticated query request
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_royalty<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: Option<&str>,
     viewer: Option<ViewerInfo>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
-    let viewer_raw = viewer
-        .map(|v| {
-            let raw = deps.api.canonical_address(&v.address)?;
-            check_key(&deps.storage, &raw, v.viewing_key)?;
-            Ok(raw)
-        })
-        .transpose()?;
+    let viewer_raw = get_querier(deps, viewer, from_permit)?;
     let (royalty, hide_addr) = if let Some(id) = token_id {
         // TODO remove this when BlockInfo becomes available to queries
         let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
@@ -1895,12 +2036,14 @@ pub fn query_minters<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> 
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 /// * `viewer` - optional address and key making an authenticated query request
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_num_tokens<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     viewer: Option<ViewerInfo>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
     // authenticate permission to view token supply
-    check_view_supply(deps, viewer)?;
+    check_view_supply(deps, viewer, from_permit)?;
     let config: Config = load(&deps.storage, CONFIG_KEY)?;
     to_binary(&QueryAnswer::NumTokens {
         count: config.token_cnt,
@@ -1915,14 +2058,16 @@ pub fn query_num_tokens<S: Storage, A: Api, Q: Querier>(
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `start_after` - optionally only display token ids that come after this one
 /// * `limit` - optional max number of tokens to display
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     viewer: Option<ViewerInfo>,
     start_after: Option<String>,
     limit: Option<u32>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
     // authenticate permission to view token supply
-    check_view_supply(deps, viewer)?;
+    check_view_supply(deps, viewer, from_permit)?;
     let mut i = start_after.map_or_else(
         || Ok(0),
         |id| {
@@ -1960,14 +2105,16 @@ pub fn query_all_tokens<S: Storage, A: Api, Q: Querier>(
 /// * `token_id` - string slice of the token id
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_owner_of<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: &str,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
     let (may_owner, approvals, _idx) =
-        process_cw721_owner_of(deps, token_id, viewer, include_expired)?;
+        process_cw721_owner_of(deps, token_id, viewer, include_expired, from_permit)?;
     if let Some(owner) = may_owner {
         return to_binary(&QueryAnswer::OwnerOf { owner, approvals });
     }
@@ -2022,12 +2169,14 @@ pub fn query_nft_info<S: ReadonlyStorage>(storage: &S, token_id: &str) -> QueryR
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 /// * `token_id` - string slice of the token id
 /// * `viewer` - optional address and key making an authenticated query request
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_private_meta<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: &str,
     viewer: Option<ViewerInfo>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
-    let prep_info = query_token_prep(deps, token_id, viewer)?;
+    let prep_info = query_token_prep(deps, token_id, viewer, from_permit)?;
     check_perm_core(
         deps,
         &prep_info.block,
@@ -2064,13 +2213,16 @@ pub fn query_private_meta<S: Storage, A: Api, Q: Querier>(
 /// * `token_id` - string slice of the token id
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: &str,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
-    let (owner, approvals, idx) = process_cw721_owner_of(deps, token_id, viewer, include_expired)?;
+    let (owner, approvals, idx) =
+        process_cw721_owner_of(deps, token_id, viewer, include_expired, from_permit)?;
     let meta_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
     let info: Option<Metadata> = may_load(&meta_store, &idx.to_le_bytes())?;
     let access = Cw721OwnerOfResponse { owner, approvals };
@@ -2078,8 +2230,8 @@ pub fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
 }
 
 /// Returns QueryResult displaying all the token information the querier is permitted to
-/// view.  This may include the owner, the public metadata, the private metadata, and
-/// the token and inventory approvals
+/// view.  This may include the owner, the public metadata, the private metadata, royalty
+/// information, mint run information, and the token and inventory approvals
 ///
 /// # Arguments
 ///
@@ -2087,13 +2239,15 @@ pub fn query_all_nft_info<S: Storage, A: Api, Q: Querier>(
 /// * `token_id` - string slice of the token id
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: &str,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
-    let mut prep_info = query_token_prep(deps, token_id, viewer)?;
+    let mut prep_info = query_token_prep(deps, token_id, viewer, from_permit)?;
     let incl_exp = include_expired.unwrap_or(false);
     let owner_slice = prep_info.token.owner.as_slice();
     let opt_viewer = prep_info.viewer_raw.as_ref();
@@ -2244,13 +2398,15 @@ pub fn query_nft_dossier<S: Storage, A: Api, Q: Querier>(
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 /// * `token_id` - string slice of the token id
-/// * `viewing_key` - the token owner's viewing key String
+/// * `viewing_key` - the optional token owner's viewing key String
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_token_approvals<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: &str,
-    viewing_key: String,
+    viewing_key: Option<String>,
     include_expired: Option<bool>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
     let config: Config = load(&deps.storage, CONFIG_KEY)?;
     let custom_err = format!(
@@ -2265,7 +2421,17 @@ pub fn query_token_approvals<S: Storage, A: Api, Q: Querier>(
         Some(&*custom_err)
     };
     let (mut token, _idx) = get_token(&deps.storage, token_id, opt_err)?;
-    check_key(&deps.storage, &token.owner, viewing_key)?;
+    // verify that the querier is the token owner
+    if let Some(pmt) = from_permit {
+        if pmt != token.owner {
+            return Err(StdError::generic_err(custom_err));
+        }
+    } else {
+        let key = viewing_key.ok_or_else(|| {
+            StdError::generic_err("This is being called incorrectly if there is no viewing key")
+        })?;
+        check_key(&deps.storage, &token.owner, key)?;
+    }
     let owner_slice = token.owner.as_slice();
     let own_priv_store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
     let global_pass: bool =
@@ -2324,18 +2490,19 @@ pub fn query_token_approvals<S: Storage, A: Api, Q: Querier>(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
-/// * `address` - a reference to the address whose approvals should be displayed
-/// * `viewing_key` - the token owner's viewing key String
+/// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_inventory_approvals<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
-    address: &HumanAddr,
-    viewing_key: String,
+    viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
-    let owner_raw = deps.api.canonical_address(address)?;
+    let owner_raw = get_querier(deps, viewer, from_permit)?.ok_or_else(|| {
+        StdError::generic_err("This is being called incorrectly if there is no querier address")
+    })?;
     let owner_slice = owner_raw.as_slice();
-    check_key(&deps.storage, &owner_raw, viewing_key)?;
     let own_priv_store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
     let config: Config = load(&deps.storage, CONFIG_KEY)?;
     let global_pass: bool =
@@ -2388,23 +2555,34 @@ pub fn query_inventory_approvals<S: Storage, A: Api, Q: Querier>(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
-/// * `owner` - a reference to the address whose transfer ALL list should be displayed
+/// * `owner` - an optional reference to the address whose transfer ALL list should be displayed
 /// * `viewing_key` - optional String of the owner's viewing key
 /// * `include_expired` - optionally true if the Approval list should include expired Approvals
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_approved_for_all<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
-    owner: &HumanAddr,
+    owner: Option<&HumanAddr>,
     viewing_key: Option<String>,
     include_expired: Option<bool>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
-    let owner_raw = deps.api.canonical_address(owner)?;
-    if let Some(key) = viewing_key {
-        check_key(&deps.storage, &owner_raw, key)?;
+    // get the address whose approvals are being queried
+    let owner_raw = if let Some(pmt) = from_permit {
+        pmt
     } else {
-        return to_binary(&QueryAnswer::ApprovedForAll {
-            operators: Vec::new(),
-        });
-    }
+        let raw = deps.api.canonical_address(owner.ok_or_else(|| {
+            StdError::generic_err("This is being called incorrectly if there is no owner address")
+        })?)?;
+        if let Some(key) = viewing_key {
+            check_key(&deps.storage, &raw, key)?;
+        // didn't supply a viewing key so just return an empty list of approvals
+        } else {
+            return to_binary(&QueryAnswer::ApprovedForAll {
+                operators: Vec::new(),
+            });
+        }
+        raw
+    };
     // TODO remove this when BlockInfo becomes available to queries
     let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
         height: 1,
@@ -2440,6 +2618,7 @@ pub fn query_approved_for_all<S: Storage, A: Api, Q: Querier>(
 /// * `start_after` - optionally only display token ids that come after this String in
 ///                   lexicographical order
 /// * `limit` - optional max number of tokens to display
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     owner: &HumanAddr,
@@ -2447,27 +2626,37 @@ pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
     viewing_key: Option<String>,
     start_after: Option<String>,
     limit: Option<u32>,
+    from_permit: Option<CanonicalAddr>,
 ) -> QueryResult {
-    let mut is_viewer = false;
-    let mut is_owner = false;
     let owner_raw = deps.api.canonical_address(owner)?;
     let cut_off = limit.unwrap_or(30);
-    let viewer_raw = viewer.map(|h| deps.api.canonical_address(&h)).transpose()?;
-    // if we need to validate an address
-    if let Some(key) = viewing_key {
-        // if a viewer was supplied, they're saying they aren't the owner so check
-        // if the key matches the viewer address first
-        if let Some(vwr) = viewer_raw.as_ref() {
-            if check_key(&deps.storage, vwr, key.clone()).is_ok() {
-                is_viewer = true;
-            }
-        }
-        // check if this is the owner's key if we need to
-        if !is_viewer {
-            check_key(&deps.storage, &owner_raw, key)?;
-            is_owner = true;
-        }
-    }
+    // determine the querier
+    let (is_owner, may_querier) = if let Some(pmt) = from_permit.as_ref() {
+        // permit tells you who is querying, so also check if he is the owner
+        (owner_raw == *pmt, from_permit)
+    // no permit, so check if a key was provided and who it matches
+    } else if let Some(key) = viewing_key {
+        // if there is a viewer
+        viewer
+            // convert to canonical
+            .map(|v| deps.api.canonical_address(&v))
+            .transpose()?
+            // only keep the viewer address if the viewing key matches
+            .filter(|v| check_key(&deps.storage, &v, key.clone()).is_ok())
+            .map_or_else(
+                // no viewer or key did not match
+                || {
+                    // check if the key matches the owner, and error if it fails this last chance
+                    check_key(&deps.storage, &owner_raw, key)?;
+                    Ok((true, Some(owner_raw.clone())))
+                },
+                // we know the querier is the viewer, so check if someone put the same address for both
+                |v| Ok((v == owner_raw, Some(v))),
+            )?
+    // no permit, no viewing key, so querier is unknown
+    } else {
+        (false, None)
+    };
     // exit early if the limit is 0
     if cut_off == 0 {
         return to_binary(&QueryAnswer::TokenList { tokens: Vec::new() });
@@ -2476,13 +2665,7 @@ pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
     let own_inv = Inventory::new(&deps.storage, owner_raw)?;
     let owner_slice = own_inv.owner.as_slice();
 
-    let querier = if is_viewer {
-        viewer_raw.as_ref()
-    } else if is_owner {
-        Some(&own_inv.owner)
-    } else {
-        None
-    };
+    let querier = may_querier.as_ref();
     // if querier is different than the owner, check if ownership is public
     let mut may_config: Option<Config> = None;
     let mut known_pass = if !is_owner {
@@ -2641,20 +2824,21 @@ pub fn query_is_unwrapped<S: ReadonlyStorage>(storage: &S, token_id: &str) -> Qu
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
-/// * `address` - a reference to the address whose transactions should be displayed
-/// * `viewing_key` - viewing key String
+/// * `viewer` - optional address and key making an authenticated query request
 /// * `page` - an optional page number.  If given, the most recent `page` times `page_size`
 ///            transactions will be skipped
 /// * `page_size` - optional max number of transactions to display
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_transactions<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
-    address: &HumanAddr,
-    viewing_key: String,
+    viewer: Option<ViewerInfo>,
     page: Option<u32>,
     page_size: Option<u32>,
+    from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
-    let address_raw = deps.api.canonical_address(address)?;
-    check_key(&deps.storage, &address_raw, viewing_key)?;
+    let address_raw = get_querier(deps, viewer, from_permit)?.ok_or_else(|| {
+        StdError::generic_err("This is being called incorrectly if there is no querier address")
+    })?;
     let (txs, total) = get_txs(
         &deps.api,
         &deps.storage,
@@ -2672,16 +2856,17 @@ pub fn query_transactions<S: Storage, A: Api, Q: Querier>(
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 /// * `token_ids` - a list of token ids to check if the address has transfer approval
-/// * `address` - a reference to the address whose transactions should be displayed
-/// * `viewing_key` - viewing key String
+/// * `viewer` - optional address and key making an authenticated query request
+/// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_verify_approval<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_ids: &[String],
-    address: &HumanAddr,
-    viewing_key: String,
+    viewer: Option<ViewerInfo>,
+    from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
-    let address_raw = deps.api.canonical_address(address)?;
-    check_key(&deps.storage, &address_raw, viewing_key)?;
+    let address_raw = get_querier(deps, viewer, from_permit)?.ok_or_else(|| {
+        StdError::generic_err("This is being called incorrectly if there is no querier address")
+    })?;
     let config: Config = load(&deps.storage, CONFIG_KEY)?;
     // TODO remove this when BlockInfo becomes available to queries
     let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
@@ -2764,18 +2949,14 @@ pub struct TokenQueryInfo {
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 /// * `token_id` - string slice of the token id
 /// * `viewer` - optional address and key making an authenticated query request
+/// * `from_permit` - address derived from an Owner permit, if applicable
 fn query_token_prep<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: &str,
     viewer: Option<ViewerInfo>,
+    from_permit: Option<CanonicalAddr>,
 ) -> StdResult<TokenQueryInfo> {
-    let viewer_raw = viewer
-        .map(|v| {
-            let raw = deps.api.canonical_address(&v.address)?;
-            check_key(&deps.storage, &raw, v.viewing_key)?;
-            Ok(raw)
-        })
-        .transpose()?;
+    let viewer_raw = get_querier(deps, viewer, from_permit)?;
     let config: Config = load(&deps.storage, CONFIG_KEY)?;
     // TODO remove this when BlockInfo becomes available to queries
     let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
@@ -2814,13 +2995,15 @@ fn query_token_prep<S: Storage, A: Api, Q: Querier>(
 /// * `token_id` - string slice of the token id
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
+/// * `from_permit` - address derived from an Owner permit, if applicable
 fn process_cw721_owner_of<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     token_id: &str,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
+    from_permit: Option<CanonicalAddr>,
 ) -> StdResult<(Option<HumanAddr>, Vec<Cw721Approval>, u32)> {
-    let prep_info = query_token_prep(deps, token_id, viewer)?;
+    let prep_info = query_token_prep(deps, token_id, viewer, from_permit)?;
     let opt_viewer = prep_info.viewer_raw.as_ref();
     if check_permission(
         deps,
@@ -3009,21 +3192,20 @@ fn gen_snip721_approvals<A: Api>(
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 /// * `viewer` - optional address and key making an authenticated query request
+/// * `from_permit` - address derived from an Owner permit, if applicable
 fn check_view_supply<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
     viewer: Option<ViewerInfo>,
+    from_permit: Option<CanonicalAddr>,
 ) -> StdResult<()> {
     let config: Config = load(&deps.storage, CONFIG_KEY)?;
     let mut is_auth = config.token_supply_is_public;
     if !is_auth {
-        if let Some(vwr) = viewer {
-            let viewer_raw = deps.api.canonical_address(&vwr.address)?;
+        let querier = get_querier(deps, viewer, from_permit)?;
+        if let Some(viewer_raw) = querier {
             let minters: Vec<CanonicalAddr> =
                 may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
-            if minters.contains(&viewer_raw) {
-                check_key(&deps.storage, &viewer_raw, vwr.viewing_key)?;
-                is_auth = true;
-            }
+            is_auth = minters.contains(&viewer_raw);
         }
         if !is_auth {
             return Err(StdError::generic_err(
@@ -4449,4 +4631,30 @@ fn enforce_metadata_field_exclusion(metadata: &Metadata) -> StdResult<()> {
         ));
     }
     Ok(())
+}
+
+/// Returns StdResult<Option<CanonicalAddr>> from determining the querying address (if possible) either
+/// from a permit validation or a ViewerInfo
+///
+/// # Arguments
+///
+/// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `viewer` - optional address and key making an authenticated query request
+/// * `from_permit` - the address derived from an Owner permit, if applicable
+fn get_querier<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    viewer: Option<ViewerInfo>,
+    from_permit: Option<CanonicalAddr>,
+) -> StdResult<Option<CanonicalAddr>> {
+    if from_permit.is_some() {
+        return Ok(from_permit);
+    }
+    let viewer_raw = viewer
+        .map(|v| {
+            let raw = deps.api.canonical_address(&v.address)?;
+            check_key(&deps.storage, &raw, v.viewing_key)?;
+            Ok(raw)
+        })
+        .transpose()?;
+    Ok(viewer_raw)
 }

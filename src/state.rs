@@ -19,6 +19,8 @@ pub const CONFIG_KEY: &[u8] = b"config";
 pub const BLOCK_KEY: &[u8] = b"blockinfo";
 /// storage key for minters
 pub const MINTERS_KEY: &[u8] = b"minters";
+/// storage key for this contract's address
+pub const MY_ADDRESS_KEY: &[u8] = b"myaddr";
 /// storage key for prng seed
 pub const PRNG_SEED_KEY: &[u8] = b"prngseed";
 /// storage key for the contract instantiator
@@ -55,6 +57,8 @@ pub const PREFIX_VIEW_KEY: &[u8] = b"viewkeys";
 pub const PREFIX_RECEIVERS: &[u8] = b"receivers";
 /// prefix for the storage of mint run numbers
 pub const PREFIX_MINT_RUN_NUM: &[u8] = b"runnum";
+/// prefix for the storage of revoked permits
+pub const PREFIX_REVOKED_PERMITS: &str = "revoke";
 
 /// Token contract config
 #[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
