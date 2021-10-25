@@ -92,7 +92,7 @@ mod tests {
             Ok(_response) => panic!("Expected error, but had Ok response"),
             Err(err) => match err {
                 StdError::GenericErr { msg, .. } => msg,
-                _ => panic!(format!("Unexpected error result {:?}", err)),
+                _ => panic!("Unexpected error result {:?}", err),
             },
         }
     }

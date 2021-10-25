@@ -76,7 +76,7 @@ pub fn receive_nft_msg(
         token_id,
         msg,
     };
-    Ok(msg.to_cosmos_msg(callback_code_hash, contract_addr, None)?)
+    msg.to_cosmos_msg(callback_code_hash, contract_addr, None)
 }
 
 /// Returns a StdResult<CosmosMsg> used to call a registered contract's
@@ -105,5 +105,5 @@ pub fn batch_receive_nft_msg(
         token_ids,
         msg,
     };
-    Ok(msg.to_cosmos_msg(callback_code_hash, contract_addr, None)?)
+    msg.to_cosmos_msg(callback_code_hash, contract_addr, None)
 }

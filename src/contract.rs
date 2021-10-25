@@ -1952,7 +1952,7 @@ pub fn query_royalty<S: Storage, A: Api, Q: Querier>(
                 token.owner.as_slice(),
                 PermissionType::Transfer.to_usize(),
                 &mut Vec::new(),
-                &"",
+                "",
             )
             .is_err();
             // get the royalty information if present
@@ -2642,7 +2642,7 @@ pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
             .map(|v| deps.api.canonical_address(&v))
             .transpose()?
             // only keep the viewer address if the viewing key matches
-            .filter(|v| check_key(&deps.storage, &v, key.clone()).is_ok())
+            .filter(|v| check_key(&deps.storage, v, key.clone()).is_ok())
             .map_or_else(
                 // no viewer or key did not match
                 || {
@@ -4179,7 +4179,7 @@ fn transfer_impl<S: Storage, A: Api, Q: Querier>(
         Some(sender),
         PermissionType::Transfer,
         oper_for,
-        &config,
+        config,
     )?;
     let old_owner = token.owner;
     // don't bother processing anything if ownership does not change
@@ -4364,7 +4364,7 @@ fn burn_list<S: Storage, A: Api, Q: Querier>(
                 Some(sender),
                 PermissionType::Transfer,
                 &mut oper_for,
-                &config,
+                config,
             )?;
             // log the inventory change
             let inv_upd = if let Some(inv) = inv_updates
