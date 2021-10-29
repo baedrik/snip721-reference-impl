@@ -881,7 +881,7 @@ RevokeAll is used to revoke all transfer approvals granted to an address.  Revok
 ```
 
 ## TransferNft
-TransferNft is used to transfer ownership of the token to the `recipient` address.  This requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the `recipient` address is the same as the current owner, no transfer will be done (transaction history will not include a transfer that does not change ownership).  If the token is transferred to a new owner, its single-token approvals will be cleared.
+TransferNft is used to transfer ownership of the token to the `recipient` address.  This requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the `recipient` address is the same as the current owner, the contract will throw an error.  If the token is transferred to a new owner, its single-token approvals will be cleared.
 
 ##### Request
 ```
@@ -971,7 +971,7 @@ SendNft is used to transfer ownership of the token to the `contract` address, an
 
 While SendNft keeps the `contract` field name in order to maintain CW-721 compliance, Secret Network does not have the same limitations as Cosmos, and it is possible to use SendNft to transfer token ownership to a personal address (not a contract) or to a contract that does not implement any [Receiver Interface](#receiver).
 
-SendNft requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the recipient address is the same as the current owner, no transfer will be done (transaction history will not include a transfer that does not change ownership), but the BatchReceiveNft (or ReceiveNft) callback will be performed if registered.  If the token is transferred to a new owner, its single-token approvals will be cleared.  If the BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction will be reverted (even the transfer will not take place).
+SendNft requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the recipient address is the same as the current owner, the contract will throw an error.  If the token is transferred to a new owner, its single-token approvals will be cleared.  If the BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction will be reverted (even the transfer will not take place).
 
 ##### Request
 ```

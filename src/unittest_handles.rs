@@ -7541,18 +7541,8 @@ mod tests {
             .canonical_address(&HumanAddr("david".to_string()))
             .unwrap();
         let david_key = david_raw.as_slice();
-        let transfer_idx = PermissionType::Transfer.to_usize();
-        let view_owner_idx = PermissionType::ViewOwner.to_usize();
-        let view_meta_idx = PermissionType::ViewMetadata.to_usize();
 
-        // confirm that sending to the same address that owns the token does not
-        // erase the current permissions
-        let handle_msg = HandleMsg::RegisterReceiveNft {
-            code_hash: "alice code hash".to_string(),
-            also_implements_batch_receive_nft: None,
-            padding: None,
-        };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        // confirm that sending to the same address that owns the token throws an error
         let handle_msg = HandleMsg::SendNft {
             contract: HumanAddr("alice".to_string()),
             receiver_info: None,
@@ -7581,90 +7571,10 @@ mod tests {
             },
             handle_msg,
         );
-        // confirm that the ReceiveNft msg was created
-        let handle_resp = handle_result.unwrap();
-        let messages = handle_resp.messages;
-        let mut msg_fr_al = to_binary(&Snip721ReceiveMsg::ReceiveNft {
-            sender: HumanAddr("alice".to_string()),
-            token_id: "MyNFT".to_string(),
-            msg: None,
-        })
-        .unwrap();
-        let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
-        let msg_fr_al = CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: HumanAddr("alice".to_string()),
-            callback_code_hash: "alice code hash".to_string(),
-            msg: Binary(msg_fr_al.to_vec()),
-            send: vec![],
-        });
-        assert_eq!(messages[0], msg_fr_al);
-
-        // confirm token was not removed from the maps
-        let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
-        let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
-        let token_key = index.to_le_bytes();
-        let map2id = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_ID, &deps.storage);
-        let id: String = load(&map2id, &token_key).unwrap();
-        assert_eq!("MyNFT".to_string(), id);
-        // confirm token info is the same
-        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
-        let token: Token = json_load(&info_store, &tok_key).unwrap();
-        assert_eq!(token.owner, alice_raw);
-        assert_eq!(token.permissions.len(), 2);
-        let charlie_tok_perm = token
-            .permissions
-            .iter()
-            .find(|p| p.address == charlie_raw)
-            .unwrap();
-        assert_eq!(charlie_tok_perm.expirations[view_meta_idx], None);
-        assert_eq!(
-            charlie_tok_perm.expirations[transfer_idx],
-            Some(Expiration::AtHeight(10))
-        );
-        assert_eq!(charlie_tok_perm.expirations[view_owner_idx], None);
-        let bob_tok_perm = token
-            .permissions
-            .iter()
-            .find(|p| p.address == bob_raw)
-            .unwrap();
-        assert_eq!(bob_tok_perm.expirations[view_meta_idx], None);
-        assert_eq!(bob_tok_perm.expirations[transfer_idx], None);
-        assert_eq!(
-            bob_tok_perm.expirations[view_owner_idx],
-            Some(Expiration::Never)
-        );
-        assert!(token.unwrapped);
-        // confirm no transfer tx was logged (latest should be the mint tx)
-        let (txs, total) = get_txs(&deps.api, &deps.storage, &alice_raw, 0, 1).unwrap();
-        assert_eq!(total, 1);
-        assert_eq!(
-            txs[0].action,
-            TxAction::Mint {
-                minter: HumanAddr("admin".to_string()),
-                recipient: HumanAddr("alice".to_string()),
-            }
-        );
-        // confirm the owner list is correct
-        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
-        assert_eq!(inventory.info.count, 1);
-        assert!(inventory.contains(&deps.storage, 0).unwrap());
-        // confirm charlie's and bob's AuthList were not changed
-        let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
-        let alice_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
-        assert_eq!(alice_list.len(), 2);
-        let charlie_auth = alice_list
-            .iter()
-            .find(|a| a.address == charlie_raw)
-            .unwrap();
-        assert_eq!(charlie_auth.tokens[transfer_idx].len(), 1);
-        assert!(charlie_auth.tokens[transfer_idx].contains(&0u32));
-        assert!(charlie_auth.tokens[view_meta_idx].is_empty());
-        assert!(charlie_auth.tokens[view_owner_idx].is_empty());
-        let bob_auth = alice_list.iter().find(|a| a.address == bob_raw).unwrap();
-        assert_eq!(bob_auth.tokens[view_owner_idx].len(), 1);
-        assert!(bob_auth.tokens[view_owner_idx].contains(&0u32));
-        assert!(bob_auth.tokens[view_meta_idx].is_empty());
-        assert!(bob_auth.tokens[transfer_idx].is_empty());
+        let error = extract_error_msg(handle_result);
+        assert!(error.contains(
+            "Attempting to transfer token ID: MyNFT to the address that already owns it"
+        ));
 
         // sanity check: operator sends
         // msg to go with ReceiveNft

@@ -4182,9 +4182,12 @@ fn transfer_impl<S: Storage, A: Api, Q: Querier>(
         config,
     )?;
     let old_owner = token.owner;
-    // don't bother processing anything if ownership does not change
+    // throw error if ownership would not change
     if old_owner == recipient {
-        return Ok(old_owner);
+        return Err(StdError::generic_err(format!(
+            "Attempting to transfer token ID: {} to the address that already owns it",
+            &token_id
+        )));
     }
     token.owner = recipient.clone();
     token.permissions.clear();
