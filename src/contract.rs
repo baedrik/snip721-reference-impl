@@ -1939,7 +1939,7 @@ pub fn query_royalty<S: Storage, A: Api, Q: Querier>(
         let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
             height: 1,
             time: 1,
-            chain_id: "secret-3".to_string(),
+            chain_id: "not used".to_string(),
         });
         // if the token id was found
         if let Ok((token, idx)) = get_token(&deps.storage, id, None) {
@@ -2440,7 +2440,7 @@ pub fn query_token_approvals<S: Storage, A: Api, Q: Querier>(
     let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
         height: 1,
         time: 1,
-        chain_id: "secret-2".to_string(),
+        chain_id: "not used".to_string(),
     });
     let perm_type_info = PermissionTypeInfo {
         view_owner_idx: PermissionType::ViewOwner.to_usize(),
@@ -2511,7 +2511,7 @@ pub fn query_inventory_approvals<S: Storage, A: Api, Q: Querier>(
     let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
         height: 1,
         time: 1,
-        chain_id: "secret-2".to_string(),
+        chain_id: "not used".to_string(),
     });
     let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
     let mut all_perm: Vec<Permission> =
@@ -2587,7 +2587,7 @@ pub fn query_approved_for_all<S: Storage, A: Api, Q: Querier>(
     let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
         height: 1,
         time: 1,
-        chain_id: "secret-2".to_string(),
+        chain_id: "not used".to_string(),
     });
     let mut operators: Vec<Cw721Approval> = Vec::new();
     let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
@@ -2682,14 +2682,14 @@ pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
         let b: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
             height: 1,
             time: 1,
-            chain_id: "secret-2".to_string(),
+            chain_id: "not used".to_string(),
         });
         b
     } else {
         BlockInfo {
             height: 1,
             time: 1,
-            chain_id: "secret-2".to_string(),
+            chain_id: "not used".to_string(),
         }
     };
     let exp_idx = PermissionType::ViewOwner.to_usize();
@@ -2872,7 +2872,7 @@ pub fn query_verify_approval<S: Storage, A: Api, Q: Querier>(
     let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
         height: 1,
         time: 1,
-        chain_id: "secret-2".to_string(),
+        chain_id: "not used".to_string(),
     });
     let mut oper_for: Vec<CanonicalAddr> = Vec::new();
     for id in token_ids {
@@ -2962,7 +2962,7 @@ fn query_token_prep<S: Storage, A: Api, Q: Querier>(
     let block: BlockInfo = may_load(&deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
         height: 1,
         time: 1,
-        chain_id: "secret-2".to_string(),
+        chain_id: "not used".to_string(),
     });
     let err_msg = format!(
         "You are not authorized to perform this action on token {}",
