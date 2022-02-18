@@ -1809,7 +1809,9 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
         }
         QueryMsg::IsUnwrapped { token_id } => query_is_unwrapped(&deps.storage, &token_id),
         QueryMsg::IsTransferable { token_id } => query_is_transferable(&deps.storage, &token_id),
-        QueryMsg::ImplementsNonTransferableTokens {} => to_binary(&QueryAnswer::ImplementsNonTransferableTokens { is_enabled: true }),
+        QueryMsg::ImplementsNonTransferableTokens {} => {
+            to_binary(&QueryAnswer::ImplementsNonTransferableTokens { is_enabled: true })
+        }
         QueryMsg::TransactionHistory {
             address,
             viewing_key,
@@ -1906,9 +1908,9 @@ pub fn permit_queries<S: Storage, A: Api, Q: Querier>(
             start_after,
             limit,
         } => query_tokens(deps, &owner, None, None, start_after, limit, Some(querier)),
-        QueryWithPermit::NumTokensOfOwner {
-            owner,
-        } => query_num_owner_tokens(deps, &owner, None, None, Some(querier)),
+        QueryWithPermit::NumTokensOfOwner { owner } => {
+            query_num_owner_tokens(deps, &owner, None, None, Some(querier))
+        }
     }
 }
 
@@ -2716,7 +2718,7 @@ pub fn query_tokens<S: Storage, A: Api, Q: Querier>(
     to_binary(&QueryAnswer::TokenList { tokens })
 }
 
-/// Returns QueryResult displaying the number of tokens that the querier has permission to 
+/// Returns QueryResult displaying the number of tokens that the querier has permission to
 /// view ownership and that belong to the specified address
 ///
 /// # Arguments
@@ -2831,10 +2833,9 @@ pub fn query_num_owner_tokens<S: Storage, A: Api, Q: Querier>(
 
     // get the list of tokens that might have viewable ownership for this querier
     let mut token_idxs: HashSet<u32> = HashSet::new();
-    found_one  = only_public;
+    found_one = only_public;
     let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
-    let auth_list: Vec<AuthList> =
-    may_load(&auth_store, owner_slice)?.unwrap_or_else(Vec::new);
+    let auth_list: Vec<AuthList> = may_load(&auth_store, owner_slice)?.unwrap_or_else(Vec::new);
     for auth in auth_list.iter() {
         if auth.address == *sender || auth.address == global_raw {
             token_idxs.extend(auth.tokens[exp_idx].iter());
@@ -2850,7 +2851,7 @@ pub fn query_num_owner_tokens<S: Storage, A: Api, Q: Querier>(
     let mut count = 0u32;
     for idx in token_idxs.into_iter() {
         if let Some(token) = json_may_load::<Token, _>(&info_store, &idx.to_le_bytes())? {
-            found_one  = only_public;
+            found_one = only_public;
             for perm in token.permissions.iter() {
                 if perm.address == *sender || perm.address == global_raw {
                     if let Some(exp) = perm.expirations[exp_idx] {
@@ -2869,10 +2870,8 @@ pub fn query_num_owner_tokens<S: Storage, A: Api, Q: Querier>(
             }
         }
     }
-    
-    to_binary(&QueryAnswer::NumTokens {
-        count,
-    })
+
+    to_binary(&QueryAnswer::NumTokens { count })
 }
 
 /// Returns QueryResult displaying true if the token has been unwrapped.  If sealed metadata
@@ -3507,14 +3506,14 @@ fn check_perm_core<S: Storage, A: Api, Q: Querier>(
                         if !exp.is_expired(block) {
                             oper_for.push(token.owner.clone());
                             return Ok(());
-                        // if the permission expired and this is the sender let them know the 
+                        // if the permission expired and this is the sender let them know the
                         // permission expired
                         } else if perm.address != global_raw {
-                                expired_msg.push_str(&format!(
-                                    "Access to all tokens of {} has expired",
-                                    &deps.api.human_address(&token.owner)?
-                                ));
-                                err_msg = &expired_msg;
+                            expired_msg.push_str(&format!(
+                                "Access to all tokens of {} has expired",
+                                &deps.api.human_address(&token.owner)?
+                            ));
+                            err_msg = &expired_msg;
                         }
                     }
                     // we can quit if we found both the sender and the global (or only checking global)

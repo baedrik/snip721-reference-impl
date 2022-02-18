@@ -1123,7 +1123,5 @@ pub enum QueryWithPermit {
     },
     /// displays the number of tokens that the querier has permission to see the owner and that
     /// belong to the specified address
-    NumTokensOfOwner {
-        owner: HumanAddr,
-    },
+    NumTokensOfOwner { owner: HumanAddr },
 }
