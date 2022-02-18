@@ -114,8 +114,11 @@ pub enum HandleMsg {
         private_metadata: Option<Metadata>,
         /// optional serial number for this token
         serial_number: Option<SerialNumber>,
-        /// optional royalty information for this token
+        /// optional royalty information for this token.  This will be ignored if the token is
+        /// non-transferable
         royalty_info: Option<RoyaltyInfo>,
+        /// optionally true if the token is transferable.  Defaults to true if omitted
+        transferable: Option<bool>,
         /// optional memo for the tx
         memo: Option<String>,
         /// optional message length padding
@@ -134,7 +137,9 @@ pub enum HandleMsg {
     /// MintNftClones call will have mint run number 1, the next time MintNftClones is called
     /// with the same mint_run_id, those clones will have mint run number 2, etc...  If no
     /// mint_run_id is specified, the clones will not have any mint run number assigned to their
-    /// MintRunInfos
+    /// MintRunInfos.  Because this mints to a single address, there is no option to specify
+    /// that the clones are non-transferable as there is no foreseen reason for someone to have
+    /// multiple copies of an nft that they can never send to others
     MintNftClones {
         /// optional mint run ID
         mint_run_id: Option<String>,
@@ -167,7 +172,8 @@ pub enum HandleMsg {
     },
     /// set royalty information.  If no token ID is provided, this royalty info will become the default
     /// RoyaltyInfo for any new tokens minted on the contract.  If a token ID is provided, this can only
-    /// be called by the token creator and only when the creator is the current owner
+    /// be called by the token creator and only when the creator is the current owner.  Royalties can not
+    /// be set on a token that is not transferable, because they can never be sold
     SetRoyaltyInfo {
         /// optional id of the token whose royalty information should be updated.  If not provided,
         /// this updates the default royalty information for any new tokens minted on the contract
@@ -267,7 +273,7 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// transfer a token
+    /// transfer a token if it is transferable
     TransferNft {
         /// recipient of the transfer
         recipient: HumanAddr,
@@ -278,14 +284,14 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// transfer many tokens
+    /// transfer many tokens and fails if any are non-transferable
     BatchTransferNft {
         /// list of transfers to perform
         transfers: Vec<Transfer>,
         /// optional message length padding
         padding: Option<String>,
     },
-    /// send a token and call receiving contract's (Batch)ReceiveNft
+    /// send a token if it is transferable and call the receiving contract's (Batch)ReceiveNft
     SendNft {
         /// address to send the token to
         contract: HumanAddr,
@@ -300,14 +306,17 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// send many tokens and call receiving contracts' (Batch)ReceiveNft
+    /// send many tokens and call the receiving contracts' (Batch)ReceiveNft.  Fails if any tokens are
+    /// non-transferable
     BatchSendNft {
         /// list of sends to perform
         sends: Vec<Send>,
         /// optional message length padding
         padding: Option<String>,
     },
-    /// burn a token
+    /// burn a token.  This can be always be done on a non-transferable token, regardless of whether burn
+    /// has been enabled on the contract.  An owner should always have a way to get rid of a token they do
+    /// not want, and burning is the only way to do that if the token is non-transferable
     BurnNft {
         /// token to burn
         token_id: String,
@@ -316,7 +325,9 @@ pub enum HandleMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// burn many tokens
+    /// burn many tokens.  This can be always be done on a non-transferable token, regardless of whether burn
+    /// has been enabled on the contract.  An owner should always have a way to get rid of a token they do
+    /// not want, and burning is the only way to do that if the token is non-transferable
     BatchBurnNft {
         /// list of burns to perform
         burns: Vec<Burn>,
@@ -422,8 +433,11 @@ pub struct Mint {
     pub private_metadata: Option<Metadata>,
     /// optional serial number for this token
     pub serial_number: Option<SerialNumber>,
-    /// optional royalty info for this token
+    /// optional royalty information for this token.  This will be ignored if the token is
+    /// non-transferable
     pub royalty_info: Option<RoyaltyInfo>,
+    /// optionally true if the token is transferable.  Defaults to true if omitted
+    pub transferable: Option<bool>,
     /// optional memo for the tx
     pub memo: Option<String>,
 }
@@ -684,9 +698,22 @@ pub enum QueryMsg {
     },
     /// displays all the information about a token that the viewer has permission to
     /// see.  This may include the owner, the public metadata, the private metadata, royalty
-    /// information, mint run information, and the token and inventory approvals
+    /// information, mint run information, whether the token is unwrapped, whether the token is
+    /// transferable, and the token and inventory approvals
     NftDossier {
         token_id: String,
+        /// optional address and key requesting to view the token information
+        viewer: Option<ViewerInfo>,
+        /// optionally include expired Approvals in the response list.  If ommitted or
+        /// false, expired Approvals will be filtered out of the response
+        include_expired: Option<bool>,
+    },
+    /// displays all the information about multiple tokens that the viewer has permission to
+    /// see.  This may include the owner, the public metadata, the private metadata, royalty
+    /// information, mint run information, whether the token is unwrapped, whether the token is
+    /// transferable, and the token and inventory approvals
+    BatchNftDossier {
+        token_ids: Vec<String>,
         /// optional address and key requesting to view the token information
         viewer: Option<ViewerInfo>,
         /// optionally include expired Approvals in the response list.  If ommitted or
@@ -740,9 +767,23 @@ pub enum QueryMsg {
         /// optional number of token ids to display
         limit: Option<u32>,
     },
+    /// displays the number of tokens that the querier has permission to see the owner and that
+    /// belong to the specified address
+    NumTokensOfOwner {
+        owner: HumanAddr,
+        /// optional address of the querier if different from the owner
+        viewer: Option<HumanAddr>,
+        /// optional viewing key
+        viewing_key: Option<String>,
+    },
     /// display if a token is unwrapped
     IsUnwrapped { token_id: String },
-    /// verify that the specified address has approval to transfer every listed token
+    /// display if a token is transferable
+    IsTransferable { token_id: String },
+    /// display that this contract implements non-transferable tokens
+    ImplementsNonTransferableTokens {},
+    /// verify that the specified address has approval to transfer every listed token.  
+    /// A token will count as unapproved if it is non-transferable
     VerifyTransferApproval {
         /// list of tokens to verify approval for
         token_ids: Vec<String>,
@@ -819,6 +860,28 @@ pub struct Cw721OwnerOfResponse {
     pub approvals: Vec<Cw721Approval>,
 }
 
+/// the token id and nft dossier info of a single token response in a batch query
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct BatchNftDossierElement {
+    pub token_id: String,
+    pub owner: Option<HumanAddr>,
+    pub public_metadata: Option<Metadata>,
+    pub private_metadata: Option<Metadata>,
+    pub display_private_metadata_error: Option<String>,
+    pub royalty_info: Option<DisplayRoyaltyInfo>,
+    pub mint_run_info: Option<MintRunInfo>,
+    /// true if this token is transferable
+    pub transferable: bool,
+    /// true if this token is unwrapped (returns true if the contract does not have selaed metadata enabled)
+    pub unwrapped: bool,
+    pub owner_is_public: bool,
+    pub public_ownership_expiration: Option<Expiration>,
+    pub private_metadata_is_public: bool,
+    pub private_metadata_is_public_expiration: Option<Expiration>,
+    pub token_approvals: Option<Vec<Snip721Approval>>,
+    pub inventory_approvals: Option<Vec<Snip721Approval>>,
+}
+
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryAnswer {
@@ -881,6 +944,8 @@ pub enum QueryAnswer {
         display_private_metadata_error: Option<String>,
         royalty_info: Option<DisplayRoyaltyInfo>,
         mint_run_info: Option<MintRunInfo>,
+        transferable: bool,
+        unwrapped: bool,
         owner_is_public: bool,
         public_ownership_expiration: Option<Expiration>,
         private_metadata_is_public: bool,
@@ -888,11 +953,20 @@ pub enum QueryAnswer {
         token_approvals: Option<Vec<Snip721Approval>>,
         inventory_approvals: Option<Vec<Snip721Approval>>,
     },
+    BatchNftDossier {
+        nft_dossiers: Vec<BatchNftDossierElement>,
+    },
     ApprovedForAll {
         operators: Vec<Cw721Approval>,
     },
     IsUnwrapped {
         token_is_unwrapped: bool,
+    },
+    IsTransferable {
+        token_is_transferable: bool,
+    },
+    ImplementsNonTransferableTokens {
+        is_enabled: bool,
     },
     VerifyTransferApproval {
         approved_for_all: bool,
@@ -956,9 +1030,20 @@ pub enum QueryWithPermit {
     PrivateMetadata { token_id: String },
     /// displays all the information about a token that the viewer has permission to
     /// see.  This may include the owner, the public metadata, the private metadata, royalty
-    /// information, mint run information, and the token and inventory approvals
+    /// information, mint run information, whether the token is unwrapped, whether the token is
+    /// transferable, and the token and inventory approvals
     NftDossier {
         token_id: String,
+        /// optionally include expired Approvals in the response list.  If ommitted or
+        /// false, expired Approvals will be filtered out of the response
+        include_expired: Option<bool>,
+    },
+    /// displays all the information about multiple tokens that the viewer has permission to
+    /// see.  This may include the owner, the public metadata, the private metadata, royalty
+    /// information, mint run information, whether the token is unwrapped, whether the token is
+    /// transferable, and the token and inventory approvals
+    BatchNftDossier {
+        token_ids: Vec<String>,
         /// optionally include expired Approvals in the response list.  If ommitted or
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
@@ -986,7 +1071,8 @@ pub enum QueryWithPermit {
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
     },
-    /// verify that the permit creator has approval to transfer every listed token
+    /// verify that the permit creator has approval to transfer every listed token.  
+    /// A token will count as unapproved if it is non-transferable
     VerifyTransferApproval {
         /// list of tokens to verify approval for
         token_ids: Vec<String>,
@@ -1034,5 +1120,10 @@ pub enum QueryWithPermit {
         start_after: Option<String>,
         /// optional number of token ids to display
         limit: Option<u32>,
+    },
+    /// displays the number of tokens that the querier has permission to see the owner and that
+    /// belong to the specified address
+    NumTokensOfOwner {
+        owner: HumanAddr,
     },
 }

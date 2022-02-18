@@ -60,7 +60,7 @@
               ]
             },
             "royalty_info": {
-              "description": "optional royalty information for this token",
+              "description": "optional royalty information for this token.  This will be ignored if the token is non-transferable",
               "anyOf": [
                 {
                   "$ref": "#/definitions/RoyaltyInfo"
@@ -85,6 +85,13 @@
               "description": "optional token id. if omitted, use current token index",
               "type": [
                 "string",
+                "null"
+              ]
+            },
+            "transferable": {
+              "description": "optionally true if the token is transferable.  Defaults to true if omitted",
+              "type": [
+                "boolean",
                 "null"
               ]
             }
@@ -124,7 +131,7 @@
       }
     },
     {
-      "description": "create a mint run of clones that will have MintRunInfos showing they are serialized copies in the same mint run with the specified quantity.  Mint_run_id can be used to track mint run numbers in subsequent MintNftClones calls.  So, if provided, the first MintNftClones call will have mint run number 1, the next time MintNftClones is called with the same mint_run_id, those clones will have mint run number 2, etc...  If no mint_run_id is specified, the clones will not have any mint run number assigned to their MintRunInfos",
+      "description": "create a mint run of clones that will have MintRunInfos showing they are serialized copies in the same mint run with the specified quantity.  Mint_run_id can be used to track mint run numbers in subsequent MintNftClones calls.  So, if provided, the first MintNftClones call will have mint run number 1, the next time MintNftClones is called with the same mint_run_id, those clones will have mint run number 2, etc...  If no mint_run_id is specified, the clones will not have any mint run number assigned to their MintRunInfos.  Because this mints to a single address, there is no option to specify that the clones are non-transferable as there is no foreseen reason for someone to have multiple copies of an nft that they can never send to others",
       "type": "object",
       "required": [
         "mint_nft_clones"
@@ -262,7 +269,7 @@
       }
     },
     {
-      "description": "set royalty information.  If no token ID is provided, this royalty info will become the default RoyaltyInfo for any new tokens minted on the contract.  If a token ID is provided, this can only be called by the token creator and only when the creator is the current owner",
+      "description": "set royalty information.  If no token ID is provided, this royalty info will become the default RoyaltyInfo for any new tokens minted on the contract.  If a token ID is provided, this can only be called by the token creator and only when the creator is the current owner.  Royalties can not be set on a token that is not transferable, because they can never be sold",
       "type": "object",
       "required": [
         "set_royalty_info"
@@ -654,7 +661,7 @@
       }
     },
     {
-      "description": "transfer a token",
+      "description": "transfer a token if it is transferable",
       "type": "object",
       "required": [
         "transfer_nft"
@@ -698,7 +705,7 @@
       }
     },
     {
-      "description": "transfer many tokens",
+      "description": "transfer many tokens and fails if any are non-transferable",
       "type": "object",
       "required": [
         "batch_transfer_nft"
@@ -729,7 +736,7 @@
       }
     },
     {
-      "description": "send a token and call receiving contract's (Batch)ReceiveNft",
+      "description": "send a token if it is transferable and call the receiving contract's (Batch)ReceiveNft",
       "type": "object",
       "required": [
         "send_nft"
@@ -795,7 +802,7 @@
       }
     },
     {
-      "description": "send many tokens and call receiving contracts' (Batch)ReceiveNft",
+      "description": "send many tokens and call the receiving contracts' (Batch)ReceiveNft.  Fails if any tokens are non-transferable",
       "type": "object",
       "required": [
         "batch_send_nft"
@@ -826,7 +833,7 @@
       }
     },
     {
-      "description": "burn a token",
+      "description": "burn a token.  This can be always be done on a non-transferable token, regardless of whether burn has been enabled on the contract.  An owner should always have a way to get rid of a token they do not want, and burning is the only way to do that if the token is non-transferable",
       "type": "object",
       "required": [
         "burn_nft"
@@ -861,7 +868,7 @@
       }
     },
     {
-      "description": "burn many tokens",
+      "description": "burn many tokens.  This can be always be done on a non-transferable token, regardless of whether burn has been enabled on the contract.  An owner should always have a way to get rid of a token they do not want, and burning is the only way to do that if the token is non-transferable",
       "type": "object",
       "required": [
         "batch_burn_nft"
@@ -1356,6 +1363,13 @@
             "type": "string"
           }
         },
+        "token_subtype": {
+          "description": "token subtypes used by Stashh for display groupings (primarily used for badges)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "youtube_url": {
           "description": "url to a YouTube video",
           "type": [
@@ -1475,7 +1489,7 @@
           ]
         },
         "royalty_info": {
-          "description": "optional royalty info for this token",
+          "description": "optional royalty information for this token.  This will be ignored if the token is non-transferable",
           "anyOf": [
             {
               "$ref": "#/definitions/RoyaltyInfo"
@@ -1500,6 +1514,13 @@
           "description": "optional token id, if omitted, use current token index",
           "type": [
             "string",
+            "null"
+          ]
+        },
+        "transferable": {
+          "description": "optionally true if the token is transferable.  Defaults to true if omitted",
+          "type": [
+            "boolean",
             "null"
           ]
         }

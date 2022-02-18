@@ -15,6 +15,8 @@ pub struct Token {
     /// true if this token has been unwrapped.  If sealed metadata is not enabled, all
     /// tokens are considered unwrapped
     pub unwrapped: bool,
+    /// true if this token is transferable
+    pub transferable: bool,
 }
 
 /// token metadata
@@ -59,6 +61,8 @@ pub struct Extension {
     /// a select list of trait_types that are in the private metadata.  This will only ever be used
     /// in public metadata
     pub protected_attributes: Option<Vec<String>>,
+    /// token subtypes used by Stashh for display groupings (primarily used for badges)
+    pub token_subtype: Option<String>,
 }
 
 /// attribute trait

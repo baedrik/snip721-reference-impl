@@ -66,7 +66,7 @@ mod tests {
                 unwrapped_metadata_is_private,
                 minter_may_update_metadata,
                 owner_may_update_metadata,
-                enable_burn
+                enable_burn,
             )
             .as_bytes(),
         ))
@@ -231,6 +231,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -250,6 +251,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -337,6 +339,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -356,6 +359,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -408,6 +412,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -427,6 +432,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -446,6 +452,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -542,6 +549,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -561,6 +569,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -580,6 +589,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -599,6 +609,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -618,6 +629,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -758,6 +770,7 @@ mod tests {
             private_metadata: Some(private_meta.clone()),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -818,6 +831,8 @@ mod tests {
                 private_metadata,
                 royalty_info: _,
                 mint_run_info: _,
+                transferable,
+                unwrapped,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -834,6 +849,8 @@ mod tests {
                     Some("You are not authorized to perform this action on token NFT1".to_string())
                 );
                 assert!(owner_is_public);
+                assert!(transferable);
+                assert!(!unwrapped);
                 assert_eq!(public_ownership_expiration, Some(Expiration::Never));
                 assert!(!private_metadata_is_public);
                 assert!(private_metadata_is_public_expiration.is_none());
@@ -860,6 +877,7 @@ mod tests {
             private_metadata: Some(private_meta.clone()),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -917,6 +935,8 @@ mod tests {
                 private_metadata,
                 royalty_info: _,
                 mint_run_info: _,
+                transferable,
+                unwrapped,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -930,6 +950,8 @@ mod tests {
                 assert_eq!(private_metadata, Some(private_meta.clone()));
                 assert!(display_private_metadata_error.is_none());
                 assert!(owner_is_public);
+                assert!(transferable);
+                assert!(unwrapped);
                 assert_eq!(public_ownership_expiration, Some(Expiration::AtHeight(5)));
                 assert!(private_metadata_is_public);
                 assert_eq!(
@@ -1014,6 +1036,8 @@ mod tests {
                 private_metadata,
                 royalty_info: _,
                 mint_run_info: _,
+                transferable,
+                unwrapped,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -1025,6 +1049,8 @@ mod tests {
                 assert_eq!(owner, Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert_eq!(private_metadata, Some(private_meta.clone()));
+                assert!(transferable);
+                assert!(unwrapped);
                 assert!(display_private_metadata_error.is_none());
                 assert!(owner_is_public);
                 assert_eq!(public_ownership_expiration, Some(Expiration::AtHeight(5)));
@@ -1114,6 +1140,8 @@ mod tests {
                 private_metadata,
                 royalty_info: _,
                 mint_run_info: _,
+                transferable,
+                unwrapped,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -1125,6 +1153,8 @@ mod tests {
                 assert_eq!(owner, Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert_eq!(private_metadata, Some(private_meta.clone()));
+                assert!(transferable);
+                assert!(unwrapped);
                 assert!(display_private_metadata_error.is_none());
                 assert!(!owner_is_public);
                 assert!(public_ownership_expiration.is_none());
@@ -1156,6 +1186,8 @@ mod tests {
                 private_metadata,
                 royalty_info: _,
                 mint_run_info: _,
+                transferable,
+                unwrapped,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -1167,6 +1199,8 @@ mod tests {
                 assert_eq!(owner, Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert_eq!(private_metadata, Some(private_meta.clone()));
+                assert!(transferable);
+                assert!(unwrapped);
                 assert!(display_private_metadata_error.is_none());
                 assert!(!owner_is_public);
                 assert!(public_ownership_expiration.is_none());
@@ -1212,6 +1246,7 @@ mod tests {
             private_metadata: Some(private_meta.clone()),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1284,6 +1319,8 @@ mod tests {
                 private_metadata,
                 royalty_info: _,
                 mint_run_info: _,
+                transferable,
+                unwrapped,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -1295,7 +1332,9 @@ mod tests {
                 assert_eq!(owner, Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert!(private_metadata.is_none());
-                assert_eq!(display_private_metadata_error, Some("Sealed metadata must be unwrapped by calling Reveal before it can be viewed".to_string()));
+                assert!(transferable);
+                assert!(!unwrapped);
+                assert_eq!(display_private_metadata_error, Some("Sealed metadata of token NFT1 must be unwrapped by calling Reveal before it can be viewed".to_string()));
                 assert!(!owner_is_public);
                 assert!(public_ownership_expiration.is_none());
                 assert!(!private_metadata_is_public);
@@ -1335,6 +1374,8 @@ mod tests {
                 private_metadata,
                 royalty_info: _,
                 mint_run_info: _,
+                transferable,
+                unwrapped,
                 display_private_metadata_error,
                 owner_is_public,
                 public_ownership_expiration,
@@ -1346,6 +1387,8 @@ mod tests {
                 assert!(owner.is_none());
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert!(private_metadata.is_none());
+                assert!(transferable);
+                assert!(unwrapped);
                 assert_eq!(
                     display_private_metadata_error,
                     Some("Access to token NFT1 has expired".to_string())
@@ -1391,6 +1434,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1402,6 +1446,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1413,6 +1458,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1424,6 +1470,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1435,6 +1482,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1446,6 +1494,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1457,6 +1506,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1468,6 +1518,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1714,6 +1765,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1725,6 +1777,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1736,6 +1789,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1747,6 +1801,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1758,6 +1813,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1769,6 +1825,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1780,6 +1837,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1791,6 +1849,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1802,6 +1861,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -2004,6 +2064,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -2060,6 +2121,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -2132,6 +2194,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -2382,6 +2445,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -2451,6 +2515,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -2465,6 +2530,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -2505,6 +2571,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -2574,6 +2641,7 @@ mod tests {
             private_metadata: Some(private_meta.clone()),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -2669,6 +2737,7 @@ mod tests {
             private_metadata: Some(private_meta.clone()),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -2853,6 +2922,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3271,6 +3341,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3282,6 +3353,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3293,6 +3365,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3304,6 +3377,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3315,6 +3389,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3460,6 +3535,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3471,6 +3547,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint 2".to_string()),
             padding: None,
         };

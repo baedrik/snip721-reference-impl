@@ -69,7 +69,7 @@ mod tests {
                 unwrapped_metadata_is_private,
                 minter_may_update_metadata,
                 owner_may_update_metadata,
-                enable_burn
+                enable_burn,
             )
             .as_bytes(),
         ))
@@ -606,6 +606,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -653,6 +654,7 @@ mod tests {
             private_metadata: None,
             royalty_info: Some(individual.clone()),
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };

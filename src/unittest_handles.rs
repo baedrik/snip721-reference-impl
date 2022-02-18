@@ -78,7 +78,7 @@ mod tests {
                 unwrapped_metadata_is_private,
                 minter_may_update_metadata,
                 owner_may_update_metadata,
-                enable_burn
+                enable_burn,
             )
             .as_bytes(),
         ))
@@ -244,6 +244,7 @@ mod tests {
                 private_metadata: None,
                 royalty_info: None,
                 serial_number: None,
+                transferable: None,
                 memo: None,
             },
             Mint {
@@ -253,6 +254,7 @@ mod tests {
                 private_metadata: Some(priv2.clone()),
                 royalty_info: None,
                 serial_number: None,
+                transferable: None,
                 memo: None,
             },
             Mint {
@@ -261,6 +263,7 @@ mod tests {
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
+                transferable: None,
                 serial_number: None,
                 memo: None,
             },
@@ -270,6 +273,7 @@ mod tests {
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
+                transferable: None,
                 serial_number: None,
                 memo: Some("has id 3".to_string()),
             },
@@ -424,6 +428,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -453,6 +458,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -476,6 +482,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -515,6 +522,7 @@ mod tests {
             private_metadata: priv_expect.clone(),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -591,6 +599,7 @@ mod tests {
             }),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -615,6 +624,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Admin wants his own".to_string()),
             padding: None,
         };
@@ -780,6 +790,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -846,6 +857,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -890,6 +902,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -970,6 +983,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -999,6 +1013,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -1181,6 +1196,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -1275,6 +1291,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -1328,6 +1345,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -1383,6 +1401,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -1463,6 +1482,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1483,6 +1503,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1503,6 +1524,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -1523,6 +1545,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3432,6 +3455,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3742,6 +3766,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3761,6 +3786,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -3938,6 +3964,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -4315,6 +4342,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -4334,6 +4362,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -4469,6 +4498,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -4564,6 +4594,7 @@ mod tests {
             }),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -4768,6 +4799,7 @@ mod tests {
             public_metadata: pub2.clone(),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -4797,6 +4829,7 @@ mod tests {
             public_metadata: pub3.clone(),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -4962,6 +4995,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5013,6 +5047,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5025,6 +5060,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5054,6 +5090,7 @@ mod tests {
             public_metadata: pub3.clone(),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5065,6 +5102,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5076,6 +5114,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5087,6 +5126,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5098,6 +5138,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5109,6 +5150,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5259,6 +5301,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5271,6 +5314,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5282,6 +5326,7 @@ mod tests {
             public_metadata: pub3.clone(),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5293,6 +5338,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5304,6 +5350,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5315,6 +5362,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5326,6 +5374,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5337,6 +5386,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5482,6 +5532,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5494,6 +5545,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: Some(false),
             memo: None,
             padding: None,
         };
@@ -5505,6 +5557,7 @@ mod tests {
             public_metadata: pub3.clone(),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5516,6 +5569,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5527,6 +5581,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5538,6 +5593,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5549,6 +5605,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: Some(false),
             memo: None,
             padding: None,
         };
@@ -5560,6 +5617,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -5876,6 +5934,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -5966,6 +6025,7 @@ mod tests {
             public_metadata: pub1.clone(),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -6431,6 +6491,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -6526,6 +6587,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -6535,6 +6597,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -6544,6 +6607,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -6553,6 +6617,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -6562,6 +6627,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -6571,6 +6637,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
             ],
@@ -6739,6 +6806,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -6751,6 +6819,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -6762,6 +6831,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -6773,6 +6843,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -6784,6 +6855,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -6795,6 +6867,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -7115,6 +7188,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -7124,6 +7198,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -7133,6 +7208,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -7142,6 +7218,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -7151,6 +7228,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -7160,6 +7238,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
             ],
@@ -7320,6 +7399,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -7416,6 +7496,7 @@ mod tests {
             public_metadata: pub1.clone(),
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -7903,6 +7984,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: Some("Mint it baby!".to_string()),
             padding: None,
         };
@@ -8000,6 +8082,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -8012,6 +8095,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -8023,6 +8107,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -8034,6 +8119,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -8045,6 +8131,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -8056,6 +8143,7 @@ mod tests {
             public_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -8473,6 +8561,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -8482,6 +8571,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -8491,6 +8581,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -8500,6 +8591,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -8509,6 +8601,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
                 Mint {
@@ -8518,6 +8611,7 @@ mod tests {
                     public_metadata: None,
                     royalty_info: None,
                     serial_number: None,
+                    transferable: None,
                     memo: None,
                 },
             ],
@@ -9317,6 +9411,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -9328,6 +9423,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -9339,6 +9435,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -9532,6 +9629,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -9543,6 +9641,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -9554,6 +9653,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -9878,6 +9978,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -10234,6 +10335,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -10254,6 +10356,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -10291,6 +10394,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -10302,6 +10406,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -10610,6 +10715,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -10621,6 +10727,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -10795,6 +10902,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };
@@ -10806,6 +10914,7 @@ mod tests {
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
+            transferable: None,
             memo: None,
             padding: None,
         };

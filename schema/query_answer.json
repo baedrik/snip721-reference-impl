@@ -356,7 +356,9 @@
           "type": "object",
           "required": [
             "owner_is_public",
-            "private_metadata_is_public"
+            "private_metadata_is_public",
+            "transferable",
+            "unwrapped"
           ],
           "properties": {
             "display_private_metadata_error": {
@@ -458,6 +460,34 @@
               "items": {
                 "$ref": "#/definitions/Snip721Approval"
               }
+            },
+            "transferable": {
+              "type": "boolean"
+            },
+            "unwrapped": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "batch_nft_dossier"
+      ],
+      "properties": {
+        "batch_nft_dossier": {
+          "type": "object",
+          "required": [
+            "nft_dossiers"
+          ],
+          "properties": {
+            "nft_dossiers": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/BatchNftDossierElement"
+              }
             }
           }
         }
@@ -498,6 +528,44 @@
           ],
           "properties": {
             "token_is_unwrapped": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "is_transferable"
+      ],
+      "properties": {
+        "is_transferable": {
+          "type": "object",
+          "required": [
+            "token_is_transferable"
+          ],
+          "properties": {
+            "token_is_transferable": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "implements_non_transferable_tokens"
+      ],
+      "properties": {
+        "implements_non_transferable_tokens": {
+          "type": "object",
+          "required": [
+            "is_enabled"
+          ],
+          "properties": {
+            "is_enabled": {
               "type": "boolean"
             }
           }
@@ -648,6 +716,130 @@
             "string",
             "null"
           ]
+        }
+      }
+    },
+    "BatchNftDossierElement": {
+      "description": "the token id and nft dossier info of a single token response in a batch query",
+      "type": "object",
+      "required": [
+        "owner_is_public",
+        "private_metadata_is_public",
+        "token_id",
+        "transferable",
+        "unwrapped"
+      ],
+      "properties": {
+        "display_private_metadata_error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inventory_approvals": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Snip721Approval"
+          }
+        },
+        "mint_run_info": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/MintRunInfo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/HumanAddr"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner_is_public": {
+          "type": "boolean"
+        },
+        "private_metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Metadata"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "private_metadata_is_public": {
+          "type": "boolean"
+        },
+        "private_metadata_is_public_expiration": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Expiration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "public_metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Metadata"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "public_ownership_expiration": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Expiration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "royalty_info": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DisplayRoyaltyInfo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "token_approvals": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Snip721Approval"
+          }
+        },
+        "token_id": {
+          "type": "string"
+        },
+        "transferable": {
+          "description": "true if this token is transferable",
+          "type": "boolean"
+        },
+        "unwrapped": {
+          "description": "true if this token is unwrapped (returns true if the contract does not have selaed metadata enabled)",
+          "type": "boolean"
         }
       }
     },
@@ -874,6 +1066,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "token_subtype": {
+          "description": "token subtypes used by Stashh for display groupings (primarily used for badges)",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "youtube_url": {
           "description": "url to a YouTube video",
