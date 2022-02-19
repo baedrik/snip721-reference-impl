@@ -3,7 +3,7 @@ mod tests {
     use crate::contract::{handle, init, query};
     use crate::expiration::Expiration;
     use crate::msg::{
-        AccessLevel, Cw721Approval, HandleMsg, InitConfig, InitMsg, QueryAnswer, QueryMsg,
+        AccessLevel, Cw721Approval, HandleMsg, InitConfig, InitMsg, Mint, QueryAnswer, QueryMsg,
         Snip721Approval, Tx, TxAction, ViewerInfo,
     };
     use crate::token::{Extension, Metadata};
@@ -3756,6 +3756,513 @@ mod tests {
             } => {
                 assert_eq!(code_hash, Some("Code Hash".to_string()));
                 assert!(also_implements_batch_receive_nft)
+            }
+            _ => panic!("unexpected"),
+        }
+    }
+
+    // test NumTokensOfOwner query
+    #[test]
+    fn test_num_tokens_of_owner() {
+        let (init_result, mut deps) =
+            init_helper_with_config(false, true, false, false, false, false, false);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        let alice = HumanAddr("alice".to_string());
+        let alice_key = "akey".to_string();
+        let bob = HumanAddr("bob".to_string());
+        let bob_key = "bkey".to_string();
+        let charlie = HumanAddr("charlie".to_string());
+        let charlie_key = "ckey".to_string();
+
+        let mints = vec![
+            Mint {
+                token_id: Some("NFT1".to_string()),
+                owner: Some(alice.clone()),
+                public_metadata: None,
+                private_metadata: None,
+                royalty_info: None,
+                serial_number: None,
+                transferable: None,
+                memo: None,
+            },
+            Mint {
+                token_id: Some("NFT2".to_string()),
+                owner: Some(alice.clone()),
+                public_metadata: None,
+                private_metadata: None,
+                royalty_info: None,
+                serial_number: None,
+                transferable: None,
+                memo: None,
+            },
+            Mint {
+                token_id: Some("NFT3".to_string()),
+                owner: Some(alice.clone()),
+                public_metadata: None,
+                private_metadata: None,
+                royalty_info: None,
+                serial_number: None,
+                transferable: None,
+                memo: None,
+            },
+        ];
+
+        let handle_msg = HandleMsg::BatchMintNft {
+            mints: mints.clone(),
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        assert!(handle_result.is_ok());
+
+        // let charlie see the owner of NFT2 until time 55
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: charlie.clone(),
+            token_id: Some("NFT2".to_string()),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: None,
+            transfer: None,
+            expires: Some(Expiration::AtTime(55)),
+            padding: None,
+        };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 2,
+                    time: 2,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("alice".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // test all 3 are public from the config
+        let query_msg = QueryMsg::NumTokensOfOwner {
+            owner: alice.clone(),
+            viewer: None,
+            viewing_key: None,
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::NumTokens { count } => {
+                assert_eq!(count, 3);
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // set ownership to private for alice
+        let handle_msg = HandleMsg::MakeOwnershipPrivate { padding: None };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 3,
+                    time: 3,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("alice".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // set charlie's viewing key
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: charlie_key.clone(),
+            padding: None,
+        };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 3,
+                    time: 3,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("charlie".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // test that charlie can only know of NFT2
+        let query_msg = QueryMsg::NumTokensOfOwner {
+            owner: alice.clone(),
+            viewer: Some(charlie.clone()),
+            viewing_key: Some(charlie_key.clone()),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::NumTokens { count } => {
+                assert_eq!(count, 1);
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // set alice's viewing key
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: alice_key.clone(),
+            padding: None,
+        };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 4,
+                    time: 4,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("alice".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // test that alice knows of all her tokens
+        let query_msg = QueryMsg::NumTokensOfOwner {
+            owner: alice.clone(),
+            viewer: None,
+            viewing_key: Some(alice_key.clone()),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::NumTokens { count } => {
+                assert_eq!(count, 3);
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // make ownership public until time 15
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: None,
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: None,
+            expires: Some(Expiration::AtTime(15)),
+            padding: None,
+        };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 10,
+                    time: 10,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("alice".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // set bob's viewing key
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: bob_key.clone(),
+            padding: None,
+        };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 10,
+                    time: 10,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("bob".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // test that bob can use the global approval to know of all 3
+        let query_msg = QueryMsg::NumTokensOfOwner {
+            owner: alice.clone(),
+            viewer: Some(bob.clone()),
+            viewing_key: Some(bob_key.clone()),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::NumTokens { count } => {
+                assert_eq!(count, 3);
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // let bob see all alice ownership until time 25
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: bob.clone(),
+            token_id: None,
+            view_owner: Some(AccessLevel::All),
+            view_private_metadata: None,
+            transfer: None,
+            expires: Some(Expiration::AtTime(25)),
+            padding: None,
+        };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 20,
+                    time: 20,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("alice".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // test that the global approval has expired
+        let query_msg = QueryMsg::NumTokensOfOwner {
+            owner: alice.clone(),
+            viewer: None,
+            viewing_key: None,
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::NumTokens { count } => {
+                assert_eq!(count, 0);
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // test that bob can use his approval to know of all 3 now that global has expired
+        let query_msg = QueryMsg::NumTokensOfOwner {
+            owner: alice.clone(),
+            viewer: Some(bob.clone()),
+            viewing_key: Some(bob_key.clone()),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::NumTokens { count } => {
+                assert_eq!(count, 3);
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // make ownership public for NFT2 until time 25
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT2".to_string()),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: None,
+            expires: Some(Expiration::AtTime(25)),
+            padding: None,
+        };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 22,
+                    time: 22,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("alice".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // make ownership public for NFT1 until time 50
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT1".to_string()),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: None,
+            expires: Some(Expiration::AtTime(50)),
+            padding: None,
+        };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 25,
+                    time: 25,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("alice".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // make ownership public for NFT3 until time 60
+        let handle_msg = HandleMsg::SetGlobalApproval {
+            token_id: Some("NFT3".to_string()),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: None,
+            expires: Some(Expiration::AtTime(60)),
+            padding: None,
+        };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 30,
+                    time: 30,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("alice".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // test that charlie knows of all of them by using the two global approvals and his own
+        let query_msg = QueryMsg::NumTokensOfOwner {
+            owner: alice.clone(),
+            viewer: Some(charlie.clone()),
+            viewing_key: Some(charlie_key.clone()),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::NumTokens { count } => {
+                assert_eq!(count, 3);
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // test that bob knows of NFT1 and NFT3 by using the two global approvals
+        let query_msg = QueryMsg::NumTokensOfOwner {
+            owner: alice.clone(),
+            viewer: Some(bob.clone()),
+            viewing_key: Some(bob_key.clone()),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::NumTokens { count } => {
+                assert_eq!(count, 2);
+            }
+            _ => panic!("unexpected"),
+        }
+
+        // set ownership to private for alice again just to change the saved blockinfo
+        let handle_msg = HandleMsg::MakeOwnershipPrivate { padding: None };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 57,
+                    time: 57,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("alice".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+
+        // test that charlie only knows of NFT3 now that the other two approvals expired
+        let query_msg = QueryMsg::NumTokensOfOwner {
+            owner: alice.clone(),
+            viewer: Some(charlie.clone()),
+            viewing_key: Some(charlie_key.clone()),
+        };
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::NumTokens { count } => {
+                assert_eq!(count, 1);
             }
             _ => panic!("unexpected"),
         }
