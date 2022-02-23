@@ -4796,6 +4796,20 @@ fn get_querier<S: Storage, A: Api, Q: Querier>(
     Ok(viewer_raw)
 }
 
+// used to cache owner information for dossier_list()
+pub struct OwnerInfo {
+    // the owner's address
+    pub owner: CanonicalAddr,
+    // the view_owner privacy override
+    pub owner_is_public: bool,
+    // inventory approvals
+    pub inventory_approvals: Vec<Snip721Approval>,
+    // expiration for global view_owner approval if applicable
+    pub view_owner_exp: Option<Expiration>,
+    // expiration for global view_private_metadata approval if applicable
+    pub view_meta_exp: Option<Expiration>,
+}
+
 /// Returns StdResult<Vec<BatchNftDossierElement>> of all the token information the querier is permitted to
 /// view for multiple tokens.  This may include the owner, the public metadata, the private metadata, royalty
 /// information, mint run information, whether the token is unwrapped, whether the token is
@@ -4839,6 +4853,7 @@ pub fn dossier_list<S: Storage, A: Api, Q: Querier>(
     let mut owner_oper_for: Vec<CanonicalAddr> = Vec::new();
     let mut meta_oper_for: Vec<CanonicalAddr> = Vec::new();
     let mut xfer_oper_for: Vec<CanonicalAddr> = Vec::new();
+    let mut owner_cache: Vec<OwnerInfo> = Vec::new();
     let mut dossiers: Vec<BatchNftDossierElement> = Vec::new();
     // set up all the immutable storage references
     let own_priv_store = ReadonlyPrefixedStorage::new(PREFIX_OWNER_PRIV, &deps.storage);
@@ -4862,8 +4877,28 @@ pub fn dossier_list<S: Storage, A: Api, Q: Querier>(
         };
         let (mut token, idx) = get_token(&deps.storage, &id, opt_err)?;
         let owner_slice = token.owner.as_slice();
-        let global_pass: bool =
-            may_load(&own_priv_store, owner_slice)?.unwrap_or(config.owner_is_public);
+        // get the owner info either from the cache or storage
+        let owner_inf = if let Some(inf) = owner_cache.iter().find(|o| o.owner == token.owner) {
+            inf
+        } else {
+            let owner_is_public: bool =
+                may_load(&own_priv_store, owner_slice)?.unwrap_or(config.owner_is_public);
+            let mut all_perm: Vec<Permission> =
+                json_may_load(&all_store, owner_slice)?.unwrap_or_else(Vec::new);
+            let (inventory_approvals, view_owner_exp, view_meta_exp) =
+                gen_snip721_approvals(&deps.api, &block, &mut all_perm, incl_exp, &perm_type_info)?;
+            owner_cache.push(OwnerInfo {
+                owner: token.owner.clone(),
+                owner_is_public,
+                inventory_approvals,
+                view_owner_exp,
+                view_meta_exp,
+            });
+            owner_cache.last().ok_or_else(|| {
+                StdError::generic_err("This can't happen since we just pushed an OwnerInfo!")
+            })?
+        };
+        let global_pass = owner_inf.owner_is_public;
         // get the owner if permitted
         let owner = if global_pass
             || check_perm_core(
@@ -4933,7 +4968,7 @@ pub fn dossier_list<S: Storage, A: Api, Q: Querier>(
             .transpose()?;
         // get the mint run information
         let mint_run: StoredMintRunInfo = load(&run_store, &token_key)?;
-        // get the approvals
+        // get the token approvals
         let (token_approv, token_owner_exp, token_meta_exp) = gen_snip721_approvals(
             &deps.api,
             &block,
@@ -4941,29 +4976,34 @@ pub fn dossier_list<S: Storage, A: Api, Q: Querier>(
             incl_exp,
             &perm_type_info,
         )?;
-        let mut all_perm: Vec<Permission> =
-            json_may_load(&all_store, owner_slice)?.unwrap_or_else(Vec::new);
-        let (inventory_approv, all_owner_exp, all_meta_exp) =
-            gen_snip721_approvals(&deps.api, &block, &mut all_perm, incl_exp, &perm_type_info)?;
         // determine if ownership is public
         let (public_ownership_expiration, owner_is_public) = if global_pass {
             (Some(Expiration::Never), true)
         } else if token_owner_exp.is_some() {
             (token_owner_exp, true)
         } else {
-            (all_owner_exp, all_owner_exp.is_some())
+            (
+                owner_inf.view_owner_exp.as_ref().cloned(),
+                owner_inf.view_owner_exp.is_some(),
+            )
         };
         // determine if private metadata is public
         let (private_metadata_is_public_expiration, private_metadata_is_public) =
             if token_meta_exp.is_some() {
                 (token_meta_exp, true)
             } else {
-                (all_meta_exp, all_meta_exp.is_some())
+                (
+                    owner_inf.view_meta_exp.as_ref().cloned(),
+                    owner_inf.view_meta_exp.is_some(),
+                )
             };
         // if the viewer is the owner, display the approvals
         let (token_approvals, inventory_approvals) = opt_viewer.map_or((None, None), |v| {
             if token.owner == *v {
-                (Some(token_approv), Some(inventory_approv))
+                (
+                    Some(token_approv),
+                    Some(owner_inf.inventory_approvals.clone()),
+                )
             } else {
                 (None, None)
             }

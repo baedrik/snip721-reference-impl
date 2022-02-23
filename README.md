@@ -1,6 +1,6 @@
 # SNIP-721 Reference Implementation
 ***NOTE***
-I'm making the code available early for people who are interested, but I still need to write the specifications for SNIP-722 (which enables badges and POAPs as well as non-transferable tokens) and SNIP-723 (which includes some miscellaneous improvements like a BatchNftDossier query, a NumTokensOfOwner query to retrieve the count of tokens owned by one address and in which the querier has permission know the tokens' ownership, and adding a token's unwrapped status to the NftDossier response).  I also still need to write unit-tests for BatchNftDossier as well as update this README with documentation of the additions.
+I'm making the code available early for people who are interested, but I still need to write the specifications for SNIP-722 (which enables badges and POAPs as well as non-transferable tokens) and SNIP-723 (which includes some miscellaneous improvements like a BatchNftDossier query, a NumTokensOfOwner query to retrieve the count of tokens owned by one address and in which the querier has permission know the tokens' ownership, and adding a token's unwrapped status to the NftDossier response).  I also still need to update this README with documentation of the additions.
 
 
 

@@ -2,9 +2,10 @@
 mod tests {
     use crate::contract::{handle, init, query};
     use crate::expiration::Expiration;
+    use crate::mint_run::MintRunInfo;
     use crate::msg::{
-        AccessLevel, Cw721Approval, HandleMsg, InitConfig, InitMsg, Mint, QueryAnswer, QueryMsg,
-        Snip721Approval, Tx, TxAction, ViewerInfo,
+        AccessLevel, BatchNftDossierElement, Cw721Approval, HandleMsg, InitConfig, InitMsg, Mint,
+        QueryAnswer, QueryMsg, Snip721Approval, Tx, TxAction, ViewerInfo,
     };
     use crate::token::{Extension, Metadata};
     use cosmwasm_std::testing::*;
@@ -4263,6 +4264,206 @@ mod tests {
         match query_answer {
             QueryAnswer::NumTokens { count } => {
                 assert_eq!(count, 1);
+            }
+            _ => panic!("unexpected"),
+        }
+    }
+
+    // test BatchNftDossier query
+    #[test]
+    fn test_query_batch_nft_dossier() {
+        let (init_result, mut deps) =
+            init_helper_with_config(false, false, false, false, true, false, true);
+        assert!(
+            init_result.is_ok(),
+            "Init failed: {}",
+            init_result.err().unwrap()
+        );
+
+        let alice = HumanAddr("alice".to_string());
+
+        let public_meta1 = Metadata {
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("Name1".to_string()),
+                description: Some("PubDesc1".to_string()),
+                image: Some("PubUri1".to_string()),
+                ..Extension::default()
+            }),
+        };
+        let private_meta1 = Metadata {
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("PrivName1".to_string()),
+                description: Some("PrivDesc1".to_string()),
+                image: Some("PrivUri1".to_string()),
+                ..Extension::default()
+            }),
+        };
+        let public_meta2 = Metadata {
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("Name2".to_string()),
+                description: Some("PubDesc2".to_string()),
+                image: Some("PubUri2".to_string()),
+                ..Extension::default()
+            }),
+        };
+        let private_meta2 = Metadata {
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("PrivName2".to_string()),
+                description: Some("PrivDesc2".to_string()),
+                image: Some("PrivUri2".to_string()),
+                ..Extension::default()
+            }),
+        };
+
+        let public_meta3 = Metadata {
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("Name3".to_string()),
+                description: Some("PubDesc3".to_string()),
+                image: Some("PubUri3".to_string()),
+                ..Extension::default()
+            }),
+        };
+        let private_meta3 = Metadata {
+            token_uri: None,
+            extension: Some(Extension {
+                name: Some("PrivName3".to_string()),
+                description: Some("PrivDesc3".to_string()),
+                image: Some("PrivUri3".to_string()),
+                ..Extension::default()
+            }),
+        };
+
+        let mints = vec![
+            Mint {
+                token_id: Some("NFT1".to_string()),
+                owner: Some(alice.clone()),
+                public_metadata: Some(public_meta1.clone()),
+                private_metadata: Some(private_meta1.clone()),
+                royalty_info: None,
+                serial_number: None,
+                transferable: None,
+                memo: None,
+            },
+            Mint {
+                token_id: Some("NFT2".to_string()),
+                owner: Some(alice.clone()),
+                public_metadata: Some(public_meta2.clone()),
+                private_metadata: Some(private_meta2.clone()),
+                royalty_info: None,
+                serial_number: None,
+                transferable: None,
+                memo: None,
+            },
+            Mint {
+                token_id: Some("NFT3".to_string()),
+                owner: Some(HumanAddr("bob".to_string())),
+                public_metadata: Some(public_meta3.clone()),
+                private_metadata: Some(private_meta3.clone()),
+                royalty_info: None,
+                serial_number: None,
+                transferable: None,
+                memo: None,
+            },
+        ];
+
+        let handle_msg = HandleMsg::BatchMintNft {
+            mints: mints.clone(),
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        assert!(handle_result.is_ok());
+
+        // test querying all 3
+        let alice_key = "akey".to_string();
+        let handle_msg = HandleMsg::SetViewingKey {
+            key: alice_key.clone(),
+            padding: None,
+        };
+        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        assert!(handle_result.is_ok());
+
+        let query_msg = QueryMsg::BatchNftDossier {
+            token_ids: vec!["NFT1".to_string(), "NFT2".to_string(), "NFT3".to_string()],
+            viewer: Some(ViewerInfo {
+                address: alice.clone(),
+                viewing_key: alice_key.clone(),
+            }),
+            include_expired: None,
+        };
+        let mint_run_info = MintRunInfo {
+            collection_creator: Some(HumanAddr("instantiator".to_string())),
+            token_creator: Some(HumanAddr("admin".to_string())),
+            time_of_minting: Some(1571797419),
+            mint_run: None,
+            serial_number: None,
+            quantity_minted_this_run: None,
+        };
+        let expected = vec![
+            BatchNftDossierElement {
+                token_id: "NFT1".to_string(),
+                owner: Some(alice.clone()),
+                public_metadata: Some(public_meta1),
+                private_metadata: Some(private_meta1),
+                display_private_metadata_error: None,
+                royalty_info: None,
+                mint_run_info: Some(mint_run_info.clone()),
+                transferable: true,
+                unwrapped: true,
+                owner_is_public: false,
+                public_ownership_expiration: None,
+                private_metadata_is_public: false,
+                private_metadata_is_public_expiration: None,
+                token_approvals: Some(Vec::new()),
+                inventory_approvals: Some(Vec::new()),
+            },
+            BatchNftDossierElement {
+                token_id: "NFT2".to_string(),
+                owner: Some(alice.clone()),
+                public_metadata: Some(public_meta2),
+                private_metadata: Some(private_meta2),
+                display_private_metadata_error: None,
+                royalty_info: None,
+                mint_run_info: Some(mint_run_info.clone()),
+                transferable: true,
+                unwrapped: true,
+                owner_is_public: false,
+                public_ownership_expiration: None,
+                private_metadata_is_public: false,
+                private_metadata_is_public_expiration: None,
+                token_approvals: Some(Vec::new()),
+                inventory_approvals: Some(Vec::new()),
+            },
+            // last one belongs to bob, so you can only see public info
+            BatchNftDossierElement {
+                token_id: "NFT3".to_string(),
+                owner: None,
+                public_metadata: Some(public_meta3),
+                private_metadata: None,
+                display_private_metadata_error: Some(
+                    "You are not authorized to perform this action on token NFT3".to_string(),
+                ),
+                royalty_info: None,
+                mint_run_info: Some(mint_run_info.clone()),
+                transferable: true,
+                unwrapped: true,
+                owner_is_public: false,
+                public_ownership_expiration: None,
+                private_metadata_is_public: false,
+                private_metadata_is_public_expiration: None,
+                token_approvals: None,
+                inventory_approvals: None,
+            },
+        ];
+        let query_result = query(&deps, query_msg);
+        let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
+        match query_answer {
+            QueryAnswer::BatchNftDossier { nft_dossiers } => {
+                assert_eq!(nft_dossiers, expected);
             }
             _ => panic!("unexpected"),
         }
