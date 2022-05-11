@@ -1847,13 +1847,14 @@ pub fn permit_queries<S: Storage, A: Api, Q: Querier>(
     let my_address = deps
         .api
         .human_address(&load::<CanonicalAddr, _>(&deps.storage, MY_ADDRESS_KEY)?)?;
-    let querier = deps.api.canonical_address(&validate(
+    let querier = deps.api.canonical_address(&HumanAddr(validate(
         deps,
         PREFIX_REVOKED_PERMITS,
         &permit,
         my_address,
-    )?)?;
-    if !permit.check_permission(&secret_toolkit::permit::Permission::Owner) {
+        Some("secret"),
+    )?))?;
+    if !permit.check_permission(&secret_toolkit::permit::TokenPermissions::Owner) {
         return Err(StdError::generic_err(format!(
             "Owner permission is required for SNIP-721 queries, got permissions {:?}",
             permit.params.permissions
