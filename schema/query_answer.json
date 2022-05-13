@@ -1068,7 +1068,7 @@
           }
         },
         "token_subtype": {
-          "description": "token subtypes used by Stashh for display groupings (primarily used for badges)",
+          "description": "token subtypes used by Stashh for display groupings (primarily used for badges, which are specified by using \"badge\" as the token_subtype)",
           "type": [
             "string",
             "null"

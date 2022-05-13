@@ -483,8 +483,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
 ) -> HandleResult {
     check_status(config.status, priority)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    let minters: Vec<CanonicalAddr> =
-        may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+    let minters: Vec<CanonicalAddr> = may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_default();
     if !minters.contains(&sender_raw) {
         return Err(StdError::generic_err(
             "Only designated minters are allowed to mint",
@@ -501,7 +500,7 @@ pub fn mint<S: Storage, A: Api, Q: Querier>(
         memo,
     }];
     let mut minted = mint_list(deps, &env, config, &sender_raw, mints)?;
-    let minted_str = minted.pop().unwrap_or_else(String::new);
+    let minted_str = minted.pop().unwrap_or_default();
     Ok(HandleResponse {
         messages: vec![],
         log: vec![log("minted", &minted_str)],
@@ -531,8 +530,7 @@ pub fn batch_mint<S: Storage, A: Api, Q: Querier>(
 ) -> HandleResult {
     check_status(config.status, priority)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    let minters: Vec<CanonicalAddr> =
-        may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+    let minters: Vec<CanonicalAddr> = may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_default();
     if !minters.contains(&sender_raw) {
         return Err(StdError::generic_err(
             "Only designated minters are allowed to mint",
@@ -581,8 +579,7 @@ pub fn mint_clones<S: Storage, A: Api, Q: Querier>(
 ) -> HandleResult {
     check_status(config.status, priority)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
-    let minters: Vec<CanonicalAddr> =
-        may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+    let minters: Vec<CanonicalAddr> = may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_default();
     if !minters.contains(&sender_raw) {
         return Err(StdError::generic_err(
             "Only designated minters are allowed to mint",
@@ -682,8 +679,7 @@ pub fn set_metadata<S: Storage, A: Api, Q: Querier>(
     let (token, idx) = get_token(&deps.storage, token_id, opt_err)?;
     let sender_raw = deps.api.canonical_address(&env.message.sender)?;
     if !(token.owner == sender_raw && config.owner_may_update_metadata) {
-        let minters: Vec<CanonicalAddr> =
-            may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+        let minters: Vec<CanonicalAddr> = may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_default();
         if !(minters.contains(&sender_raw) && config.minter_may_update_metadata) {
             return Err(StdError::generic_err(custom_err));
         }
@@ -760,8 +756,7 @@ pub fn set_royalty_info<S: Storage, A: Api, Q: Querier>(
         )?;
     // set default royalty
     } else {
-        let minters: Vec<CanonicalAddr> =
-            may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+        let minters: Vec<CanonicalAddr> = may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_default();
         if !minters.contains(&sender_raw) {
             return Err(StdError::generic_err(
                 "Only designated minters can set default royalties for the contract",
@@ -1503,8 +1498,7 @@ pub fn add_minters<S: Storage, A: Api, Q: Querier>(
             "This is an admin command and can only be run from the admin address",
         ));
     }
-    let mut minters: Vec<CanonicalAddr> =
-        may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+    let mut minters: Vec<CanonicalAddr> = may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_default();
     let old_len = minters.len();
     for minter in new_minters {
         let minter_raw = deps.api.canonical_address(minter)?;
@@ -1990,7 +1984,7 @@ pub fn query_royalty<S: Storage, A: Api, Q: Querier>(
         } else {
             let config: Config = load(&deps.storage, CONFIG_KEY)?;
             let minters: Vec<CanonicalAddr> =
-                may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+                may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_default();
             let is_minter = viewer_raw.map(|v| minters.contains(&v)).unwrap_or(false);
             // if minter querying or the token supply is public, let them know the token does not exist
             if config.token_supply_is_public || is_minter {
@@ -2004,8 +1998,7 @@ pub fn query_royalty<S: Storage, A: Api, Q: Querier>(
         }
     // no id specified, so get the default
     } else {
-        let minters: Vec<CanonicalAddr> =
-            may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+        let minters: Vec<CanonicalAddr> = may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_default();
         // only let minters view default royalty addresses
         (
             may_load::<StoredRoyaltyInfo, _>(&deps.storage, DEFAULT_ROYALTY_KEY)?,
@@ -2044,8 +2037,7 @@ pub fn query_config<S: ReadonlyStorage>(storage: &S) -> QueryResult {
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 pub fn query_minters<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>) -> QueryResult {
-    let minters: Vec<CanonicalAddr> =
-        may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+    let minters: Vec<CanonicalAddr> = may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_default();
 
     to_binary(&QueryAnswer::Minters {
         minters: minters
@@ -2386,8 +2378,7 @@ pub fn query_token_approvals<S: Storage, A: Api, Q: Querier>(
         &perm_type_info,
     )?;
     let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
-    let mut all_perm: Vec<Permission> =
-        json_may_load(&all_store, owner_slice)?.unwrap_or_else(Vec::new);
+    let mut all_perm: Vec<Permission> = json_may_load(&all_store, owner_slice)?.unwrap_or_default();
     let (_inventory_approv, all_owner_exp, all_meta_exp) =
         gen_snip721_approvals(&deps.api, &block, &mut all_perm, incl_exp, &perm_type_info)?;
     // determine if ownership is public
@@ -2443,8 +2434,7 @@ pub fn query_inventory_approvals<S: Storage, A: Api, Q: Querier>(
         chain_id: "not used".to_string(),
     });
     let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
-    let mut all_perm: Vec<Permission> =
-        json_may_load(&all_store, owner_slice)?.unwrap_or_else(Vec::new);
+    let mut all_perm: Vec<Permission> = json_may_load(&all_store, owner_slice)?.unwrap_or_default();
     let perm_type_info = PermissionTypeInfo {
         view_owner_idx: PermissionType::ViewOwner.to_usize(),
         view_meta_idx: PermissionType::ViewMetadata.to_usize(),
@@ -2521,7 +2511,7 @@ pub fn query_approved_for_all<S: Storage, A: Api, Q: Querier>(
     let mut operators: Vec<Cw721Approval> = Vec::new();
     let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
     let all_perm: Vec<Permission> =
-        json_may_load(&all_store, owner_raw.as_slice())?.unwrap_or_else(Vec::new);
+        json_may_load(&all_store, owner_raw.as_slice())?.unwrap_or_default();
     gen_cw721_approvals(
         &deps.api,
         &block,
@@ -2836,7 +2826,7 @@ pub fn query_num_owner_tokens<S: Storage, A: Api, Q: Querier>(
     let mut token_idxs: HashSet<u32> = HashSet::new();
     found_one = only_public;
     let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
-    let auth_list: Vec<AuthList> = may_load(&auth_store, owner_slice)?.unwrap_or_else(Vec::new);
+    let auth_list: Vec<AuthList> = may_load(&auth_store, owner_slice)?.unwrap_or_default();
     for auth in auth_list.iter() {
         if auth.address == *sender || auth.address == global_raw {
             token_idxs.extend(auth.tokens[exp_idx].iter());
@@ -3187,7 +3177,7 @@ fn get_owner_of_resp<S: Storage, A: Api, Q: Querier>(
             )?;
             let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
             let all_perm: Vec<Permission> =
-                json_may_load(&all_store, token.owner.as_slice())?.unwrap_or_else(Vec::new);
+                json_may_load(&all_store, token.owner.as_slice())?.unwrap_or_default();
             gen_cw721_approvals(
                 &deps.api,
                 block,
@@ -3326,7 +3316,7 @@ fn check_view_supply<S: Storage, A: Api, Q: Querier>(
         let querier = get_querier(deps, viewer, from_permit)?;
         if let Some(viewer_raw) = querier {
             let minters: Vec<CanonicalAddr> =
-                may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_else(Vec::new);
+                may_load(&deps.storage, MINTERS_KEY)?.unwrap_or_default();
             is_auth = minters.contains(&viewer_raw);
         }
         if !is_auth {
@@ -3353,7 +3343,7 @@ fn check_key<S: ReadonlyStorage>(
     // load the address' key
     let read_key = ReadonlyPrefixedStorage::new(PREFIX_VIEW_KEY, storage);
     let load_key: [u8; VIEWING_KEY_SIZE] =
-        may_load(&read_key, address.as_slice())?.unwrap_or_else(|| [0u8; VIEWING_KEY_SIZE]);
+        may_load(&read_key, address.as_slice())?.unwrap_or([0u8; VIEWING_KEY_SIZE]);
     let input_key = ViewingKey(viewing_key);
     // if key matches
     if input_key.check_viewing_key(&load_key) {
@@ -3666,6 +3656,7 @@ pub enum SetAppResp {
 }
 
 // table of bools used to alter AuthLists properly
+#[derive(Default)]
 pub struct AlterAuthTable {
     // true if the specified token index should be added to an AuthList for that PermissionType
     pub add: [bool; 3],
@@ -3679,19 +3670,8 @@ pub struct AlterAuthTable {
     pub has_update: bool,
 }
 
-impl Default for AlterAuthTable {
-    fn default() -> Self {
-        AlterAuthTable {
-            add: [false; 3],
-            full: [false; 3],
-            remove: [false; 3],
-            clear: [false; 3],
-            has_update: false,
-        }
-    }
-}
-
 // table of bools used to alter a permission list appropriately
+#[derive(Default)]
 pub struct AlterPermTable {
     // true if the address should be added to the permission list for that PermissionType
     pub add: [bool; 3],
@@ -3699,16 +3679,6 @@ pub struct AlterPermTable {
     pub remove: [bool; 3],
     // true if there is at least one true in the table
     pub has_update: bool,
-}
-
-impl Default for AlterPermTable {
-    fn default() -> Self {
-        AlterPermTable {
-            add: [false; 3],
-            remove: [false; 3],
-            has_update: false,
-        }
-    }
 }
 
 // bundled info needed when setting accesses
@@ -3783,8 +3753,7 @@ fn process_accesses<S: Storage>(
                         if !proc_info.from_oper {
                             let all_store =
                                 ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, storage);
-                            all_perm =
-                                json_may_load(&all_store, owner_slice)?.unwrap_or_else(Vec::new);
+                            all_perm = json_may_load(&all_store, owner_slice)?.unwrap_or_default();
                         }
                         if let Some(pos) = all_perm.iter().position(|p| p.address == *address) {
                             found_perm = true;
@@ -3881,7 +3850,7 @@ fn process_accesses<S: Storage>(
         // load "all" permissions if we haven't already
         if !tried_oper {
             let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, storage);
-            all_perm = json_may_load(&all_store, owner_slice)?.unwrap_or_else(Vec::new);
+            all_perm = json_may_load(&all_store, owner_slice)?.unwrap_or_default();
         }
         // if there was an update to the "all" permissions
         if alter_perm_list(
@@ -3924,8 +3893,7 @@ fn process_accesses<S: Storage>(
     if alt_auth_list.has_update {
         // get the AuthLists for this address
         let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, storage);
-        let mut auth_list: Vec<AuthList> =
-            may_load(&auth_store, owner_slice)?.unwrap_or_else(Vec::new);
+        let mut auth_list: Vec<AuthList> = may_load(&auth_store, owner_slice)?.unwrap_or_default();
         let mut new_auth = AuthList {
             address: address.clone(),
             tokens: [Vec::new(), Vec::new(), Vec::new()],
@@ -4885,7 +4853,7 @@ pub fn dossier_list<S: Storage, A: Api, Q: Querier>(
             let owner_is_public: bool =
                 may_load(&own_priv_store, owner_slice)?.unwrap_or(config.owner_is_public);
             let mut all_perm: Vec<Permission> =
-                json_may_load(&all_store, owner_slice)?.unwrap_or_else(Vec::new);
+                json_may_load(&all_store, owner_slice)?.unwrap_or_default();
             let (inventory_approvals, view_owner_exp, view_meta_exp) =
                 gen_snip721_approvals(&deps.api, &block, &mut all_perm, incl_exp, &perm_type_info)?;
             owner_cache.push(OwnerInfo {
