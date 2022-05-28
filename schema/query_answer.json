@@ -575,6 +575,25 @@
     {
       "type": "object",
       "required": [
+        "implements_token_subtype"
+      ],
+      "properties": {
+        "implements_token_subtype": {
+          "type": "object",
+          "required": [
+            "is_enabled"
+          ],
+          "properties": {
+            "is_enabled": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
         "verify_transfer_approval"
       ],
       "properties": {

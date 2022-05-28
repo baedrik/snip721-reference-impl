@@ -553,6 +553,18 @@
       }
     },
     {
+      "description": "display that this contract implements the use of the `token_subtype` metadata extension field",
+      "type": "object",
+      "required": [
+        "implements_token_subtype"
+      ],
+      "properties": {
+        "implements_token_subtype": {
+          "type": "object"
+        }
+      }
+    },
+    {
       "description": "verify that the specified address has approval to transfer every listed token. A token will count as unapproved if it is non-transferable",
       "type": "object",
       "required": [

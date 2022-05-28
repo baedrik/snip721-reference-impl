@@ -782,6 +782,8 @@ pub enum QueryMsg {
     IsTransferable { token_id: String },
     /// display that this contract implements non-transferable tokens
     ImplementsNonTransferableTokens {},
+    /// display that this contract implements the use of the `token_subtype` metadata extension field
+    ImplementsTokenSubtype {},
     /// verify that the specified address has approval to transfer every listed token.  
     /// A token will count as unapproved if it is non-transferable
     VerifyTransferApproval {
@@ -966,6 +968,9 @@ pub enum QueryAnswer {
         token_is_transferable: bool,
     },
     ImplementsNonTransferableTokens {
+        is_enabled: bool,
+    },
+    ImplementsTokenSubtype {
         is_enabled: bool,
     },
     VerifyTransferApproval {

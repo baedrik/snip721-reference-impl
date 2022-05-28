@@ -1,10 +1,10 @@
 # SNIP-721 Reference Implementation
 ***NOTE***
-I'm making the code available early for people who are interested, but I still need to write the specifications for SNIP-722 (which enables badges and POAPs as well as non-transferable tokens) and SNIP-723 (which includes some miscellaneous improvements like a BatchNftDossier query, a NumTokensOfOwner query to retrieve the count of tokens owned by one address and in which the querier has permission know the tokens' ownership, and adding a token's unwrapped status to the NftDossier response).  I also still need to update this README with documentation of the additions.
+I'm making the code available early for people who are interested, but I still need to write the specification for SNIP-723 (which includes some miscellaneous improvements like a BatchNftDossier query, a NumTokensOfOwner query to retrieve the count of tokens owned by one address and in which the querier has permission know the tokens' ownership, and adding a token's unwrapped status to the NftDossier response).  I also still need to update this README with documentation of the additions.
 
 
 
-This is a reference implementation of the [SNIP-721 specification](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md).  It not only implements the base requirements of SNIP-721,  but it also includes additional functionality that may be helpful for many use cases.  As SNIP-721 is a superset of the [CW-721 specification](https://github.com/CosmWasm/cosmwasm-plus/blob/master/packages/cw721/README.md), this implementation is CW-721 compliant; however, because CW-721 does not support privacy, a number of the CW-721-compliant functions may not return all the information a CW-721 implementation would.  For example, the [OwnerOf](#ownerof) query will not display the approvals for a token unless the token owner has supplied his address and viewing key.  In order to strive for CW-721 compliance, a number of queries that require authentication use optional parameters that the CW-721 counterpart does not have.  If the optional authentication parameters are not supplied, the responses will only display information that the token owner has made public.
+This is a reference implementation of the [SNIP-721 specification](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md) and [SNIP-722 specification](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md).  It not only implements the base requirements of SNIP-721 and SNIP-722,  but it also includes additional functionality that may be helpful for many use cases.  As SNIP-721 is a superset of the [CW-721 specification](https://github.com/CosmWasm/cw-nfts/tree/main/packages/cw721), this implementation is CW-721 compliant; however, because CW-721 does not support privacy, a number of the CW-721-compliant functions may not return all the information a CW-721 implementation would.  For example, the [OwnerOf](#ownerof) query will not display the approvals for a token unless the token owner has supplied his address and viewing key.  In order to strive for CW-721 compliance, a number of queries that require authentication use optional parameters that the CW-721 counterpart does not have.  If the optional authentication parameters are not supplied, the responses will only display information that the token owner has made public.
 
 ### Terms
 - __Message__ - This is an on-chain interface. It is triggered by sending a transaction, and receiving an on-chain response which is read by the client. Messages are authenticated both by the blockchain, and by the secret enclave.
@@ -19,6 +19,64 @@ Requests should be sent as base64 encoded JSON. Future versions of Secret Networ
 
 ### Responses
 Message responses will be JSON encoded in the `data` field of the Cosmos response, rather than in the `logs`, except in the case of MintNft, BatchMintNft, and MintNftClones messages, where the token ID(s) will be returned in both the `data` and `logs` fields.  This is because minting may frequently be done by a contract, and `data` fields of responses from callback messages do not get forwarded to the sender of the initial message.
+
+* [Instantiating The Token Contract](#Instantiating-The-Token-Contract)
+* Messages
+    * [MintNft](#MintNft)
+    * [BatchMintNft](#BatchMintNft)
+    * [MintNftClones](#MintNftClones)
+    * [SetMetadata](#setmetadata)
+    * [SetRoyaltyInfo](#setroyaltyinfo)
+    * [Reveal](#reveal)
+    * [MakeOwnershipPrivate](#MakeOwnershipPrivate)
+    * [SetGlobalApproval](#setglobal)
+    * [SetWhitelistedApproval](#setwhitelisted)
+    * [Approve](#Approve)
+    * [Revoke](#Revoke)
+    * [ApproveAll](#ApproveAll)
+    * [RevokeAll](#RevokeAll)
+    * [TransferNft](#TransferNft)
+    * [BatchTransferNft](#BatchTransferNft)
+    * [SendNft](#sendnft)
+    * [BatchSendNft](#batchsend)
+    * [BurnNft](#BurnNft)
+    * [BatchBurnNft](#BatchBurnNft)
+    * [CreateViewingKey](#CreateViewingKey)
+    * [SetViewingKey](#SetViewingKey)
+    * [AddMinters](#AddMinters)
+    * [RemoveMinters](#RemoveMinters)
+    * [SetMinters](#SetMinters)
+    * [SetContractStatus](#SetContractStatus)
+    * [ChangeAdmin](#ChangeAdmin)
+    * [RegisterReceiveNft](#registerreceive)
+    * [RevokePermit](#RevokePermit)
+* Queries
+    * [ContractInfo](#ContractInfo)
+    * [ContractConfig](#ContractConfig)
+    * [Minters](#Minters)
+    * [RegisteredCodeHash](#RegisteredCodeHash)
+    * [NumTokens](#NumTokens)
+    * [AllTokens](#AllTokens)
+    * [IsUnwrapped](#IsUnwrapped)
+    * [IsTransferable](#istransferable)
+    * [OwnerOf](#ownerof)
+    * [NftInfo](#nftinfo)
+    * [AllNftInfo](#AllNftInfo)
+    * [PrivateMetadata](#PrivateMetadata)
+    * [NftDossier](#nftdossier)
+    * [RoyaltyInfo](#royaltyquery)
+    * [TokenApprovals](#TokenApprovals)
+    * [ApprovedForAll](#ApprovedForAll)
+    * [InventoryApprovals](#inventoryapprovals)
+    * [Tokens](#Tokens)
+    * [VerifyTransferApproval](#verifyapproval)
+    * [ImplementsTokenSubtype](#ImplementsTokenSubtype)
+    * [ImplementsNonTransferableTokens](#implementsnontransferabletokens)
+    * [TransactionHistory](#TransactionHistory)
+	* [WithPermit](#WithPermit)
+* [Receiver Interface](#receiver)
+    * [ReceiveNft](#receivenft)
+    * [BatchReceiveNft](#batchreceivenft)
 
 # Instantiating The Token Contract
 ##### Request
@@ -75,7 +133,7 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 | config             | [Config (see below)](#config)                          | Privacy configuration for the contract                              | yes      | defined below      |
 | post_init_callback | [PostInitCallback (see below)](#postinitcallback)      | Information used to perform a callback message after initialization | yes      | nothing            |
 
-The contract's default RoyaltyInfo is the RoyaltyInfo that will be assigned to any token that is minted without explicitly defining its own RoyaltyInfo.  It should be noted that default RoyaltyInfo only applies to new tokens minted while the default is in effect, and will not alter the royalties for any existing NFTs.  This is because a token creator should not be able to sell a token with only 1% advertised royalty, and then change it to 100% once it is purchased.
+The contract's default RoyaltyInfo is the RoyaltyInfo that will be assigned to any token that is minted without explicitly defining its own RoyaltyInfo.  It should be noted that default RoyaltyInfo only applies to new tokens minted while the default is in effect, and will not alter the royalties for any existing NFTs.  This is because a token creator should not be able to sell a token with only 1% advertised royalty, and then change it to 100% once it is purchased.  If a [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) non-transferable token is minted, it will not inherit default royalties because non-transferable tokens can never be transferred as part of a sale, rendering royalties meaningless.
 
 ### <a name="royaltyinfo"></a>RoyaltyInfo
 RoyaltyInfo is used to define royalties to be paid when an NFT is sold.  This implementation will only display a token's royalty recipient addresses if the querier has permission to transfer the token, and it will only display the contract's default royalty recipient addresses if the querier is an authorized minter.
@@ -119,7 +177,7 @@ Config is the privacy configuration for the contract.
 * <a name="unwrapprivate"></a>`unwrapped_metadata_is_private` - This config value indicates if the [Reveal](#reveal) message should keep the sealed metadata private after unwrapping.  This config value is ignored if sealed metadata is not enabled (default: False)
 * `minter_may_update_metadata` - This config value indicates whether a minter is permitted to update a token's metadata (default: True)
 * `owner_may_update_metadata` - This config value indicates whether the owner of a token is permitted to update a token's metadata (default: False)
-* `enable_burn` - This config value indicates whether burn functionality is enabled (default: False)
+* `enable_burn` - This config value indicates whether burn functionality is enabled.  [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) non-transferable tokens can always be burned even when burning is disabled.  This is because an owner must have a way to dispose of an unwanted, non-transferable token (default: False)
 ```
 {
 	“public_token_supply”: true | false,
@@ -183,6 +241,8 @@ Coin is the payment to send with the post-init callback message.  Although `send
 ## MintNft
 MintNft mints a single token.  Only an authorized minting address my execute MintNft.
 
+[SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) adds the ability to optionally mint non-transferable tokens, which are NFTs that can never have a different owner than the address it was minted to.
+
 ##### Request
 ```
 {
@@ -218,6 +278,7 @@ MintNft mints a single token.  Only an authorized minting address my execute Min
 				}
 			],
 		},
+		"transferable": true | false,
 		"memo": "optional_memo_for_the_mint_tx",
 		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
@@ -231,8 +292,11 @@ MintNft mints a single token.  Only an authorized minting address my execute Min
 | private_metadata | [Metadata (see below)](#metadata)         | The metadata that is viewable only by the token owner and addresses the owner has whitelisted | yes      | nothing              |
 | serial_number    | [SerialNumber (see below)](#serialnumber) | The SerialNumber for this token                                                               | yes      | nothing              |
 | royalty_info     | [RoyaltyInfo (see above)](#royaltyinfo)   | RoyaltyInfo for this token                                                                    | yes      | default RoyaltyInfo  |
+| transferable     | bool                                      | True if the minted token should be transferable                                               | yes      | true                 |
 | memo             | string                                    | `memo` for the mint tx that is only viewable by addresses involved in the mint (minter, owner)| yes      | nothing              |
 | padding          | string                                    | An ignored string that can be used to maintain constant message length                        | yes      | nothing              |
+
+Setting royalties for a non-transferable token has no purpose, because it can never be transferred as part of a sale, so this implementation will not store any RoyaltyInfo for non-transferable tokens.
 
 ##### Response
 ```
@@ -262,6 +326,8 @@ This implementation will throw an error if both `token_uri` and `extension` are 
 
 ### <a name="extension"></a>Extension
 This is an on-chain metadata extension struct that conforms to the Stashh metadata standard (which in turn implements https://docs.opensea.io/docs/metadata-standards).  Urls should be prefixed with `http://`, `https://`, `ipfs://`, or `ar://`.  Feel free to add/delete any fields as necessary.
+
+[SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) adds an optional `token_subtype` field in Extension to be used for Badges/POAPs.  This field is intended to be used by applications in order to differentiate NFTs that are used as Badges/POAPs so that they can be displayed as such because they will be used for things like trophies, achievements, proof of attendence, etc...
 ```
 {
 	"image": "optional_image_url",
@@ -297,7 +363,8 @@ This is an on-chain metadata extension struct that conforms to the Stashh metada
 			"...": "...",
 		},
 	],
-	"protected_attributes": [ "list", "of_attributes", "whose_types", "are_public", "but_values", "are_private" ]
+	"protected_attributes": [ "list", "of_attributes", "whose_types", "are_public", "but_values", "are_private" ],
+	"token_subtype": "badge"
 }
 ```
 | Name                 | Type                                         | Description                                                                          | Optional | Value If Omitted     |
@@ -313,6 +380,7 @@ This is an on-chain metadata extension struct that conforms to the Stashh metada
 | youtube_url          | string                                       | Url to a YouTube video                                                               | yes      | nothing              |
 | media                | array of [MediaFile (see below)](#mediafile) | List of multimedia files using Stashh specifications                                 | yes      | nothing              |
 | protected_attributes | array of string                              | List of attributes whose types are public but whose values are private               | yes      | nothing              |
+| token_subtype        | string                                       | token subtype used to signify what the NFT is used for, such as "badge"              | yes      | nothing              |
 
 ### <a name="trait"></a>Trait
 Trait describes a token attribute as defined in https://docs.opensea.io/docs/metadata-standards.
@@ -384,6 +452,8 @@ A mint run is a group of NFTs released at the same time.  So, for example, if a 
 ## BatchMintNft
 BatchMintNft mints a list of tokens.  Only an authorized minting address my execute BatchMintNft.
 
+[SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) adds the ability to optionally mint non-transferable tokens, which are NFTs that can never have a different owner than the address it was minted to.
+
 ##### Request
 ```
 {
@@ -421,6 +491,7 @@ BatchMintNft mints a list of tokens.  Only an authorized minting address my exec
 						}
 					],
 				},
+				"transferable": true | false,
 				"memo": "optional_memo_for_the_mint_tx"
 			},
 			{
@@ -483,6 +554,7 @@ The Mint object defines the data necessary to mint one token.
 			}
 		],
 	},
+	"transferable": true | false,
 	"memo": "optional_memo_for_the_mint_tx"
 }
 ```
@@ -494,10 +566,15 @@ The Mint object defines the data necessary to mint one token.
 | private_metadata | [Metadata (see above)](#metadata)         | The metadata that is viewable only by the token owner and addresses the owner has whitelisted  | yes      | nothing              |
 | serial_number    | [SerialNumber (see above)](#serialnumber) | The SerialNumber for this token                                                                | yes      | nothing              |
 | royalty_info     | [RoyaltyInfo (see above)](#royaltyinfo)   | RoyaltyInfo for this token                                                                     | yes      | default RoyaltyInfo  |
+| transferable     | bool                                      | True if the minted token should be transferable                                                | yes      | true                 |
 | memo             | string                                    | `memo` for the mint tx that is only viewable by addresses involved in the mint (minter, owner) | yes      | nothing              |
+
+Setting royalties for a non-transferable token has no purpose, because it can never be transferred as part of a sale, so this implementation will not store any RoyaltyInfo for non-transferable tokens.
 
 ## MintNftClones
 MintNftClones mints copies of an NFT, giving each one a [MintRunInfo](#mintruninfo) that indicates its serial number and the number of identical NFTs minted with it.  If the optional `mint_run_id` is provided, the contract will also indicate which mint run these tokens were minted in, where the first use of the `mint_run_id` will be mint run number 1, the second time MintNftClones is called with that `mint_run_id` will be mint run number 2, etc...  If no `mint_run_id` is provided, the MintRunInfo will not include a `mint_run`.
+
+[SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) adds the ability to optionally mint non-transferable tokens, which are NFTs that can never have a different owner than the address it was minted to.
 
 ##### Request
 ```
@@ -530,6 +607,7 @@ MintNftClones mints copies of an NFT, giving each one a [MintRunInfo](#mintrunin
 				}
 			],
 		},
+		"transferable": true | false,
 		"memo": "optional_memo_for_the_mint_tx",
 		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
 	}
@@ -543,8 +621,11 @@ MintNftClones mints copies of an NFT, giving each one a [MintRunInfo](#mintrunin
 | public_metadata  | [Metadata (see above)](#metadata)       | The metadata that is publicly viewable                                                                   | yes      | nothing             |
 | private_metadata | [Metadata (see above)](#metadata)       | The metadata that is viewable only by the token owner and addresses the owner has whitelisted            | yes      | nothing             |
 | royalty_info     | [RoyaltyInfo (see above)](#royaltyinfo) | RoyaltyInfo for these tokens                                                                             | yes      | default RoyaltyInfo |
+| transferable     | bool                                    | True if the minted token should be transferable                                                          | yes      | true                 |
 | memo             | string                                  | `memo` for the mint tx that is only viewable by addresses involved in the mint (minter, owner)           | yes      | nothing             |
 | padding          | string                                  | An ignored string that can be used to maintain constant message length                                   | yes      | nothing             |
+
+Setting royalties for a non-transferable token has no purpose, because it can never be transferred as part of a sale, so this implementation will not store any RoyaltyInfo for non-transferable tokens.
 
 ##### Response
 ```
@@ -601,6 +682,8 @@ SetMetadata will set the public and/or private metadata to the corresponding inp
 If a token_id is supplied, SetRoyaltyInfo will update the specified token's RoyaltyInfo to the input.  If no RoyaltyInfo is provided, it will delete the RoyaltyInfo and replace it with the contract's default RoyaltyInfo (if there is one).  If no token_id is provided, SetRoyaltyInfo will update the contract's default RoyaltyInfo to the input, or delete it if no RoyaltyInfo is provided.<br />
 Only an authorized minter may update the contract's default RoyaltyInfo.<br />
 Only a token's creator may update its RoyaltyInfo, and only if they are also the current owner.
+
+This implementation will throw an error if trying to set the royalty of a [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) non-transferable token, because they can never be transferred as part of a sale.
 
 ##### Request
 ```
@@ -888,6 +971,8 @@ RevokeAll is used to revoke all transfer approvals granted to an address.  Revok
 ## TransferNft
 TransferNft is used to transfer ownership of the token to the `recipient` address.  This requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the `recipient` address is the same as the current owner, the contract will throw an error.  If the token is transferred to a new owner, its single-token approvals will be cleared.
 
+This implementation will throw an error if trying to transfer a [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) non-transferable token.
+
 ##### Request
 ```
 {
@@ -918,7 +1003,9 @@ TransferNft is used to transfer ownership of the token to the `recipient` addres
 ## BatchTransferNft
 BatchTransferNft is used to perform multiple token transfers.  The message sender may specify a list of tokens to transfer to one `recipient` address in each [Transfer](#transfer) object, and any `memo` provided will be applied to every token transferred in that one `Transfer` object.  The message sender may provide multiple `Transfer` objects to perform transfers to multiple addresses, providing a different `memo` for each address if desired.  Each individual transfer of a token will show separately in transaction histories.  The message sender must have permission to transfer all the tokens listed (either by being the owner or being granted transfer approval) and every listed `token_id` must be valid.  A contract may use the [VerifyTransferApproval](#verifyapproval) query to verify that it has permission to transfer all the tokens.  
 
-If the message sender does not have permission to transfer any one of the listed tokens, the entire message will fail (no tokens will be transferred) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.  If any token transfer involves a `recipient` address that is the same as its current owner, that transfer will not be done (transaction history will not include a transfer that does not change ownership), but all the other transfers will proceed.  Any token that is transferred to a new owner will have its single-token approvals cleared.
+If the message sender does not have permission to transfer any one of the listed tokens, the entire message will fail (no tokens will be transferred) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.  If any token transfer involves a `recipient` address that is the same as its current owner, the contract will throw an error.  Any token that is transferred to a new owner will have its single-token approvals cleared.
+
+This implementation will throw an error if trying to transfer a [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) non-transferable token.
 
 ##### Request
 ```
@@ -978,6 +1065,8 @@ While SendNft keeps the `contract` field name in order to maintain CW-721 compli
 
 SendNft requires a valid `token_id` and the message sender must either be the owner or an address with valid transfer approval.  If the recipient address is the same as the current owner, the contract will throw an error.  If the token is transferred to a new owner, its single-token approvals will be cleared.  If the BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction will be reverted (even the transfer will not take place).
 
+This implementation will throw an error if trying to send a [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) non-transferable token.
+
 ##### Request
 ```
 {
@@ -1027,8 +1116,10 @@ The optional ReceiverInfo object may be used to provide the code hash of the con
 ## <a name="batchsend"></a>BatchSendNft
 BatchSendNft is used to perform multiple token transfers, and then call the recipient contracts' [BatchReceiveNft](#batchreceivenft) (or [ReceiveNft](#receivenft)) if they have registered their receiver interface with the NFT contract or if their [ReceiverInfo](#receiverinfo) is provided.  The message sender may specify a list of tokens to send to one recipient address in each [Send](#send) object, and any `memo` or `msg` provided will be applied to every token transferred in that one `Send` object.  If the list of transferred tokens belonged to multiple previous owners, a separate BatchReceiveNft callback will be performed for each of the previous owners.  If the contract only implements ReceiveNft, one ReceiveNft will be performed for every sent token.  Therefore it is highly recommended to implement BatchReceiveNft if there is the possibility of being sent multiple tokens at one time.  This will significantly reduce gas costs.  
 
-The message sender may provide multiple [Send](#send) objects to perform sends to multiple addresses, providing a different `memo` and `msg` for each address if desired.  Each individual transfer of a token will show separately in transaction histories.  The message sender must have permission to transfer all the tokens listed (either by being the owner or being granted transfer approval) and every token ID must be valid.  A contract may use the [VerifyTransferApproval](#verifyapproval) query to verify that it has permission to transfer all the tokens.  If the message sender does not have permission to transfer any one of the listed tokens, the entire message will fail (no tokens will be transferred) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.  If any token transfer involves a recipient address that is the same as its current owner, that transfer will not be done (transaction history will not include a transfer that does not change ownership), but all the other transfers will proceed.  Any token that is transferred to a new owner will have its single-token approvals cleared.
+The message sender may provide multiple [Send](#send) objects to perform sends to multiple addresses, providing a different `memo` and `msg` for each address if desired.  Each individual transfer of a token will show separately in transaction histories.  The message sender must have permission to transfer all the tokens listed (either by being the owner or being granted transfer approval) and every token ID must be valid.  A contract may use the [VerifyTransferApproval](#verifyapproval) query to verify that it has permission to transfer all the tokens.  If the message sender does not have permission to transfer any one of the listed tokens, the entire message will fail (no tokens will be transferred) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.  If any token transfer involves a recipient address that is the same as its current owner, the contract will throw an error.  Any token that is transferred to a new owner will have its single-token approvals cleared.
 If any BatchReceiveNft (or ReceiveNft) callback fails, the entire transaction will be reverted (even the transfers will not take place).
+
+This implementation will throw an error if trying to send a [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) non-transferable token.
 
 ##### Request
 ```
@@ -1094,7 +1185,7 @@ The Send object provides a list of tokens to transfer to one recipient address, 
 | memo          | string                                    | `memo` for the tx that is only viewable by addresses involved (recipient, sender, previous owner)      | yes      | nothing          |
 
 ## BurnNft
-BurnNft is used to burn a single token, providing an optional `memo` to include in the burn's transaction history if desired.  If the contract has not enabled burn functionality using the init configuration `enable_burn`, BurnNft will result in an error.  Only the token owner and anyone else with valid transfer approval may burn this token.
+BurnNft is used to burn a single token, providing an optional `memo` to include in the burn's transaction history if desired.  If the contract has not enabled burn functionality using the init configuration `enable_burn`, BurnNft will result in an error, unless the token being burned is a [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) non-transferable token.  This is because an owner should always be able to dispose of an unwanted, non-transferable token.  Only the token owner and anyone else with valid transfer approval may burn this token.
 
 ##### Request
 ```
@@ -1123,6 +1214,8 @@ BurnNft is used to burn a single token, providing an optional `memo` to include 
 
 ## BatchBurnNft
 BatchBurnNft is used to burn multiple tokens.  The message sender may specify a list of tokens to burn in each [Burn](#burn) object, and any `memo` provided will be applied to every token burned in that one `Burn` object.  The message sender will usually list every token to be burned in one `Burn` object, but if a different `memo` is needed for different tokens being burned, multiple `Burn` objects may be listed. Each individual burning of a token will show separately in transaction histories.  The message sender must have permission to transfer/burn all the tokens listed (either by being the owner or being granted transfer approval).  A contract may use the [VerifyTransferApproval](#verifyapproval) query to verify that it has permission to transfer/burn all the tokens.  If the message sender does not have permission to transfer/burn any one of the listed tokens, the entire message will fail (no tokens will be burned) and the error will provide the ID of the first token encountered in which the sender does not have the required permission.
+
+A [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) non-transferable token can always be burned even if burn functionality has been disabled using the init configuration.  This is because an owner should always be able to dispose of an unwanted, non-transferable token.
 
 ##### Request
 ```
@@ -1393,6 +1486,32 @@ A contract will use RegisterReceiveNft to notify the NFT contract that it implem
 }
 ```
 
+## RevokePermit
+RevokePermit allows a user to disable the use of a permit for authenticated queries.
+
+##### Request
+```
+{
+	"revoke_permit": {
+		"permit_name": "name_of_the_permit_that_is_no_longer_valid",
+ 		"padding": "optional_ignored_string_that_can_be_used_to_maintain_constant_message_length"
+	}
+}
+```
+| Name                              | Type   | Description                                                               | Optional | Value If Omitted |
+|-----------------------------------|--------|---------------------------------------------------------------------------|----------|------------------|
+| permit_name                       | string | name of the permit that is no longer valid                                | no       |                  |
+| padding                           | string | An ignored string that can be used to maintain constant message length    | yes      | nothing          |
+
+##### Response
+```
+{
+	"revoke_permit": {
+		"status": "success"
+	}
+}
+```
+
 # Queries
 Queries are off-chain requests, that are not cryptographically validated; therefore, this contract utilizes viewing keys to authenticate address-specific queries.  It makes viewing key validation resource intensive in order to combat offline brute-force attempts to guess viewing keys.  Also, even if a user has not set a viewing key, it will perform the same resource intensive processing to prevent an attacker from knowing that a key has not been set and provides the same error response whether there is no viewing key or if the input key does not match.
 
@@ -1610,6 +1729,33 @@ IsUnwrapped indicates whether the token has been unwrapped.  If [sealed metadata
 |---------------------|------|---------------------------------------------------------------------------------------|----------|
 | token_is_unwrapped  | bool | True if the token is unwrapped (or [sealed metadata](#enablesealed) is not enabled)   | no       |
 
+## IsTransferable
+IsTransferable is a [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) query that indicates whether the token is transferable.  This query is not authenticated.
+
+##### Request
+```
+{
+	"is_transferable": {
+		"token_id": "ID_of_the_token_whose_transferability_is_being_queried"
+	}
+}
+```
+| Name        | Type   | Description                                                                              | Optional | Value If Omitted |
+|-------------|--------|------------------------------------------------------------------------------------------|----------|------------------|
+| token_id    | string | The ID of the token whose transferability is being queried                               | no       |                  |
+
+##### Response
+```
+{
+	"is_transferable": {
+		"token_is_transferable": true | false
+	}
+}
+```
+| Name                   | Type | Description                                                             | Optional | 
+|------------------------|------|-------------------------------------------------------------------------|----------|
+| token_is_transferable  | bool | True if the token is transferable                                       | no       |
+
 ## <a name="ownerof"></a>OwnerOf
 OwnerOf returns the owner of the specified token if the querier is the owner or has been granted permission to view the owner.  If the querier is the owner, OwnerOf will also display all the addresses that have been given transfer permission.  The transfer approval list is provided as part of CW-721 compliance; however, the token owner is advised to use [NftDossier](#nftdossier) for a more complete list that includes view_owner and view_private_metadata approvals (which CW-721 is not capable of keeping private).  If no [viewer](#viewerinfo) is provided, OwnerOf will only display the owner if ownership is public for this token.
 
@@ -1810,7 +1956,11 @@ PrivateMetadata returns the private metadata of a token if the querier is permit
 At most, one of the fields `token_uri` OR `extension` will be defined.
 
 ## <a name="nftdossier"></a>NftDossier
-NftDossier returns all the information about a token that the viewer is permitted to view.  If no [viewer](#viewerinfo) is provided, NftDossier will only display the information that has been made public.  The response may include the owner, the public metadata, the private metadata, the reason the private metadata is not viewable, the royalty information, the mint run information, whether ownership is public, whether the private metadata is public, and (if the querier is the owner,) the approvals for this token as well as the inventory-wide approvals for the owner.  This implementation will only display a token's royalty recipient addresses if the querier has permission to transfer the token.
+NftDossier returns all the information about a token that the viewer is permitted to view.  If no [viewer](#viewerinfo) is provided, NftDossier will only display the information that has been made public.  The response may include the owner, the public metadata, the private metadata, the reason the private metadata is not viewable, the royalty information, the mint run information, whether the token is transferable, whether ownership is public, whether the private metadata is public, and (if the querier is the owner,) the approvals for this token as well as the inventory-wide approvals for the owner.  This implementation will only display a token's royalty recipient addresses if the querier has permission to transfer the token.
+
+[SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) adds a `transferable` field to the NftDossier response.
+
+SNIP-723 (specification to be written) adds an `unwrapped` field which is false if private metadata for this token is sealed.
 
 ##### Request
 ```
@@ -1869,6 +2019,8 @@ NftDossier returns all the information about a token that the viewer is permitte
 			"serial_number": 67,
 			"quantity_minted_this_run": 1000,
 		},
+		"transferable": true | false,
+		"unwrapped": true | false,
 		"owner_is_public": true | false,
 		"public_ownership_expiration": "never" | {"at_height": 999999} | {"at_time":999999},
 		"private_metadata_is_public": true | false,
@@ -1906,12 +2058,17 @@ NftDossier returns all the information about a token that the viewer is permitte
 | display_private_metadata_error        | string                                                | If the private metadata is not displayed, the corresponding error message              | yes      |
 | royalty_info                          | [RoyaltyInfo (see above)](#royaltyinfo)               | The token's RoyaltyInfo                                                                | yes      |
 | mint_run_info                         | [MintRunInfo (see below)](#mintruninfo)               | The token's MintRunInfo                                                                | yes      |
+| transferable                          | bool                                                  | True if this token is transferable                                                     | no*      |
+| unwrapped                             | bool                                                  | False if this token's private metadata is sealed                                       | no*      |
 | owner_is_public                       | bool                                                  | True if ownership is public for this token                                             | no       |
 | public_ownership_expiration           | [Expiration (see above)](#expiration)                 | When public ownership expires for this token.  Can be a blockheight, time, or never    | yes      |
 | private_metadata_is_public            | bool                                                  | True if private metadata is public for this token                                      | no       |
 | private_metadata_is_public_expiration | [Expiration (see above)](#expiration)                 | When public display of private metadata expires.  Can be a blockheight, time, or never | yes      |
 | token_approvals                       | array of [Snip721Approval (see below)](#snipapproval) | List of approvals for this token                                                       | yes      |
 | inventory_approvals                   | array of [Snip721Approval (see below)](#snipapproval) | List of inventory-wide approvals for the token's owner                                 | yes      |
+
+The `transferable` field is mandatory for [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) compliant contracts, but because SNIP-722 is an optional extension to SNIP-721, any NftDossier response that does not include the field can be considered to come from a contract that only implements transferable tokens (considered equivalent to `transferable` = true).
+The `unwrapped` field is mandatory for SNIP-723 (specification to be written) compliant contracts, but because SNIP-723 is an optional extension to SNIP-721, an NftDossier response might not include the field.  In this case, the `display_private_metadata_error` field might indicate that the private metadata is sealed if the querier has permission to normally view private metadata.  Or an [IsUnwrapped](#IsUnwrapped) query may be performed to learn the token's sealed status.  
 
 ### <a name="mintruninfo"></a> MintRunInfo
 MintRunInfo contains information aout the minting of this token.
@@ -1961,12 +2118,17 @@ If a `token_id` is provided in the request, RoyaltyInfo returns the royalty info
 {
 	"royalty_info": {
 		"token_id": "optional_ID_of_the_token_being_queried",
+		"viewer": {
+			"address": "address_of_the_querier_if_supplying_optional_ViewerInfo",
+			"viewing_key": "viewer's_key_if_supplying_optional_ViewerInfo"
+		},
 	}
 }
 ```
 | Name            | Type                                  | Description                                                           | Optional | Value If Omitted                     |
 |-----------------|---------------------------------------|-----------------------------------------------------------------------|----------|--------------------------------------|
 | token_id        | string                                | ID of the token being queried                                         | yes      | query contract's default RoyaltyInfo |
+| viewer          | [ViewerInfo (see above)](#viewerinfo) | The address and viewing key performing this query                     | yes      | nothing                              |
 
 ##### Response
 ```
@@ -2166,6 +2328,8 @@ Tokens displays an optionally paginated list of all the token IDs that belong to
 ## <a name="verifyapproval"></a> VerifyTransferApproval
 VerifyTransferApproval will verify that the specified address has approval to transfer the entire provided list of tokens.  As explained [above](#queryblockinfo), queries may experience a delay in revealing expired approvals, so it is possible that a transfer attempt will still fail even after being verified by VerifyTransferApproval.  If the address does not have transfer approval on all the tokens, the response will indicate the first token encountered that can not be transferred by the address.
 
+Because the intent of VerifyTransferApproval is to provide contracts a way to know before-hand whether an attempt to transfer tokens will fail, this implementation will consider any [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) non-transferable token as unapproved for transfer.
+
 ##### Request
 ```
 {
@@ -2197,6 +2361,48 @@ VerifyTransferApproval will verify that the specified address has approval to tr
 |------------------------|--------|-----------------------------------------------------------------------------------|----------|
 | approved_for_all       | bool   | True if the `address` has transfer approval on all the `token_ids`                | no       |
 | first_unapproved_token | string | The first token in the list that the `address` does not have approval to transfer | yes      |
+
+## ImplementsTokenSubtype
+ImplementsTokenSubtype is a [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) query which indicates whether the contract implements the `token_subtype` Extension field.  Because legacy SNIP-721 contracts do not implement this query and do not implement token subtypes, any use of this query should always check for an error response, and if the response is an error, it can be considered that the contract does not implement subtypes.  Because message parsing ignores input fields that a contract does not expect, this query should be used before attempting a message that uses the `token_subtype` [Extension](#extension) field.  If the message is sent to a SNIP-721 contract that does not implement `token_subtype`, that field will just be ignored and the resulting NFT will still be created/updated, but without a `token_subtype`.
+
+##### Request
+```
+{
+	"implements_token_subtype": {}
+}
+```
+##### Response
+```
+{
+	"implements_token_subtype": {
+		"is_enabled": true | false
+	}
+}
+```
+| Name        | Type | Description                                                             | Optional | 
+|-------------|------|-------------------------------------------------------------------------|----------|
+| is_enabled  | bool | True if the contract implements token subtypes                          | no       |
+
+## ImplementsNonTransferableTokens
+ImplementsNonTransferableTokens is a [SNIP-722](https://github.com/baedrik/snip-722-spec/blob/master/SNIP-722.md) query which indicates whether the contract implements non-transferable tokens.  Because legacy SNIP-721 contracts do not implement this query and do not implement non-transferable tokens, any use of this query should always check for an error response, and if the response is an error, it can be considered that the contract does not implement non-transferable tokens.  Because message parsing ignores input fields that a contract does not expect, this query should be used before attempting to mint a non-transferable token.  If the message is sent to a SNIP-721 contract that does not implement non-transferable tokens, the `transferable` field will just be ignored and the resulting NFT will still be created, but will always be transferable.
+
+##### Request
+```
+{
+	"implements_non_transferable_tokens": {}
+}
+```
+##### Response
+```
+{
+	"implements_non_transferable_tokens": {
+		"is_enabled": true | false
+	}
+}
+```
+| Name        | Type | Description                                                             | Optional | 
+|-------------|------|-------------------------------------------------------------------------|----------|
+| is_enabled  | bool | True if the contract implements non-transferable tokens                 | no       |
 
 ## TransactionHistory
 TransactionHistory displays an optionally paginated list of transactions (mint, burn, and transfer) in reverse chronological order that involve the specified address.
@@ -2341,6 +2547,191 @@ The TxAction object defines the type of transaction and holds the information sp
 |-----------|--------------------|--------------------------------------------------------------------------------|----------|
 | owner     | string (HumanAddr) | The previous owner of the token                                                | no       |
 | burner    | string (HumanAddr) | The address that burned the token if different than the previous owner         | yes      |
+
+## WithPermit
+SNIP-721 contracts may optionally implement query permits as specified in [SNIP-24](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-24.md).  They are an improvement over viewing keys in that permits allow a user to query private information without first needing to send a transaction to set or create a viewing key (see [here](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-24.md#Rationale) for more details).
+
+Because SNIP-721s already provide whitelisting functionality for approving other addresses to view private information, SNIP-721 permits typically use the `owner` permission type to authenticate the query to display all the private information that the address of the creator of the permit is authorized to see.  So, it is generally advised that you never give SNIP-721 permits with `owner` permission to anyone.  If you need someone to view private information of a token you own, you should whitelist their address, and they will then use a permit they create themselves to view only what you have approved.  This eliminates the need to provide them a permit, eliminates the need to track permit names in order to later revoke viewing permission, and provides an easy way to query the network to see everyone that currently has viewing approval.  That said, contract developers are not limited, and may choose, if appropriate for their use-case, to implement permits that have more granular permissions that users are meant to share with others.
+
+WithPermit wraps permit queries in the [same manner](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-24.md#WithPermit) as SNIP-24.
+
+##### Request
+```
+{
+	"with_permit": {
+		"permit": {
+			"params": {
+				"permit_name": "some_name",
+				"allowed_tokens": ["collection_address_1", "collection_address_2", "..."],
+				"chain_id": "some_chain_id",
+				"permissions": ["owner"]
+			},
+			"signature": {
+				"pub_key": {
+					"type": "tendermint/PubKeySecp256k1",
+					"value": "33_bytes_of_secp256k1_pubkey_as_base64"
+				},
+				"signature": "64_bytes_of_secp256k1_signature_as_base64"
+			}
+		},
+		"query": {
+			"QueryWithPermit_variant_defined_below": { "...": "..." }
+		}
+	}
+}
+```
+| Name   | Type                                                                                  | Description                                   | Optional | Value If Omitted |
+|--------|---------------------------------------------------------------------------------------|-----------------------------------------------|----------|------------------|
+| permit | [Permit](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-24.md#WithPermit) | A permit following SNIP-24 standard           | no       |                  |
+| query  | [QueryWithPermit (see below)](#QueryWithPermit)                                       | The query to perform and its input parameters | no       |                  |
+
+#### QueryWithPermit
+QueryWithPermit is an enum whose variants correlate with all SNIP-721 queries that require authentication.  The input parameters are the same as the corresponding query other than the absence of [ViewerInfo](#viewerinfo) and viewing keys because the permit supplied with the `WithPermit` query provides both the address and authentication.
+
+* NumTokens ([corresponding query](#NumTokens))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"num_tokens": {}
+}
+```
+* AllTokens ([corresponding query](#AllTokens))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"all_tokens": {
+		"start_after": "optionally_display_only_token_ids_that_come_after_this_one_in_the_list",
+		"limit": 10
+	}
+}
+```
+* OwnerOf ([corresponding query](#OwnerOf))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"owner_of": {
+		"token_id": "ID_of_the_token_being_queried",
+		"include_expired": true | false
+	}
+}
+```
+* AllNftInfo ([corresponding query](#allnftinfo))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"all_nft_info": {
+		"token_id": "ID_of_the_token_being_queried",
+		"include_expired": true | false
+	}
+}
+```
+* PrivateMetadata ([corresponding query](#PrivateMetadata))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"private_metadata": {
+		"token_id": "ID_of_the_token_being_queried",
+	}
+}
+```
+* NftDossier ([corresponding query](#NftDossier))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"nft_dossier": {
+		"token_id": "ID_of_the_token_being_queried",
+		"include_expired": true | false
+	}
+}
+```
+* BatchNftDossier ([corresponding query](#BatchNftDossier))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"batch_nft_dossier": {
+		"token_ids": ["ID_of", "the_tokens", "being_queried"],
+		"include_expired": true | false
+	}
+}
+```
+* RoyaltyInfo ([corresponding query](#royaltyquery))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"royalty_info": {
+		"token_id": "optional_ID_of_the_token_being_queried",
+	}
+}
+```
+* TokenApprovals ([corresponding query](#TokenApprovals))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"token_approvals": {
+		"token_id": "ID_of_the_token_being_queried",
+		"include_expired": true | false
+	}
+}
+```
+* ApprovedForAll ([corresponding query](#ApprovedForAll))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"approved_for_all": {
+		"include_expired": true | false
+	}
+}
+```
+* InventoryApprovals ([corresponding query](#InventoryApprovals))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"inventory_approvals": {
+		"include_expired": true | false
+	}
+}
+```
+* NumTokensOfOwner ([corresponding query](#NumTokensOfOwner))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"num_tokens_of_owner": {
+		"owner": "address_whose_token_count_is_being_queried",
+	}
+}
+```
+* Tokens ([corresponding query](#tokens))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"tokens": {
+		"owner": "address_whose_inventory_is_being_queried",
+		"start_after": "optionally_display_only_token_ids_that_come_after_this_one_in_the_list",
+		"limit": 10
+	}
+}
+```
+* VerifyTransferApproval ([corresponding query](#VerifyTransferApproval))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"verify_transfer_approval": {
+		"token_ids": [
+			"list", "of", "tokens", "to", "check", "for", "transfer", "approval", "..."
+		],
+	}
+}
+```
+* TransactionHistory ([corresponding query](#TransactionHistory))
+##### WithPermit `query` Parameter
+```
+"query": {
+	"transaction_history": {
+		"page": "optional_page_to_display",
+		"page_size": 10
+	}
+}
+```
 
 # <a name="receiver"></a>Receiver Interface
 When the token contract executes [SendNft](#sendnft) and [BatchSendNft](#batchsend) messages, it will perform a callback to the receiving contract's receiver interface if the contract had registered its code hash using [RegisterReceiveNft](#registerreceive).  [BatchReceiveNft](#batchreceivenft) is preferred over [ReceiveNft](#receivenft), because ReceiveNft does not allow the recipient to know who sent the token, only its previous owner, and ReceiveNft can only process one token.  So it is inefficient when sending multiple tokens to the same contract (a deck of game cards for instance).  ReceiveNft primarily exists just to maintain CW-721 compliance, and if the receiving contract registered that it implements BatchReceiveNft, BatchReceiveNft will be called, even when there is only one token_id in the message.

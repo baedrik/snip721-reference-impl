@@ -1806,6 +1806,9 @@ pub fn query<S: Storage, A: Api, Q: Querier>(deps: &Extern<S, A, Q>, msg: QueryM
         QueryMsg::ImplementsNonTransferableTokens {} => {
             to_binary(&QueryAnswer::ImplementsNonTransferableTokens { is_enabled: true })
         }
+        QueryMsg::ImplementsTokenSubtype {} => {
+            to_binary(&QueryAnswer::ImplementsTokenSubtype { is_enabled: true })
+        }
         QueryMsg::TransactionHistory {
             address,
             viewing_key,
