@@ -2071,7 +2071,7 @@ The `transferable` field is mandatory for [SNIP-722](https://github.com/baedrik/
 The `unwrapped` field is mandatory for SNIP-723 (specification to be written) compliant contracts, but because SNIP-723 is an optional extension to SNIP-721, an NftDossier response might not include the field.  In this case, the `display_private_metadata_error` field might indicate that the private metadata is sealed if the querier has permission to normally view private metadata.  Or an [IsUnwrapped](#IsUnwrapped) query may be performed to learn the token's sealed status.  
 
 ### <a name="mintruninfo"></a> MintRunInfo
-MintRunInfo contains information aout the minting of this token.
+MintRunInfo contains information about the minting of this token.
 ```
 {
 	"collection_creator": "optional_address_that_instantiated_this_contract",
