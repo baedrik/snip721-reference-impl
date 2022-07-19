@@ -1765,6 +1765,83 @@ mod tests {
         assert!(bob_auth.tokens[view_meta_idx].is_empty());
         assert!(bob_auth.tokens[view_owner_idx].is_empty());
 
+        // verify that setting a token approval with the same expiration as an existing ALL approval, does
+        // not modify THAT approval, but continues to process other permission types
+        let handle_msg = HandleMsg::SetWhitelistedApproval {
+            address: HumanAddr("bob".to_string()),
+            token_id: Some("NFT2".to_string()),
+            view_owner: Some(AccessLevel::ApproveToken),
+            view_private_metadata: None,
+            transfer: Some(AccessLevel::ApproveToken),
+            expires: Some(Expiration::AtTime(1000000)),
+            padding: None,
+        };
+        let handle_result = handle(
+            &mut deps,
+            Env {
+                block: BlockInfo {
+                    height: 100,
+                    time: 1000,
+                    chain_id: "cosmos-testnet-14002".to_string(),
+                },
+                message: MessageInfo {
+                    sender: HumanAddr("alice".to_string()),
+                    sent_funds: vec![],
+                },
+                contract: cosmwasm_std::ContractInfo {
+                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                },
+                contract_key: Some("".to_string()),
+                contract_code_hash: "".to_string(),
+            },
+            handle_msg,
+        );
+        assert!(handle_result.is_ok());
+        // confirm ALL permission
+        let all_store = ReadonlyPrefixedStorage::new(PREFIX_ALL_PERMISSIONS, &deps.storage);
+        let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
+        assert_eq!(all_perm.len(), 1);
+        let bob_oper_perm = all_perm.iter().find(|p| p.address == bob_raw).unwrap();
+        assert_eq!(
+            bob_oper_perm.expirations[view_owner_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(bob_oper_perm.expirations[view_meta_idx], None);
+        assert_eq!(bob_oper_perm.expirations[transfer_idx], None);
+        // confirm NFT2 permissions and that the token data did not get modified
+        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let token: Token = json_load(&info_store, &nft2_key).unwrap();
+        assert_eq!(token.owner, alice_raw);
+        assert!(token.unwrapped);
+        let pub_store = ReadonlyPrefixedStorage::new(PREFIX_PUB_META, &deps.storage);
+        let pub_meta: Metadata = load(&pub_store, &nft2_key).unwrap();
+        assert_eq!(pub_meta, pub2.clone().unwrap());
+        let priv_store = ReadonlyPrefixedStorage::new(PREFIX_PRIV_META, &deps.storage);
+        let priv_meta: Option<Metadata> = may_load(&priv_store, &nft2_key).unwrap();
+        assert!(priv_meta.is_none());
+        assert_eq!(token.permissions.len(), 1);
+        let bob_tok_perm = token
+            .permissions
+            .iter()
+            .find(|p| p.address == bob_raw)
+            .unwrap();
+        assert_eq!(
+            bob_tok_perm.expirations[transfer_idx],
+            Some(Expiration::AtTime(1000000))
+        );
+        assert_eq!(bob_tok_perm.expirations[view_meta_idx], None);
+        assert_eq!(bob_tok_perm.expirations[view_owner_idx], None);
+        // confirm AuthLists has bob with NFT2 permission
+        let auth_store = ReadonlyPrefixedStorage::new(PREFIX_AUTHLIST, &deps.storage);
+        let auth_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
+        assert_eq!(auth_list.len(), 1);
+        let bob_auth = auth_list.iter().find(|a| a.address == bob_raw).unwrap();
+        assert_eq!(bob_auth.tokens[transfer_idx].len(), 2);
+        assert!(bob_auth.tokens[transfer_idx].contains(&0u32));
+        assert!(bob_auth.tokens[transfer_idx].contains(&1u32));
+        assert!(bob_auth.tokens[view_meta_idx].is_empty());
+        assert!(bob_auth.tokens[view_owner_idx].is_empty());
+
         // verify changing an existing ALL expiration while adding token access
         let handle_msg = HandleMsg::SetWhitelistedApproval {
             address: HumanAddr("bob".to_string()),

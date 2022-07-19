@@ -3786,7 +3786,7 @@ fn process_accesses<S: Storage>(
                                     // operator, but not changing the expiration, nothing
                                     // needs to be done
                                     if is_approve && expirations[i] == exp {
-                                        return Ok(());
+                                        continue;
                                     }
                                     // need to put all the other tokens in the AuthList
                                     alt_auth_list.full[i] = true;
