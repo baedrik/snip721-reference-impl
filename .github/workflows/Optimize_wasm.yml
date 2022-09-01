@@ -1,0 +1,35 @@
+name: Create optimized wasm Workflow
+
+on: 
+  push:
+    branches:
+      - [main,dev]
+
+jobs:
+
+  compose:
+
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v3
+      name: Setup Action
+
+    - name: Build the wasm Artifact
+      run: make compile-optimized-reproducible
+
+    - uses: actions/upload-artifact@v2
+      if: startsWith(github.event.ref, 'refs/tags/')
+      name: Upload tagged artifact
+      with: 
+        name: Production contract ${{github.ref_name}}
+        path: contract.wasm.gz
+        retention-days: 200
+
+    - uses: actions/upload-artifact@v2
+      if: ${{ !startsWith(github.event.ref, 'refs/tags/') }}
+      name: Upload non-tagged artifact
+      with: 
+        name: latest contract
+        path: contract.wasm.gz
+        retention-days: 20
