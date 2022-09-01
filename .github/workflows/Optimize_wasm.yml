@@ -1,9 +1,6 @@
 name: Create optimized wasm Workflow
 
-on: 
-  push:
-    branches:
-      - [main,dev]
+on: push
 
 jobs:
 
