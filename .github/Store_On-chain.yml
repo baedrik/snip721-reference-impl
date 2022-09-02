@@ -1,0 +1,53 @@
+name: Store contract on-chain
+
+on: 
+
+  workflow_dispatch:
+
+    inputs:
+
+      gas:
+        description:  "Gas limit to use for the transaction"
+        required: true
+        type: string
+        default: "5000000"
+
+jobs:
+
+  store:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download artifact
+      id: download-artifact
+      uses: dawidd6/action-download-artifact@v2
+      with:
+        github_token: ${{secrets.ACCESS_TOKEN}}
+        workflow: Optimize_wasm.yml
+        workflow_conclusion: success
+        skip_unpack: false
+
+    - name: Create .env file
+      env:
+        mnemonic: ${{ secrets.MNEMONIC }}
+        grpc_web_url: ${{ secrets.GRPC_WEB_URL }}
+        gas_limit: ${{ inputs.gas }}
+        chain_id: ${{ secrets.CHAIN_ID }}
+      run: |
+        touch .env
+        echo "MNEMONIC='${mnemonic}'" >> .env
+        echo "GAS_LIMIT='${gas_limit}'" >> .env
+        echo "SECRET_GRPC_WEB_URL='${grpc_web_url}'" >> .env
+        echo "SECRET_CHAIN_ID='${chain_id}'" >> .env
+
+    - uses: actions/setup-node@v3
+      name: Setup node version
+      with:
+        node-version: 16
+    - name: Deploy on-chain
+      run: npx npx @stakeordie/secret-contract-cicd >> Contract-Info.txt
+
+    - uses: actions/upload-artifact@v2
+      name: Upload Contract-Info artifact
+      with: 
+        name: Contract-Info
+        path: Contract-Info.txt
