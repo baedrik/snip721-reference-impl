@@ -20,7 +20,7 @@ unit-test:
 
 .PHONY: integration-test
 integration-test: compile-optimized
-	tests/integration.sh
+	cargo test --test '*'
 
 .PHONY: list-code
 list-code:
