@@ -1,5 +1,14 @@
 #[cfg(test)]
 mod tests {
+    use std::any::Any;
+
+    use cosmwasm_std::{
+        Addr, Api, Binary, Coin, from_binary, OwnedDeps, Response, StdError, StdResult, SubMsg,
+        to_binary, Uint128, WasmMsg,
+    };
+    use cosmwasm_std::testing::*;
+    use cosmwasm_storage::ReadonlyPrefixedStorage;
+
     use crate::contract::{execute, instantiate, query};
     use crate::expiration::Expiration;
     use crate::inventory::Inventory;
@@ -9,19 +18,12 @@ mod tests {
     };
     use crate::royalties::{DisplayRoyalty, DisplayRoyaltyInfo, Royalty, RoyaltyInfo};
     use crate::state::{
-        json_may_load, load, may_load, Config, CONFIG_KEY, PREFIX_INFOS, PREFIX_MAP_TO_ID,
+        Config, CONFIG_KEY, json_may_load, load, may_load, PREFIX_INFOS, PREFIX_MAP_TO_ID,
         PREFIX_MAP_TO_INDEX,
     };
     use crate::token::{Extension, Metadata, Token};
-    use cosmwasm_std::testing::*;
-    use cosmwasm_std::{
-        from_binary, to_binary, Api, Binary, Coin, Response, StdError, StdResult, Uint128, WasmMsg,
-        OwnedDeps, SubMsg, Addr
-    };
-    use cosmwasm_storage::ReadonlyPrefixedStorage;
-    use std::any::Any;
 
-    // Helper functions
+// Helper functions
 
     fn init_helper_default() -> (
         StdResult<Response>,
@@ -75,9 +77,9 @@ mod tests {
                 owner_may_update_metadata,
                 enable_burn,
             )
-            .as_bytes(),
+                .as_bytes(),
         ))
-        .unwrap();
+            .unwrap();
         let info = mock_info("instantiator", &[]);
         let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
@@ -125,9 +127,9 @@ mod tests {
                 owner_may_update_metadata,
                 enable_burn,
             )
-            .as_bytes(),
+                .as_bytes(),
         ))
-        .unwrap();
+            .unwrap();
         let info = mock_info("instantiator", &[]);
         let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
@@ -482,7 +484,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT1 is non-transferable"));
 
@@ -503,7 +505,7 @@ mod tests {
             transfers,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT2 is non-transferable"));
 
@@ -516,7 +518,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT1 is non-transferable"));
 
@@ -541,7 +543,7 @@ mod tests {
             sends,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT2 is non-transferable"));
     }
@@ -609,7 +611,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         assert!(handle_result.is_ok());
         // confirm token was removed from the maps
         let map2idx = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_INDEX);
@@ -638,7 +640,7 @@ mod tests {
             burns,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         assert!(handle_result.is_ok());
         // confirm tokens were removed from the maps
         let map2idx = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_INDEX);
@@ -885,7 +887,7 @@ mod tests {
             key: "akey".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
         let execute_msg = ExecuteMsg::SetViewingKey {

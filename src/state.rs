@@ -2,12 +2,10 @@ use std::any::type_name;
 
 use cosmwasm_std::{Api, BlockInfo, CanonicalAddr, StdError, StdResult, Storage};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
-
 use secret_toolkit::{
     serialization::{Bincode2, Json, Serde},
-    storage::{AppendStore},
+    storage::AppendStore,
 };
-
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::expiration::Expiration;
@@ -393,7 +391,7 @@ pub fn get_txs(
                 json_load(&tx_store, &id.to_le_bytes())
                     .and_then(|tx: StoredTx| tx.into_humanized(api))
             })
-            .and_then(|x| x)
+                .and_then(|x| x)
         })
         .collect();
 

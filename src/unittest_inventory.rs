@@ -1,9 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use crate::inventory::{Inventory, InventoryIter};
-    use cosmwasm_std::testing::*;
-    use cosmwasm_std::{Api, StdError};
     use std::collections::HashSet;
+
+    use cosmwasm_std::{Api, StdError};
+    use cosmwasm_std::testing::*;
+
+    use crate::inventory::{Inventory, InventoryIter};
 
     #[test]
     fn test_inventory() {

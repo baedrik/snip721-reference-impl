@@ -1,8 +1,10 @@
-use crate::state::{may_load, remove, save};
+use std::collections::HashSet;
+
 use cosmwasm_std::{CanonicalAddr, StdError, StdResult, Storage};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
+use crate::state::{may_load, remove, save};
 
 /// storage prefix for an owner's inventory information
 pub const PREFIX_INVENTORY_INFO: &[u8] = b"invinfo";
@@ -230,7 +232,7 @@ impl Inventory {
         token_idx: u32,
     ) -> StdResult<bool> {
         let map_store =
-            ReadonlyPrefixedStorage::multilevel(storage,&[PREFIX_INVENTORY_MAP, owner.as_slice()]);
+            ReadonlyPrefixedStorage::multilevel(storage, &[PREFIX_INVENTORY_MAP, owner.as_slice()]);
         Ok(may_load::<u32>(&map_store, &token_idx.to_le_bytes())?.is_some())
     }
 

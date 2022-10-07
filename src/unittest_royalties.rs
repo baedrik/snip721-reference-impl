@@ -1,20 +1,22 @@
 #[cfg(test)]
 mod tests {
+    use std::any::Any;
+
+    use cosmwasm_std::{
+        Addr, Api, Binary, Coin, from_binary, OwnedDeps, Response, StdError, StdResult,
+        SubMsg, to_binary, Uint128, WasmMsg,
+    };
+    use cosmwasm_std::testing::*;
+
     use crate::contract::{execute, instantiate, query};
     use crate::msg::{
         AccessLevel, ContractStatus, ExecuteMsg, InitConfig, InstantiateMsg, PostInitCallback, QueryAnswer,
         QueryMsg, ViewerInfo,
     };
     use crate::royalties::{DisplayRoyalty, DisplayRoyaltyInfo, Royalty, RoyaltyInfo};
-    use crate::state::{load, Config, CONFIG_KEY};
-    use cosmwasm_std::testing::*;
-    use cosmwasm_std::{
-        from_binary, to_binary, Api, Binary, Coin, Response, StdError, StdResult, Uint128,
-        WasmMsg, OwnedDeps, Addr, SubMsg
-    };
-    use std::any::Any;
+    use crate::state::{Config, CONFIG_KEY, load};
 
-    // Helper functions
+// Helper functions
 
     fn init_helper_royalties(
         royalty_info: Option<RoyaltyInfo>,
@@ -71,9 +73,9 @@ mod tests {
                 owner_may_update_metadata,
                 enable_burn,
             )
-            .as_bytes(),
+                .as_bytes(),
         ))
-        .unwrap();
+            .unwrap();
         let info = mock_info("instantiator", &[]);
         let init_msg = InstantiateMsg {
             name: "sec721".to_string(),

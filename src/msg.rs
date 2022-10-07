@@ -1,9 +1,9 @@
 #![allow(clippy::large_enum_variant)]
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{Addr, Binary, Coin};
+use schemars::JsonSchema;
 use secret_toolkit::permit::Permit;
+use serde::{Deserialize, Serialize};
 
 use crate::expiration::Expiration;
 use crate::mint_run::{MintRunInfo, SerialNumber};

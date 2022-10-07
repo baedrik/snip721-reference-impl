@@ -1,9 +1,7 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
 use cosmwasm_std::{Addr, Binary, CosmosMsg, StdResult};
-
+use schemars::JsonSchema;
 use secret_toolkit::utils::HandleCallback;
+use serde::{Deserialize, Serialize};
 
 use crate::contract::BLOCK_SIZE;
 

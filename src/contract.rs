@@ -3,7 +3,10 @@ use std::borrow::Borrow;
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
 use std::collections::HashSet;
 
-use cosmwasm_std::{entry_point, Api, attr, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, Env, Response, StdError, StdResult, Storage, to_binary, WasmMsg, MessageInfo, Timestamp, Addr};
+use cosmwasm_std::{
+    Addr, Api, attr, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, entry_point, Env,
+    MessageInfo, Response, StdError, StdResult, Storage, Timestamp, to_binary, WasmMsg,
+};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use primitive_types::U256;
 use secret_toolkit::{
@@ -16,7 +19,7 @@ use crate::inventory::{Inventory, InventoryIter};
 use crate::mint_run::{SerialNumber, StoredMintRunInfo};
 use crate::msg::{
     AccessLevel, BatchNftDossierElement, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse,
-    HandleAnswer, ExecuteMsg, InstantiateMsg, Mint, QueryAnswer, QueryMsg, QueryWithPermit, ReceiverInfo,
+    ExecuteMsg, HandleAnswer, InstantiateMsg, Mint, QueryAnswer, QueryMsg, QueryWithPermit, ReceiverInfo,
     ResponseStatus::Success, Send, Snip721Approval, Transfer, ViewerInfo,
 };
 use crate::rand::sha_256;
@@ -620,7 +623,7 @@ pub fn mint_clones(
                 ))
             })?;
             save(&mut run_store, key, &this_num)?;
-            Ok::<u32,StdError>(this_num)
+            Ok::<u32, StdError>(this_num)
         })
         .transpose()?;
     let mut serial_number = SerialNumber {
@@ -4578,7 +4581,7 @@ fn mint_list(
         inventory.insert(deps.storage, config.mint_cnt, false)?;
 
         // map index to id
-        let mut map2id = PrefixedStorage::new(deps.storage,PREFIX_MAP_TO_ID);
+        let mut map2id = PrefixedStorage::new(deps.storage, PREFIX_MAP_TO_ID);
         save(&mut map2id, &token_key, &id)?;
 
         //
@@ -4802,12 +4805,12 @@ pub fn dossier_list(
     let mut owner_cache: Vec<OwnerInfo> = Vec::new();
     let mut dossiers: Vec<BatchNftDossierElement> = Vec::new();
     // set up all the immutable storage references
-    let own_priv_store = ReadonlyPrefixedStorage::new(deps.storage,PREFIX_OWNER_PRIV);
-    let pub_store = ReadonlyPrefixedStorage::new(deps.storage,PREFIX_PUB_META);
-    let priv_store = ReadonlyPrefixedStorage::new(deps.storage,PREFIX_PRIV_META);
-    let roy_store = ReadonlyPrefixedStorage::new(deps.storage,PREFIX_ROYALTY_INFO);
-    let run_store = ReadonlyPrefixedStorage::new(deps.storage,PREFIX_MINT_RUN);
-    let all_store = ReadonlyPrefixedStorage::new(deps.storage,PREFIX_ALL_PERMISSIONS);
+    let own_priv_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_OWNER_PRIV);
+    let pub_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_PUB_META);
+    let priv_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_PRIV_META);
+    let roy_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_ROYALTY_INFO);
+    let run_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_MINT_RUN);
+    let all_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_ALL_PERMISSIONS);
 
     for id in token_ids.into_iter() {
         let err_msg = format!(

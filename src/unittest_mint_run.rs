@@ -1,13 +1,15 @@
 #[cfg(test)]
 mod tests {
+    use std::any::Any;
+
+    use cosmwasm_std::{Addr, from_binary, OwnedDeps, Response, StdError, StdResult};
+    use cosmwasm_std::testing::*;
+
     use crate::contract::{execute, instantiate, query};
     use crate::mint_run::MintRunInfo;
     use crate::msg::{ExecuteMsg, InstantiateMsg, QueryAnswer, QueryMsg};
-    use cosmwasm_std::testing::*;
-    use cosmwasm_std::{Addr, from_binary, OwnedDeps, Response, StdError, StdResult};
-    use std::any::Any;
 
-    // Helper functions
+// Helper functions
 
     fn init_helper() -> (
         StdResult<Response>,

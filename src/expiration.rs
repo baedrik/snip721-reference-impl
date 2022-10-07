@@ -1,8 +1,8 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use std::fmt;
 
 use cosmwasm_std::BlockInfo;
-use std::fmt;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -51,6 +51,7 @@ impl Expiration {
 #[cfg(test)]
 mod test {
     use cosmwasm_std::Timestamp;
+
     use super::*;
 
     #[test]

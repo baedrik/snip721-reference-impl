@@ -1,31 +1,33 @@
 #[cfg(test)]
 mod tests {
+    use std::any::Any;
+
+    use cosmwasm_std::{
+        Addr, Api, Binary, BlockInfo, CanonicalAddr, Coin, Env, from_binary, OwnedDeps, Response,
+        StdError, StdResult, SubMsg, Timestamp, to_binary, Uint128, WasmMsg,
+    };
+    use cosmwasm_std::testing::*;
+    use cosmwasm_storage::ReadonlyPrefixedStorage;
+    use secret_toolkit::utils::space_pad;
+
     use crate::contract::{check_permission, execute, instantiate, query};
     use crate::expiration::Expiration;
     use crate::inventory::Inventory;
     use crate::msg::{
-        AccessLevel, Burn, ContractStatus, HandleAnswer, ExecuteMsg, InitConfig, InstantiateMsg, Mint,
+        AccessLevel, Burn, ContractStatus, ExecuteMsg, HandleAnswer, InitConfig, InstantiateMsg, Mint,
         PostInitCallback, QueryAnswer, QueryMsg, ReceiverInfo, Send, Transfer, Tx, TxAction,
     };
     use crate::receiver::Snip721ReceiveMsg;
     use crate::state::{
-        get_txs, json_load, json_may_load, load, may_load, AuthList, Config, Permission,
-        PermissionType, CONFIG_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
+        AuthList, Config, CONFIG_KEY, get_txs, json_load, json_may_load, load, may_load,
+        MINTERS_KEY, Permission, PermissionType, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
         PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_OWNER_PRIV, PREFIX_PRIV_META,
         PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_VIEW_KEY,
     };
     use crate::token::{Extension, Metadata, Token};
-    use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
-    use cosmwasm_std::testing::*;
-    use cosmwasm_std::{
-        from_binary, to_binary, Api, Binary, BlockInfo, CanonicalAddr, Coin, Env, Response, Addr,
-        StdError, StdResult, Uint128, WasmMsg, OwnedDeps, Timestamp, SubMsg
-    };
-    use cosmwasm_storage::ReadonlyPrefixedStorage;
-    use secret_toolkit::utils::space_pad;
-    use std::any::Any;
+    use crate::viewing_key::{VIEWING_KEY_SIZE, ViewingKey};
 
-    // Helper functions
+// Helper functions
 
     fn init_helper_default() -> (
         StdResult<Response>,
@@ -79,9 +81,9 @@ mod tests {
                 owner_may_update_metadata,
                 enable_burn,
             )
-            .as_bytes(),
+                .as_bytes(),
         ))
-        .unwrap();
+            .unwrap();
         let info = mock_info("instantiator", &[]);
         let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
@@ -330,7 +332,7 @@ mod tests {
         }
 
         // verify the tokens are in the id and index maps
-        let map2idx = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_INDEX, );
+        let map2idx = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_INDEX);
         let index1: u32 = load(&map2idx, "0".as_bytes()).unwrap();
         let token_key1 = index1.to_le_bytes();
         let index2: u32 = load(&map2idx, "NFT2".as_bytes()).unwrap();
@@ -339,7 +341,7 @@ mod tests {
         let token_key3 = index3.to_le_bytes();
         let index4: u32 = load(&map2idx, "3".as_bytes()).unwrap();
         let token_key4 = index4.to_le_bytes();
-        let map2id = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_ID, );
+        let map2id = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_ID);
         let id1: String = load(&map2id, &token_key1).unwrap();
         assert_eq!("0".to_string(), id1);
         let id2: String = load(&map2id, &token_key2).unwrap();
@@ -349,7 +351,7 @@ mod tests {
         let id4: String = load(&map2id, &token_key4).unwrap();
         assert_eq!("3".to_string(), id4);
         // verify all the token info
-        let info_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_INFOS, );
+        let info_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_INFOS);
         let token1: Token = json_load(&info_store, &token_key1).unwrap();
         assert_eq!(token1.owner, alice_raw);
         assert_eq!(token1.permissions, Vec::new());
@@ -829,7 +831,7 @@ mod tests {
             private_metadata: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Not authorized to update metadata"));
 
@@ -1058,7 +1060,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let map2idx = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_INDEX);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -1167,7 +1169,7 @@ mod tests {
             }),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Not authorized to update metadata of token MyNFT"));
 
@@ -1215,7 +1217,7 @@ mod tests {
             private_metadata: priv_expect.clone(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let priv_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_PRIV_META);
         let priv_meta: Metadata = load(&priv_store, &token_key).unwrap();
         assert_eq!(priv_meta, priv_expect.unwrap());
@@ -1240,7 +1242,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
 
@@ -1257,7 +1259,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You do not own token MyNFT"));
 
@@ -1300,7 +1302,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -1315,7 +1317,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Sealed metadata functionality is not enabled for this contract"));
 
@@ -1362,7 +1364,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let map2idx = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_INDEX);
         let index: u32 = load(&map2idx, "MyNFT".as_bytes()).unwrap();
         let token_key = index.to_le_bytes();
@@ -1409,7 +1411,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let priv_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_PRIV_META);
         let priv_meta: Metadata = load(&priv_store, &token_key).unwrap();
         assert_eq!(priv_meta, seal_meta.unwrap());
@@ -1439,7 +1441,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT1 not found"));
 
@@ -1461,7 +1463,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You do not own token NFT1"));
 
@@ -1565,7 +1567,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
         // setting approval is ok even during StopTransactions status
@@ -1599,7 +1601,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains(
             "Attempted to grant/revoke permission for a token, but did not specify a token ID"
@@ -1615,7 +1617,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains(
             "Attempted to grant/revoke permission for a token, but did not specify a token ID"
@@ -1631,7 +1633,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let bob_raw = deps
             .api
             .addr_canonicalize(&("bob".to_string()))
@@ -1719,7 +1721,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm ALL permission
         let all_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -1848,7 +1850,7 @@ mod tests {
             expires: Some(Expiration::AtHeight(1000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm ALL permission with new expiration
         let all_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -1904,7 +1906,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm NFT3 permissions
         let info_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft3_key).unwrap();
@@ -1942,7 +1944,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm NFT4 permissions
         let info_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft4_key).unwrap();
@@ -1966,7 +1968,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "david".to_string(),
             token_id: None,
@@ -1976,7 +1978,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1500000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "edmund".to_string(),
             token_id: None,
@@ -1986,7 +1988,7 @@ mod tests {
             expires: Some(Expiration::AtHeight(2000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test revoking token permission
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
@@ -1999,7 +2001,7 @@ mod tests {
             expires: Some(Expiration::AtTime(5)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm didn't affect ALL permissions
         let all_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -2241,7 +2243,7 @@ mod tests {
             expires: Some(Expiration::AtTime(5)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm only bob's ALL permission is gone
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -2711,7 +2713,7 @@ mod tests {
             expires: Some(Expiration::AtHeight(5000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm frank's ALL permission
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -3034,7 +3036,7 @@ mod tests {
             expires: Some(Expiration::AtHeight(2500)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm frank's ALL permission
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -3179,7 +3181,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm frank's ALL permission is gone
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Option<Vec<Permission>> = json_may_load(&all_store, alice_key).unwrap();
@@ -3317,7 +3319,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm NFT2 permission removed charlie
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft2_key).unwrap();
@@ -3356,7 +3358,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "david".to_string(),
             token_id: None,
@@ -3366,7 +3368,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "edmund".to_string(),
             token_id: None,
@@ -3376,7 +3378,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // verify no ALL permissions left
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Option<Vec<Permission>> = json_may_load(&all_store, alice_key).unwrap();
@@ -3420,7 +3422,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // verify no ALL permissions left
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Option<Vec<Permission>> = json_may_load(&all_store, alice_key).unwrap();
@@ -3473,7 +3475,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
 
@@ -3491,7 +3493,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("Not authorized to grant/revoke transfer permission for token MyNFT")
@@ -3531,7 +3533,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -3564,7 +3566,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("MyNFT".to_string()),
@@ -3574,7 +3576,7 @@ mod tests {
             expires: Some(Expiration::AtTime(500000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         let execute_msg = ExecuteMsg::Approve {
             spender: "charlie".to_string(),
@@ -3846,7 +3848,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm david is an operator
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -3968,7 +3970,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
 
@@ -3985,7 +3987,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("Not authorized to grant/revoke transfer permission for token MyNFT")
@@ -4024,7 +4026,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -4056,7 +4058,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("MyNFT".to_string()),
@@ -4066,7 +4068,7 @@ mod tests {
             expires: Some(Expiration::AtTime(500000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         let execute_msg = ExecuteMsg::Revoke {
             spender: "charlie".to_string(),
@@ -4277,7 +4279,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm charlie does not have ALL permission
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -4401,7 +4403,7 @@ mod tests {
             expires: Some(Expiration::Never),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm david is an operator
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -4537,7 +4539,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -4553,7 +4555,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Burn functionality is not enabled for this token"));
 
@@ -4571,7 +4573,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
 
@@ -4589,7 +4591,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You are not authorized to perform this action on token MyNFT"));
 
@@ -4639,7 +4641,7 @@ mod tests {
             expires: Some(Expiration::AtHeight(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::BurnNft {
             token_id: "MyNFT".to_string(),
             memo: None,
@@ -4671,7 +4673,7 @@ mod tests {
             expires: Some(Expiration::AtHeight(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::BurnNft {
             token_id: "MyNFT".to_string(),
             memo: None,
@@ -4853,14 +4855,14 @@ mod tests {
             expires: Some(Expiration::AtHeight(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::Approve {
             spender: "david".to_string(),
             token_id: "MyNFT3".to_string(),
             expires: Some(Expiration::AtHeight(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::BurnNft {
             token_id: "MyNFT2".to_string(),
             memo: None,
@@ -4947,7 +4949,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm token was removed from the maps
         let map2idx = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_MAP_TO_INDEX);
         let index: Option<u32> = may_load(&map2idx, "MyNFT3".as_bytes()).unwrap();
@@ -5022,7 +5024,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -5038,7 +5040,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Burn functionality is not enabled for this token"));
 
@@ -5175,7 +5177,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("NFT1".to_string()),
@@ -5185,7 +5187,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("NFT2".to_string()),
@@ -5195,7 +5197,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -5205,7 +5207,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "alice".to_string(),
             token_id: Some("NFT4".to_string()),
@@ -5411,7 +5413,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("NFT1".to_string()),
@@ -5421,7 +5423,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("NFT2".to_string()),
@@ -5431,7 +5433,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -5441,7 +5443,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "alice".to_string(),
             token_id: Some("NFT4".to_string()),
@@ -5642,7 +5644,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("NFT1".to_string()),
@@ -5652,7 +5654,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("NFT2".to_string()),
@@ -5662,7 +5664,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -5672,7 +5674,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "alice".to_string(),
             token_id: Some("NFT4".to_string()),
@@ -5962,7 +5964,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -5987,7 +5989,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
 
@@ -6006,7 +6008,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You are not authorized to perform this action on token MyNFT"));
 
@@ -6051,7 +6053,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::TransferNft {
             recipient: "bob".to_string(),
             token_id: "MyNFT".to_string(),
@@ -6069,7 +6071,7 @@ mod tests {
             expires: Some(Expiration::AtHeight(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::TransferNft {
             recipient: "bob".to_string(),
             token_id: "MyNFT".to_string(),
@@ -6102,7 +6104,7 @@ mod tests {
             expires: Some(Expiration::AtHeight(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::TransferNft {
             recipient: "charlie".to_string(),
             token_id: "MyNFT".to_string(),
@@ -6507,7 +6509,7 @@ mod tests {
             transfers,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -6535,7 +6537,7 @@ mod tests {
             transfers,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
 
@@ -6648,7 +6650,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("NFT1".to_string()),
@@ -6658,7 +6660,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT2".to_string()),
@@ -6668,7 +6670,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -6678,7 +6680,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "david".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -6688,7 +6690,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "alice".to_string(),
             token_id: Some("NFT4".to_string()),
@@ -6728,7 +6730,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "david".to_string(),
             token_id: None,
@@ -6876,7 +6878,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("NFT1".to_string()),
@@ -6886,7 +6888,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT2".to_string()),
@@ -6896,7 +6898,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -6906,7 +6908,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "david".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -6916,7 +6918,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "alice".to_string(),
             token_id: Some("NFT4".to_string()),
@@ -6956,7 +6958,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "david".to_string(),
             token_id: None,
@@ -7249,7 +7251,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: None,
@@ -7350,7 +7352,7 @@ mod tests {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let query_msg = QueryMsg::Tokens {
             owner: "alice".to_string(),
             viewer: None,
@@ -7414,7 +7416,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -7441,7 +7443,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
 
@@ -7462,7 +7464,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You are not authorized to perform this action on token MyNFT"));
 
@@ -7507,7 +7509,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SendNft {
             contract: "bob".to_string(),
             receiver_info: None,
@@ -7527,7 +7529,7 @@ mod tests {
             expires: Some(Expiration::AtHeight(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SendNft {
             contract: "bob".to_string(),
             receiver_info: None,
@@ -7562,7 +7564,7 @@ mod tests {
             expires: Some(Expiration::AtHeight(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SendNft {
             contract: "charlie".to_string(),
             receiver_info: None,
@@ -7650,7 +7652,7 @@ mod tests {
                 operator: "zoe".to_string(),
                 padding: None,
             })
-            .unwrap(),
+                .unwrap(),
         );
         // register david's ReceiveNft
         let execute_msg = ExecuteMsg::RegisterReceiveNft {
@@ -7692,13 +7694,13 @@ mod tests {
             token_id: "MyNFT".to_string(),
             msg: send_msg.clone(),
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
         let msg_fr_al = SubMsg::new(WasmMsg::Execute {
             contract_addr: "david".to_string(),
             code_hash: "david code hash".to_string(),
             msg: Binary(msg_fr_al.to_vec()),
-            funds: vec![]
+            funds: vec![],
         });
         assert_eq!(messages[0], msg_fr_al);
         // confirm token was not removed from the maps
@@ -7802,7 +7804,7 @@ mod tests {
             token_ids: vec!["MyNFT".to_string()],
             msg: send_msg.clone(),
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_dv = space_pad(&mut msg_fr_dv.0, 256usize);
         let msg_fr_dv = SubMsg::new(WasmMsg::Execute {
             contract_addr: "charlie".to_string(),
@@ -7884,7 +7886,7 @@ mod tests {
             token_id: "MyNFT".to_string(),
             msg: send_msg.clone(),
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_ch = space_pad(&mut msg_fr_ch.0, 256usize);
         let msg_fr_ch = SubMsg::new(WasmMsg::Execute {
             contract_addr: "alice".to_string(),
@@ -7987,7 +7989,7 @@ mod tests {
             sends,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -8017,7 +8019,7 @@ mod tests {
             sends,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: MyNFT not found"));
 
@@ -8137,7 +8139,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("NFT1".to_string()),
@@ -8147,7 +8149,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT2".to_string()),
@@ -8157,7 +8159,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -8167,7 +8169,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "david".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -8177,7 +8179,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "alice".to_string(),
             token_id: Some("NFT4".to_string()),
@@ -8217,7 +8219,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "david".to_string(),
             token_id: None,
@@ -8250,7 +8252,7 @@ mod tests {
                 operator: "zoe".to_string(),
                 padding: None,
             })
-            .unwrap(),
+                .unwrap(),
         );
         let sends = vec![
             Send {
@@ -8294,7 +8296,7 @@ mod tests {
             token_id: "NFT1".to_string(),
             msg: send_msg.clone(),
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
         let msg_fr_al = SubMsg::new(WasmMsg::Execute {
             contract_addr: "charlie".to_string(),
@@ -8309,7 +8311,7 @@ mod tests {
             token_id: "NFT1".to_string(),
             msg: send_msg.clone(),
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
         let msg_fr_al = SubMsg::new(WasmMsg::Execute {
             contract_addr: "bob".to_string(),
@@ -8449,7 +8451,7 @@ mod tests {
             token_id: "NFT1".to_string(),
             msg: send_msg.clone(),
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_b = space_pad(&mut msg_fr_b.0, 256usize);
         let msg_fr_b = SubMsg::new(WasmMsg::Execute {
             contract_addr: "charlie".to_string(),
@@ -8465,7 +8467,7 @@ mod tests {
             token_ids: vec!["NFT3".to_string()],
             msg: send_msg.clone(),
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
         let msg_fr_al = SubMsg::new(WasmMsg::Execute {
             contract_addr: "bob".to_string(),
@@ -8607,7 +8609,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: None,
@@ -8623,7 +8625,7 @@ mod tests {
             also_implements_batch_receive_nft: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::RegisterReceiveNft {
             code_hash: "charlie code hash".to_string(),
             also_implements_batch_receive_nft: Some(true),
@@ -8635,7 +8637,7 @@ mod tests {
                 operator: "zoe".to_string(),
                 padding: None,
             })
-            .unwrap(),
+                .unwrap(),
         );
         let execute_msg = ExecuteMsg::BatchSendNft {
             sends: vec![
@@ -8665,7 +8667,7 @@ mod tests {
             token_ids: vec!["NFT2".to_string(), "NFT3".to_string()],
             msg: send_msg.clone(),
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
         let msg_fr_al = SubMsg::new(WasmMsg::Execute {
             contract_addr: "charlie".to_string(),
@@ -8679,7 +8681,7 @@ mod tests {
             token_ids: vec!["NFT4".to_string()],
             msg: send_msg.clone(),
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_b = space_pad(&mut msf_fr_b.0, 256usize);
         let msg_fr_b = SubMsg::new(WasmMsg::Execute {
             contract_addr: "charlie".to_string(),
@@ -8692,7 +8694,7 @@ mod tests {
             token_id: "NFT3".to_string(),
             msg: None,
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_c3 = space_pad(&mut msg_fr_c3.0, 256usize);
         let msg_fr_c3 = SubMsg::new(WasmMsg::Execute {
             contract_addr: "alice".to_string(),
@@ -8705,7 +8707,7 @@ mod tests {
             token_id: "NFT4".to_string(),
             msg: None,
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_c4 = space_pad(&mut msg_fr_c4.0, 256usize);
         let msg_fr_c4 = SubMsg::new(WasmMsg::Execute {
             contract_addr: "alice".to_string(),
@@ -8718,7 +8720,7 @@ mod tests {
             token_id: "NFT6".to_string(),
             msg: None,
         })
-        .unwrap();
+            .unwrap();
         let msg_fr_c6 = space_pad(&mut msg_fr_c6.0, 256usize);
         let msg_fr_c6 = SubMsg::new(WasmMsg::Execute {
             contract_addr: "alice".to_string(),
@@ -8737,7 +8739,7 @@ mod tests {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm alice's tokens
         let query_msg = QueryMsg::Tokens {
             owner: "alice".to_string(),
@@ -8839,7 +8841,7 @@ mod tests {
             also_implements_batch_receive_nft: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -8856,7 +8858,7 @@ mod tests {
             also_implements_batch_receive_nft: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_RECEIVERS);
         let hash: String = load(
             &store,
@@ -8865,7 +8867,7 @@ mod tests {
                 .unwrap()
                 .as_slice(),
         )
-        .unwrap();
+            .unwrap();
         assert_eq!(&hash, "alice code hash");
     }
 
@@ -8889,7 +8891,7 @@ mod tests {
             entropy: "blah".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -8904,7 +8906,7 @@ mod tests {
             entropy: "blah".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         assert!(
             handle_result.is_ok(),
             "handle() failed: {}",
@@ -8946,7 +8948,7 @@ mod tests {
             key: "blah".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -8961,7 +8963,7 @@ mod tests {
             key: "blah".to_string(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let key = ViewingKey("blah".to_string());
         let alice_raw = deps
             .api
@@ -9014,7 +9016,7 @@ mod tests {
             minters: minters.clone(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("This is an admin command and can only be run from the admin address")
@@ -9106,7 +9108,7 @@ mod tests {
             minters: minters.clone(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("This is an admin command and can only be run from the admin address")
@@ -9231,7 +9233,7 @@ mod tests {
             minters: minters.clone(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("This is an admin command and can only be run from the admin address")
@@ -9309,7 +9311,7 @@ mod tests {
             address: "alice".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("This is an admin command and can only be run from the admin address")
@@ -9353,7 +9355,7 @@ mod tests {
             level: ContractStatus::StopAll,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("This is an admin command and can only be run from the admin address")
@@ -9432,7 +9434,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
         // setting approval is ok even during StopTransactions status
@@ -9467,7 +9469,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT2".to_string()),
@@ -9477,7 +9479,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -9487,7 +9489,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // confirm bob has transfer token permissions but not transfer all permission
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
@@ -9561,7 +9563,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm bob has transfer all permission
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -9649,7 +9651,7 @@ mod tests {
             operator: "bob".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
         // setting approval is ok even during StopTransactions status
@@ -9684,7 +9686,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT2".to_string()),
@@ -9694,7 +9696,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "bob".to_string(),
             token_id: Some("NFT3".to_string()),
@@ -9704,7 +9706,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // confirm bob has transfer token permissions but not transfer all permission
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
@@ -9777,7 +9779,7 @@ mod tests {
             operator: "bob".to_string(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm bob does not have transfer all permission
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -9810,7 +9812,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm bob has transfer all permission
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -9830,7 +9832,7 @@ mod tests {
             operator: "bob".to_string(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm bob no longer has transfer all permission
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -9861,7 +9863,7 @@ mod tests {
         };
         let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         let execute_msg = ExecuteMsg::MakeOwnershipPrivate { padding: None };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
 
@@ -9874,7 +9876,7 @@ mod tests {
 
         // sanity check when contract default is private
         let execute_msg = ExecuteMsg::MakeOwnershipPrivate { padding: None };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let alice_raw = deps
             .api
             .addr_canonicalize(&("alice".to_string()))
@@ -9893,7 +9895,7 @@ mod tests {
             init_result.err().unwrap()
         );
         let execute_msg = ExecuteMsg::MakeOwnershipPrivate { padding: None };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_OWNER_PRIV);
         let owner_priv: bool = load(&store, alice_key).unwrap();
         assert!(!owner_priv);
@@ -9918,7 +9920,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT1 not found"));
 
@@ -9938,7 +9940,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("You do not own token NFT1"));
 
@@ -9977,7 +9979,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The contract admin has temporarily disabled this action"));
         // setting approval is ok even during StopTransactions status
@@ -10007,7 +10009,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains(
             "Attempted to grant/revoke permission for a token, but did not specify a token ID"
@@ -10021,7 +10023,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains(
             "Attempted to grant/revoke permission for a token, but did not specify a token ID"
@@ -10035,7 +10037,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let global_raw = CanonicalAddr(Binary::from(b"public"));
         let alice_raw = deps
             .api
@@ -10100,7 +10102,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let bob_raw = deps
             .api
             .addr_canonicalize(&("bob".to_string()))
@@ -10221,7 +10223,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         // confirm ALL permission
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
@@ -10407,7 +10409,7 @@ mod tests {
 
         // test owner makes their tokens private when the contract has public ownership
         let execute_msg = ExecuteMsg::MakeOwnershipPrivate { padding: None };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let check_perm = check_permission(
             deps.as_ref(),
             &block,
@@ -10430,7 +10432,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
         let check_perm = check_permission(
@@ -10482,7 +10484,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token2: Token = json_load(&info_store, &nft2_key).unwrap();
         let check_perm = check_permission(
@@ -10560,7 +10562,7 @@ mod tests {
             expires: Some(Expiration::AtTime(5)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token2: Token = json_load(&info_store, &nft2_key).unwrap();
         let check_perm = check_permission(
@@ -10633,7 +10635,7 @@ mod tests {
             expires: Some(Expiration::AtTime(7)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
         let check_perm = check_permission(
@@ -10723,7 +10725,7 @@ mod tests {
             expires: Some(Expiration::AtTime(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -10731,7 +10733,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let block = BlockInfo {
             height: 1,
             time: Timestamp::from_nanos(100),
@@ -10762,7 +10764,7 @@ mod tests {
             expires: Some(Expiration::AtTime(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: None,
@@ -10770,7 +10772,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let block = BlockInfo {
             height: 1,
             time: Timestamp::from_nanos(100),
@@ -10801,7 +10803,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -10809,7 +10811,7 @@ mod tests {
             expires: Some(Expiration::AtTime(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let block = BlockInfo {
             height: 1,
             time: Timestamp::from_nanos(100),
@@ -10840,7 +10842,7 @@ mod tests {
             expires: Some(Expiration::AtTime(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: None,
@@ -10848,7 +10850,7 @@ mod tests {
             expires: Some(Expiration::AtTime(1000)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let block = BlockInfo {
             height: 1,
             time: Timestamp::from_nanos(100),
@@ -10912,7 +10914,7 @@ mod tests {
             expires: Some(Expiration::AtTime(100)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -10920,7 +10922,7 @@ mod tests {
             expires: Some(Expiration::AtTime(10)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let block = BlockInfo {
             height: 1,
             time: Timestamp::from_nanos(1),
@@ -11007,7 +11009,7 @@ mod tests {
             expires: Some(Expiration::AtTime(100)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: "charlie".to_string(),
             token_id: Some("NFT1".to_string()),
@@ -11017,7 +11019,7 @@ mod tests {
             expires: Some(Expiration::AtTime(100)),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token1: Token = json_load(&info_store, &nft1_key).unwrap();
         let check_perm = check_permission(

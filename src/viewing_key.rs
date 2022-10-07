@@ -1,11 +1,10 @@
 use std::fmt;
 
+use cosmwasm_std::{Env, MessageInfo};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Env, MessageInfo};
-
-use crate::rand::{sha_256, Prng};
+use crate::rand::{Prng, sha_256};
 use crate::utils::{create_hashed_password, ct_slice_compare};
 
 pub const VIEWING_KEY_SIZE: usize = 32;
