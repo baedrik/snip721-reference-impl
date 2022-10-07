@@ -44,6 +44,7 @@ subtle = { version = "2.2.3", default-features = false }
 base64 = "0.13.0"
 hex = "0.4.2"
 primitive-types = { version = "0.12.0", default-features = false }
+getrandom = { version = "0.2", features = ["js"] }
 rand_chacha = { version = "0.3.1", default-features = false }
 rand_core = { version = "0.6.4", default-features = false }
 sha2 = { version = "0.10.6", default-features = false }
