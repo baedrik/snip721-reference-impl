@@ -332,7 +332,7 @@ mod tests {
             royalty_info: Some(royalties.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("Only designated minters can set default royalties for the contract")
@@ -429,13 +429,13 @@ mod tests {
             key: alice_key.clone(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         let execute_msg = ExecuteMsg::SetViewingKey {
             key: bob_key.clone(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
 
         // set default royalties sanity check
         let execute_msg = ExecuteMsg::SetRoyaltyInfo {
@@ -773,7 +773,7 @@ mod tests {
             royalty_info: Some(individual.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("A token's RoyaltyInfo may only be set by the token creator when they are also the token owner"));
 
