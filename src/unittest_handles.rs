@@ -17,7 +17,10 @@ mod tests {
     use crate::token::{Extension, Metadata, Token};
     use crate::viewing_key::{ViewingKey, VIEWING_KEY_SIZE};
     use cosmwasm_std::testing::*;
-    use cosmwasm_std::{from_binary, to_binary, Api, Binary, BlockInfo, CanonicalAddr, Coin, CosmosMsg, Env, Response, Addr, MessageInfo, StdError, StdResult, Uint128, WasmMsg, OwnedDeps, Timestamp, SubMsg, TransactionInfo};
+    use cosmwasm_std::{
+        from_binary, to_binary, Api, Binary, BlockInfo, CanonicalAddr, Coin, Env, Response, Addr,
+        StdError, StdResult, Uint128, WasmMsg, OwnedDeps, Timestamp, SubMsg
+    };
     use cosmwasm_storage::ReadonlyPrefixedStorage;
     use secret_toolkit::utils::space_pad;
     use std::any::Any;

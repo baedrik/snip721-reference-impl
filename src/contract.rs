@@ -2,7 +2,6 @@ use std::borrow::Borrow;
 /// This contract implements SNIP-721 standard:
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
 use std::collections::HashSet;
-use std::ops::Add;
 
 use cosmwasm_std::{entry_point, Api, attr, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, Env, Response, StdError, StdResult, Storage, to_binary, WasmMsg, MessageInfo, Timestamp, Addr};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};

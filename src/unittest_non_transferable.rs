@@ -14,7 +14,10 @@ mod tests {
     };
     use crate::token::{Extension, Metadata, Token};
     use cosmwasm_std::testing::*;
-    use cosmwasm_std::{from_binary, to_binary, Api, Binary, Coin, CosmosMsg, Response, StdError, StdResult, Uint128, WasmMsg, OwnedDeps, SubMsg, Addr};
+    use cosmwasm_std::{
+        from_binary, to_binary, Api, Binary, Coin, Response, StdError, StdResult, Uint128, WasmMsg,
+        OwnedDeps, SubMsg, Addr
+    };
     use cosmwasm_storage::ReadonlyPrefixedStorage;
     use std::any::Any;
 

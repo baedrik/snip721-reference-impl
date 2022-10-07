@@ -8,7 +8,10 @@ mod tests {
     use crate::royalties::{DisplayRoyalty, DisplayRoyaltyInfo, Royalty, RoyaltyInfo};
     use crate::state::{load, Config, CONFIG_KEY};
     use cosmwasm_std::testing::*;
-    use cosmwasm_std::{from_binary, to_binary, Api, Binary, Coin, CosmosMsg, Response, StdError, StdResult, Uint128, WasmMsg, OwnedDeps, Addr, SubMsg};
+    use cosmwasm_std::{
+        from_binary, to_binary, Api, Binary, Coin, Response, StdError, StdResult, Uint128,
+        WasmMsg, OwnedDeps, Addr, SubMsg
+    };
     use std::any::Any;
 
     // Helper functions

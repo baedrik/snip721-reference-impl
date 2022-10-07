@@ -9,7 +9,10 @@ mod tests {
     };
     use crate::token::{Extension, Metadata};
     use cosmwasm_std::testing::*;
-    use cosmwasm_std::{from_binary, Binary, BlockInfo, Env, Addr, Response, MessageInfo, StdError, StdResult, OwnedDeps, Timestamp};
+    use cosmwasm_std::{
+        from_binary, Binary, BlockInfo, Env, Addr, Response, StdError, StdResult, OwnedDeps,
+        Timestamp
+    };
     use std::any::Any;
 
     // Helper functions
