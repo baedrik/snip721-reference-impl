@@ -341,9 +341,10 @@ fn append_tx_for_addr(
     tx_id: u64,
     address: &CanonicalAddr,
 ) -> StdResult<()> {
-    // let mut store = PrefixedStorage::multilevel(storage, &[PREFIX_TX_IDS, address.as_slice()]);
+    // let mut store = PrefixedStorage::multilevel(&[PREFIX_TX_IDS, address.as_slice()], storage);
+    // let mut store = AppendStoreMut::attach_or_create(&mut store)?;
+    // store.push(&tx_id)
     // TODO: figure out if this is correct
-    // let mut store = AppendStore::attach_or_create(&mut store)?;
     let store: AppendStore<u64, Bincode2> = AppendStore::new(PREFIX_TX_IDS);
     let id_store = store.add_suffix(address);
     id_store.push(storage, &tx_id)
@@ -365,9 +366,17 @@ pub fn get_txs(
     page: u32,
     page_size: u32,
 ) -> StdResult<(Vec<Tx>, u64)> {
-    // TODO: figure out if this is correct
     // let id_store =
-    //     ReadonlyPrefixedStorage::multilevel(storage,&[PREFIX_TX_IDS, address.as_slice()]);
+    //     ReadonlyPrefixedStorage::multilevel(&[PREFIX_TX_IDS, address.as_slice()], storage);
+    //
+    // // Try to access the storage of tx ids for the account.
+    // // If it doesn't exist yet, return an empty list of txs.
+    // let id_store = if let Some(result) = AppendStore::<u64, _>::attach(&id_store) {
+    //     result?
+    // } else {
+    //     return Ok((vec![], 0));
+    // };
+    // TODO: figure out if this is correct
     let store: AppendStore<u64, Bincode2> = AppendStore::new(PREFIX_TX_IDS);
     let id_store = store.add_suffix(address);
 
