@@ -1,4 +1,4 @@
-use cosmwasm_std::{Api, CanonicalAddr, HumanAddr, StdResult};
+use cosmwasm_std::{Addr, Api, CanonicalAddr, StdResult};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MintRunInfo {
     /// optional address of the SNIP-721 contract creator
-    pub collection_creator: Option<HumanAddr>,
+    pub collection_creator: Option<String>,
     /// optional address of this NFT's creator
-    pub token_creator: Option<HumanAddr>,
+    pub token_creator: Option<Addr>,
     /// optional time of minting (in seconds since 01/01/1970)
     pub time_of_minting: Option<u64>,
     /// optional number of the mint run this token was minted in.  A mint run represents a
@@ -53,10 +53,10 @@ impl StoredMintRunInfo {
     ///
     /// * `api` - a reference to the Api used to convert human and canonical addresses
     /// * `contract_creator` - the address that instantiated the contract
-    pub fn to_human<A: Api>(&self, api: &A, contract_creator: HumanAddr) -> StdResult<MintRunInfo> {
+    pub fn to_human(&self, api: &dyn Api, contract_creator: String) -> StdResult<MintRunInfo> {
         Ok(MintRunInfo {
             collection_creator: Some(contract_creator),
-            token_creator: Some(api.human_address(&self.token_creator)?),
+            token_creator: Some(api.addr_humanize(&self.token_creator)?),
             time_of_minting: Some(self.time_of_minting),
             mint_run: self.mint_run,
             serial_number: self.serial_number,

@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use crate::contract::{handle, init, query};
+    use crate::contract::{execute, instantiate, query};
     use crate::expiration::Expiration;
     use crate::inventory::Inventory;
     use crate::msg::{
-        Burn, ContractStatus, HandleMsg, InitConfig, InitMsg, Mint, PostInitCallback, QueryAnswer,
+        Burn, ContractStatus, ExecuteMsg, InitConfig, InstantiateMsg, Mint, PostInitCallback, QueryAnswer,
         QueryMsg, Send, Transfer,
     };
     use crate::royalties::{DisplayRoyalty, DisplayRoyaltyInfo, Royalty, RoyaltyInfo};
@@ -14,33 +14,30 @@ mod tests {
     };
     use crate::token::{Extension, Metadata, Token};
     use cosmwasm_std::testing::*;
-    use cosmwasm_std::{
-        from_binary, to_binary, Api, Binary, Coin, CosmosMsg, Extern, HumanAddr, InitResponse,
-        StdError, StdResult, Uint128, WasmMsg,
-    };
+    use cosmwasm_std::{from_binary, to_binary, Api, Binary, Coin, CosmosMsg, Response, StdError, StdResult, Uint128, WasmMsg, OwnedDeps, SubMsg, Addr};
     use cosmwasm_storage::ReadonlyPrefixedStorage;
     use std::any::Any;
 
     // Helper functions
 
     fn init_helper_default() -> (
-        StdResult<InitResponse>,
-        Extern<MockStorage, MockApi, MockQuerier>,
+        StdResult<Response>,
+        OwnedDeps<MockStorage, MockApi, MockQuerier>,
     ) {
-        let mut deps = mock_dependencies(20, &[]);
-        let env = mock_env("instantiator", &[]);
-
-        let init_msg = InitMsg {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("instantiator", &[]);
+        let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
             symbol: "S721".to_string(),
-            admin: Some(HumanAddr("admin".to_string())),
+            admin: Some("admin".to_string()),
             entropy: "We're going to need a bigger boat".to_string(),
             royalty_info: None,
             config: None,
             post_init_callback: None,
         };
 
-        (init(&mut deps, env, init_msg), deps)
+        (instantiate(deps.as_mut(), env, info, init_msg), deps)
     }
 
     fn init_helper_with_config(
@@ -52,12 +49,12 @@ mod tests {
         owner_may_update_metadata: bool,
         enable_burn: bool,
     ) -> (
-        StdResult<InitResponse>,
-        Extern<MockStorage, MockApi, MockQuerier>,
+        StdResult<Response>,
+        OwnedDeps<MockStorage, MockApi, MockQuerier>,
     ) {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies();
 
-        let env = mock_env("instantiator", &[]);
+        let env = mock_env();
         let init_config: InitConfig = from_binary(&Binary::from(
             format!(
                 "{{\"public_token_supply\":{},
@@ -78,17 +75,18 @@ mod tests {
             .as_bytes(),
         ))
         .unwrap();
-        let init_msg = InitMsg {
+        let info = mock_info("instantiator", &[]);
+        let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
             symbol: "S721".to_string(),
-            admin: Some(HumanAddr("admin".to_string())),
+            admin: Some("admin".to_string()),
             entropy: "We're going to need a bigger boat".to_string(),
             royalty_info: None,
             config: Some(init_config),
             post_init_callback: None,
         };
 
-        (init(&mut deps, env, init_msg), deps)
+        (instantiate(deps.as_mut(), env, info, init_msg), deps)
     }
 
     fn init_helper_royalties_with_config(
@@ -101,12 +99,12 @@ mod tests {
         owner_may_update_metadata: bool,
         enable_burn: bool,
     ) -> (
-        StdResult<InitResponse>,
-        Extern<MockStorage, MockApi, MockQuerier>,
+        StdResult<Response>,
+        OwnedDeps<MockStorage, MockApi, MockQuerier>,
     ) {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies();
 
-        let env = mock_env("instantiator", &[]);
+        let env = mock_env();
         let init_config: InitConfig = from_binary(&Binary::from(
             format!(
                 "{{\"public_token_supply\":{},
@@ -127,17 +125,18 @@ mod tests {
             .as_bytes(),
         ))
         .unwrap();
-        let init_msg = InitMsg {
+        let info = mock_info("instantiator", &[]);
+        let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
             symbol: "S721".to_string(),
-            admin: Some(HumanAddr("admin".to_string())),
+            admin: Some("admin".to_string()),
             entropy: "We're going to need a bigger boat".to_string(),
             royalty_info,
             config: Some(init_config),
             post_init_callback: None,
         };
 
-        (init(&mut deps, env, init_msg), deps)
+        (instantiate(deps.as_mut(), env, info, init_msg), deps)
     }
 
     fn extract_error_msg<T: Any>(error: StdResult<T>) -> String {
@@ -156,8 +155,8 @@ mod tests {
     fn test_init_sanity() {
         // test default
         let (init_result, deps) = init_helper_default();
-        assert_eq!(init_result.unwrap(), InitResponse::default());
-        let config: Config = load(&deps.storage, CONFIG_KEY).unwrap();
+        assert_eq!(init_result.unwrap(), Response::default());
+        let config: Config = load(deps.as_ref().storage, CONFIG_KEY).unwrap();
         assert_eq!(config.status, ContractStatus::Normal.to_u8());
         assert_eq!(config.mint_cnt, 0);
         assert_eq!(config.tx_cnt, 0);
@@ -165,7 +164,7 @@ mod tests {
         assert_eq!(
             config.admin,
             deps.api
-                .canonical_address(&HumanAddr("admin".to_string()))
+                .addr_canonicalize(&("admin".to_string()))
                 .unwrap()
         );
         assert_eq!(config.symbol, "S721".to_string());
@@ -180,8 +179,8 @@ mod tests {
         // test config specification
         let (init_result, deps) =
             init_helper_with_config(true, true, true, true, false, true, false);
-        assert_eq!(init_result.unwrap(), InitResponse::default());
-        let config: Config = load(&deps.storage, CONFIG_KEY).unwrap();
+        assert_eq!(init_result.unwrap(), Response::default());
+        let config: Config = load(deps.as_ref().storage, CONFIG_KEY).unwrap();
         assert_eq!(config.status, ContractStatus::Normal.to_u8());
         assert_eq!(config.mint_cnt, 0);
         assert_eq!(config.tx_cnt, 0);
@@ -189,7 +188,7 @@ mod tests {
         assert_eq!(
             config.admin,
             deps.api
-                .canonical_address(&HumanAddr("admin".to_string()))
+                .addr_canonicalize(&("admin".to_string()))
                 .unwrap()
         );
         assert_eq!(config.symbol, "S721".to_string());
@@ -202,39 +201,39 @@ mod tests {
         assert_eq!(config.burn_is_enabled, false);
 
         // test post init callback
-        let mut deps = mock_dependencies(20, &[]);
-        let env = mock_env("instantiator", &[]);
+        let mut deps = mock_dependencies();
+        let env = mock_env();
         // just picking a random short HandleMsg that wouldn't really make sense
-        let post_init_msg = to_binary(&HandleMsg::MakeOwnershipPrivate { padding: None }).unwrap();
+        let post_init_msg = to_binary(&ExecuteMsg::MakeOwnershipPrivate { padding: None }).unwrap();
         let post_init_send = vec![Coin {
-            amount: Uint128(100),
+            amount: Uint128::new(100),
             denom: "uscrt".to_string(),
         }];
         let post_init_callback = Some(PostInitCallback {
             msg: post_init_msg.clone(),
-            contract_address: HumanAddr("spawner".to_string()),
+            contract_address: "spawner".to_string(),
             code_hash: "spawner hash".to_string(),
             send: post_init_send.clone(),
         });
-
-        let init_msg = InitMsg {
+        let info = mock_info("instantiator", &[]);
+        let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
             symbol: "S721".to_string(),
-            admin: Some(HumanAddr("admin".to_string())),
+            admin: Some("admin".to_string()),
             entropy: "We're going to need a bigger boat".to_string(),
             royalty_info: None,
             config: None,
             post_init_callback,
         };
 
-        let init_response = init(&mut deps, env, init_msg).unwrap();
+        let init_response = instantiate(deps.as_mut(), env, info, init_msg).unwrap();
         assert_eq!(
             init_response.messages,
-            vec![CosmosMsg::Wasm(WasmMsg::Execute {
+            vec![SubMsg::new(WasmMsg::Execute {
                 msg: post_init_msg,
-                contract_addr: HumanAddr("spawner".to_string()),
-                callback_code_hash: "spawner hash".to_string(),
-                send: post_init_send,
+                contract_addr: "spawner".to_string(),
+                code_hash: "spawner hash".to_string(),
+                funds: post_init_send,
             })]
         );
 
@@ -243,11 +242,11 @@ mod tests {
             decimal_places_in_rates: 2,
             royalties: vec![
                 Royalty {
-                    recipient: HumanAddr("alice".to_string()),
+                    recipient: "alice".to_string(),
                     rate: 10,
                 },
                 Royalty {
-                    recipient: HumanAddr("bob".to_string()),
+                    recipient: "bob".to_string(),
                     rate: 5,
                 },
             ],
@@ -277,8 +276,8 @@ mod tests {
             true,
             false,
         );
-        assert_eq!(init_result.unwrap(), InitResponse::default());
-        let config: Config = load(&deps.storage, CONFIG_KEY).unwrap();
+        assert_eq!(init_result.unwrap(), Response::default());
+        let config: Config = load(deps.as_ref().storage, CONFIG_KEY).unwrap();
         assert_eq!(config.status, ContractStatus::Normal.to_u8());
         assert_eq!(config.mint_cnt, 0);
         assert_eq!(config.tx_cnt, 0);
@@ -286,7 +285,7 @@ mod tests {
         assert_eq!(
             config.admin,
             deps.api
-                .canonical_address(&HumanAddr("admin".to_string()))
+                .addr_canonicalize(&("admin".to_string()))
                 .unwrap()
         );
         assert_eq!(config.symbol, "S721".to_string());
@@ -302,7 +301,7 @@ mod tests {
             token_id: None,
             viewer: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -326,11 +325,11 @@ mod tests {
             decimal_places_in_rates: 2,
             royalties: vec![
                 Royalty {
-                    recipient: HumanAddr("alice".to_string()),
+                    recipient: "alice".to_string(),
                     rate: 10,
                 },
                 Royalty {
-                    recipient: HumanAddr("bob".to_string()),
+                    recipient: "bob".to_string(),
                     rate: 5,
                 },
             ],
@@ -346,7 +345,7 @@ mod tests {
             false,
             false,
         );
-        assert_eq!(init_result.unwrap(), InitResponse::default());
+        assert_eq!(init_result.unwrap(), Response::default());
 
         let mints = vec![
             Mint {
@@ -371,11 +370,11 @@ mod tests {
             },
         ];
 
-        let handle_msg = HandleMsg::BatchMintNft {
+        let execute_msg = ExecuteMsg::BatchMintNft {
             mints: mints.clone(),
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
         // verify there are no royalties when trying to specify on mint
@@ -383,7 +382,7 @@ mod tests {
             token_id: Some("TrySetRoys".to_string()),
             viewer: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -402,7 +401,7 @@ mod tests {
             token_id: Some("TryDefaultRoys".to_string()),
             viewer: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -417,12 +416,12 @@ mod tests {
         }
 
         // test trying SetRoyaltyInfo on a non-transferable token
-        let handle_msg = HandleMsg::SetRoyaltyInfo {
+        let execute_msg = ExecuteMsg::SetRoyaltyInfo {
             token_id: Some("TryDefaultRoys".to_string()),
             royalty_info: Some(royalties.clone()),
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("Non-transferable tokens can not be sold, so royalties are meaningless")
@@ -440,13 +439,13 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
 
         let mints = vec![
             Mint {
                 token_id: Some("NFT1".to_string()),
-                owner: Some(alice.clone()),
+                owner: Some(Addr::unchecked(alice.clone())),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -456,7 +455,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT2".to_string()),
-                owner: Some(alice.clone()),
+                owner: Some(Addr::unchecked(alice.clone())),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -466,47 +465,47 @@ mod tests {
             },
         ];
 
-        let handle_msg = HandleMsg::BatchMintNft {
+        let execute_msg = ExecuteMsg::BatchMintNft {
             mints: mints.clone(),
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
         // verify TransferNft fails on a non-transferable token
-        let handle_msg = HandleMsg::TransferNft {
+        let execute_msg = ExecuteMsg::TransferNft {
             recipient: bob.clone(),
             token_id: "NFT1".to_string(),
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT1 is non-transferable"));
 
         // verify BatchTransferNft fails on a non-transferable token
         let transfers = vec![
             Transfer {
-                recipient: bob.clone(),
+                recipient: Addr::unchecked(bob.clone()),
                 token_ids: vec!["NFT2".to_string()],
                 memo: None,
             },
             Transfer {
-                recipient: bob.clone(),
+                recipient: Addr::unchecked(bob.clone()),
                 token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
         ];
-        let handle_msg = HandleMsg::BatchTransferNft {
+        let execute_msg = ExecuteMsg::BatchTransferNft {
             transfers,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT2 is non-transferable"));
 
         // verify SendNft fails on a non-transferable token
-        let handle_msg = HandleMsg::SendNft {
+        let execute_msg = ExecuteMsg::SendNft {
             contract: bob.clone(),
             receiver_info: None,
             token_id: "NFT1".to_string(),
@@ -514,32 +513,32 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT1 is non-transferable"));
 
         // verify BatchSendNft fails on a non-transferable token
         let sends = vec![
             Send {
-                contract: bob.clone(),
+                contract: Addr::unchecked(bob.clone()),
                 receiver_info: None,
                 token_ids: vec!["NFT2".to_string()],
                 msg: None,
                 memo: None,
             },
             Send {
-                contract: bob.clone(),
+                contract: Addr::unchecked(bob.clone()),
                 receiver_info: None,
                 token_ids: vec!["NFT1".to_string()],
                 msg: None,
                 memo: None,
             },
         ];
-        let handle_msg = HandleMsg::BatchSendNft {
+        let execute_msg = ExecuteMsg::BatchSendNft {
             sends,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT2 is non-transferable"));
     }
@@ -558,13 +557,13 @@ mod tests {
         let tok_key = 0u32.to_le_bytes();
         let tok2_key = 1u32.to_le_bytes();
         let tok3_key = 2u32.to_le_bytes();
-        let alice = HumanAddr("alice".to_string());
-        let alice_raw = deps.api.canonical_address(&alice).unwrap();
+        let alice = "alice".to_string();
+        let alice_raw = deps.api.addr_canonicalize(&alice).unwrap();
 
         let mints = vec![
             Mint {
                 token_id: Some("NFT1".to_string()),
-                owner: Some(alice.clone()),
+                owner: Some(Addr::unchecked(alice.clone())),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -574,7 +573,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT2".to_string()),
-                owner: Some(alice.clone()),
+                owner: Some(Addr::unchecked(alice.clone())),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -584,7 +583,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT3".to_string()),
-                owner: Some(alice.clone()),
+                owner: Some(Addr::unchecked(alice.clone())),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -594,34 +593,34 @@ mod tests {
             },
         ];
 
-        let handle_msg = HandleMsg::BatchMintNft {
+        let execute_msg = ExecuteMsg::BatchMintNft {
             mints: mints.clone(),
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
         // verify BurnNft works on a non-transferable token even when burn is disabled
-        let handle_msg = HandleMsg::BurnNft {
+        let execute_msg = ExecuteMsg::BurnNft {
             token_id: "NFT1".to_string(),
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
         assert!(handle_result.is_ok());
         // confirm token was removed from the maps
-        let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
+        let map2idx = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_INDEX);
         let index: Option<u32> = may_load(&map2idx, "NFT1".as_bytes()).unwrap();
         assert!(index.is_none());
-        let map2id = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_ID, &deps.storage);
+        let map2id = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_ID);
         let id: Option<String> = may_load(&map2id, &tok_key).unwrap();
         assert!(id.is_none());
         // confirm token info was deleted from storage
-        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let info_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_INFOS);
         let token: Option<Token> = json_may_load(&info_store, &tok_key).unwrap();
         assert!(token.is_none());
         // confirm the token was removed from the owner's list
-        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        let inventory = Inventory::new(deps.as_ref().storage, alice_raw.clone()).unwrap();
         assert_eq!(inventory.info.count, 2);
         assert!(!inventory.contains(&deps.storage, 0).unwrap());
         assert!(inventory.contains(&deps.storage, 1).unwrap());
@@ -632,31 +631,31 @@ mod tests {
             token_ids: vec!["NFT2".to_string(), "NFT3".to_string()],
             memo: None,
         }];
-        let handle_msg = HandleMsg::BatchBurnNft {
+        let execute_msg = ExecuteMsg::BatchBurnNft {
             burns,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
         assert!(handle_result.is_ok());
         // confirm tokens were removed from the maps
-        let map2idx = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_INDEX, &deps.storage);
+        let map2idx = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_INDEX);
         let index: Option<u32> = may_load(&map2idx, "NFT2".as_bytes()).unwrap();
         assert!(index.is_none());
         let index: Option<u32> = may_load(&map2idx, "NFT3".as_bytes()).unwrap();
         assert!(index.is_none());
-        let map2id = ReadonlyPrefixedStorage::new(PREFIX_MAP_TO_ID, &deps.storage);
+        let map2id = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_ID);
         let id: Option<String> = may_load(&map2id, &tok2_key).unwrap();
         assert!(id.is_none());
         let id: Option<String> = may_load(&map2id, &tok3_key).unwrap();
         assert!(id.is_none());
         // confirm token infos were deleted from storage
-        let info_store = ReadonlyPrefixedStorage::new(PREFIX_INFOS, &deps.storage);
+        let info_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_INFOS);
         let token: Option<Token> = json_may_load(&info_store, &tok2_key).unwrap();
         assert!(token.is_none());
         let token: Option<Token> = json_may_load(&info_store, &tok3_key).unwrap();
         assert!(token.is_none());
         // confirm the tokens were removed from the owner's list
-        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        let inventory = Inventory::new(deps.as_ref().storage, alice_raw.clone()).unwrap();
         assert_eq!(inventory.info.count, 0);
         assert!(!inventory.contains(&deps.storage, 1).unwrap());
         assert!(!inventory.contains(&deps.storage, 2).unwrap());
@@ -693,9 +692,9 @@ mod tests {
                 ..Extension::default()
             }),
         };
-        let alice = HumanAddr("alice".to_string());
+        let alice = "alice".to_string();
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
@@ -706,7 +705,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
         // test viewer not given, contract has public ownership
@@ -715,7 +714,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier {
@@ -734,7 +733,7 @@ mod tests {
                 token_approvals,
                 inventory_approvals,
             } => {
-                assert_eq!(owner, Some(alice.clone()));
+                assert_eq!(owner.map(|o| o.to_string()), Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert!(private_metadata.is_none());
                 assert_eq!(
@@ -769,7 +768,7 @@ mod tests {
         let query_msg = QueryMsg::IsTransferable {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT1 not found"));
 
@@ -785,7 +784,7 @@ mod tests {
         let query_msg = QueryMsg::IsTransferable {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::IsTransferable {
@@ -827,18 +826,18 @@ mod tests {
             },
         ];
 
-        let handle_msg = HandleMsg::BatchMintNft {
+        let execute_msg = ExecuteMsg::BatchMintNft {
             mints: mints.clone(),
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
         // test IsTransferable on a non-transferable token
         let query_msg = QueryMsg::IsTransferable {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::IsTransferable {
@@ -853,7 +852,7 @@ mod tests {
         let query_msg = QueryMsg::IsTransferable {
             token_id: "NFT2".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::IsTransferable {
@@ -876,24 +875,24 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
 
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]),  execute_msg);
         assert!(handle_result.is_ok());
 
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "bkey".to_string(),
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: None,
@@ -904,7 +903,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
         // verify that alice does not have transfer approval despite owning the non-transferable token
@@ -913,7 +912,7 @@ mod tests {
             address: alice.clone(),
             viewing_key: "akey".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::VerifyTransferApproval {
@@ -932,7 +931,7 @@ mod tests {
             address: bob.clone(),
             viewing_key: "bkey".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::VerifyTransferApproval {
