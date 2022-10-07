@@ -60,7 +60,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Only designated minters are allowed to mint"));
 
