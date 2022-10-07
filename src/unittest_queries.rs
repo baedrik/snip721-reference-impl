@@ -3539,7 +3539,7 @@ mod tests {
         let mint1 = Tx {
             tx_id: 0,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT1".to_string(),
             memo: None,
             action: TxAction::Mint {
@@ -3550,7 +3550,7 @@ mod tests {
         let mint2 = Tx {
             tx_id: 1,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT2".to_string(),
             memo: Some("Mint 2".to_string()),
             action: TxAction::Mint {
@@ -3561,7 +3561,7 @@ mod tests {
         let xfer1 = Tx {
             tx_id: 2,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT1".to_string(),
             memo: None,
             action: TxAction::Transfer {
@@ -3573,7 +3573,7 @@ mod tests {
         let burn2 = Tx {
             tx_id: 3,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT2".to_string(),
             memo: None,
             action: TxAction::Burn {
@@ -4334,7 +4334,7 @@ mod tests {
         let mint_run_info = MintRunInfo {
             collection_creator: Some("instantiator".to_string()),
             token_creator: Some(Addr::unchecked("admin".to_string())),
-            time_of_minting: Some(1571797419),
+            time_of_minting: Some(1571797419879305533),
             mint_run: None,
             serial_number: None,
             quantity_minted_this_run: None,

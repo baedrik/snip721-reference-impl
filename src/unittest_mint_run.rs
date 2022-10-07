@@ -97,7 +97,7 @@ mod tests {
         let run_info_0 = MintRunInfo {
             collection_creator: Some(instantiator.clone()),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419),
+            time_of_minting: Some(1571797419879305533),
             mint_run: None,
             serial_number: Some(1),
             quantity_minted_this_run: Some(3),
@@ -105,7 +105,7 @@ mod tests {
         let run_info_1 = MintRunInfo {
             collection_creator: Some(instantiator.clone()),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419),
+            time_of_minting: Some(1571797419879305533),
             mint_run: None,
             serial_number: Some(2),
             quantity_minted_this_run: Some(3),
@@ -113,7 +113,7 @@ mod tests {
         let run_info_2 = MintRunInfo {
             collection_creator: Some(instantiator.clone()),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419),
+            time_of_minting: Some(1571797419879305533),
             mint_run: None,
             serial_number: Some(3),
             quantity_minted_this_run: Some(3),
@@ -175,7 +175,7 @@ mod tests {
         let run_info_3 = MintRunInfo {
             collection_creator: Some(instantiator.clone()),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419),
+            time_of_minting: Some(1571797419879305533),
             mint_run: Some(1),
             serial_number: Some(1),
             quantity_minted_this_run: Some(1),
@@ -211,7 +211,7 @@ mod tests {
         let run_info_4 = MintRunInfo {
             collection_creator: Some(instantiator.clone()),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419),
+            time_of_minting: Some(1571797419879305533),
             mint_run: Some(2),
             serial_number: Some(1),
             quantity_minted_this_run: Some(2),
@@ -232,7 +232,7 @@ mod tests {
         let run_info_5 = MintRunInfo {
             collection_creator: Some(instantiator.clone()),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419),
+            time_of_minting: Some(1571797419879305533),
             mint_run: Some(2),
             serial_number: Some(2),
             quantity_minted_this_run: Some(2),

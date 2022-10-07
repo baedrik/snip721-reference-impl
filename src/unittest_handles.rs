@@ -7309,7 +7309,7 @@ mod tests {
         let xfer4 = Tx {
             tx_id: 8,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT4".to_string(),
             memo: Some("test memo".to_string()),
             action: TxAction::Transfer {
@@ -7321,7 +7321,7 @@ mod tests {
         let xfer1 = Tx {
             tx_id: 9,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT1".to_string(),
             memo: None,
             action: TxAction::Transfer {
@@ -8763,7 +8763,7 @@ mod tests {
         let xfer6 = Tx {
             tx_id: 11,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT6".to_string(),
             memo: None,
             action: TxAction::Transfer {
@@ -8775,7 +8775,7 @@ mod tests {
         let xfer3 = Tx {
             tx_id: 7,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT3".to_string(),
             memo: Some("test memo".to_string()),
             action: TxAction::Transfer {
