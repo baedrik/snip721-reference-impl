@@ -12,7 +12,7 @@ mod tests {
     use crate::expiration::Expiration;
     use crate::mint_run::MintRunInfo;
     use crate::msg::{
-        AccessLevel, BatchNftDossierElement, Cw721Approval, ExecuteMsg, InitConfig, InstantiateMsg, Mint,
+        AccessLevel, BatchNftDossierElement, Cw721Approval, ExecuteMsg, InstantiateConfig, InstantiateMsg, Mint,
         QueryAnswer, QueryMsg, Snip721Approval, Tx, TxAction, ViewerInfo,
     };
     use crate::token::{Extension, Metadata};
@@ -54,7 +54,7 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let env = mock_env();
-        let init_config: InitConfig = from_binary(&Binary::from(
+        let init_config: InstantiateConfig = from_binary(&Binary::from(
             format!(
                 "{{\"public_token_supply\":{},
             \"public_owner\":{},

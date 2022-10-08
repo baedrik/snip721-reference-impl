@@ -14,8 +14,8 @@ mod tests {
     use crate::expiration::Expiration;
     use crate::inventory::Inventory;
     use crate::msg::{
-        AccessLevel, Burn, ContractStatus, ExecuteMsg, HandleAnswer, InitConfig, InstantiateMsg, Mint,
-        PostInitCallback, QueryAnswer, QueryMsg, ReceiverInfo, Send, Transfer, Tx, TxAction,
+        AccessLevel, Burn, ContractStatus, ExecuteMsg, ExecuteAnswer, InstantiateConfig, InstantiateMsg, Mint,
+        PostInstantiateCallback, QueryAnswer, QueryMsg, ReceiverInfo, Send, Transfer, Tx, TxAction,
     };
     use crate::receiver::Snip721ReceiveMsg;
     use crate::state::{
@@ -64,7 +64,7 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let env = mock_env();
-        let init_config: InitConfig = from_binary(&Binary::from(
+        let init_config: InstantiateConfig = from_binary(&Binary::from(
             format!(
                 "{{\"public_token_supply\":{},
             \"public_owner\":{},
@@ -175,7 +175,7 @@ mod tests {
             amount: Uint128::new(100),
             denom: "uscrt".to_string(),
         }];
-        let post_init_callback = Some(PostInitCallback {
+        let post_init_callback = Some(PostInstantiateCallback {
             msg: post_init_msg.clone(),
             contract_address: "spawner".to_string(),
             code_hash: "spawner hash".to_string(),
@@ -322,10 +322,10 @@ mod tests {
             "NFT3".to_string(),
             "3".to_string(),
         ];
-        let handle_answer: HandleAnswer =
+        let handle_answer: ExecuteAnswer =
             from_binary(&handle_result.unwrap().data.unwrap()).unwrap();
         match handle_answer {
-            HandleAnswer::BatchMintNft { token_ids } => {
+            ExecuteAnswer::BatchMintNft { token_ids } => {
                 assert_eq!(token_ids, minted_vec);
             }
             _ => panic!("unexpected"),
@@ -631,10 +631,10 @@ mod tests {
         };
         let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         let minted_str = "1".to_string();
-        let handle_answer: HandleAnswer =
+        let handle_answer: ExecuteAnswer =
             from_binary(&handle_result.unwrap().data.unwrap()).unwrap();
         match handle_answer {
-            HandleAnswer::MintNft { token_id } => {
+            ExecuteAnswer::MintNft { token_id } => {
                 assert_eq!(token_id, minted_str);
             }
             _ => panic!("unexpected"),
@@ -8912,10 +8912,10 @@ mod tests {
             "handle() failed: {}",
             handle_result.err().unwrap()
         );
-        let answer: HandleAnswer = from_binary(&handle_result.unwrap().data.unwrap()).unwrap();
+        let answer: ExecuteAnswer = from_binary(&handle_result.unwrap().data.unwrap()).unwrap();
 
         let key_str = match answer {
-            HandleAnswer::ViewingKey { key } => key,
+            ExecuteAnswer::ViewingKey { key } => key,
             _ => panic!("NOPE"),
         };
         let key = ViewingKey(key_str);

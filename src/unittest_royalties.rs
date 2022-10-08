@@ -10,7 +10,7 @@ mod tests {
 
     use crate::contract::{execute, instantiate, query};
     use crate::msg::{
-        AccessLevel, ContractStatus, ExecuteMsg, InitConfig, InstantiateMsg, PostInitCallback, QueryAnswer,
+        AccessLevel, ContractStatus, ExecuteMsg, InstantiateConfig, InstantiateMsg, PostInstantiateCallback, QueryAnswer,
         QueryMsg, ViewerInfo,
     };
     use crate::royalties::{DisplayRoyalty, DisplayRoyaltyInfo, Royalty, RoyaltyInfo};
@@ -56,7 +56,7 @@ mod tests {
         let mut deps = mock_dependencies();
 
         let env = mock_env();
-        let init_config: InitConfig = from_binary(&Binary::from(
+        let init_config: InstantiateConfig = from_binary(&Binary::from(
             format!(
                 "{{\"public_token_supply\":{},
             \"public_owner\":{},
@@ -275,7 +275,7 @@ mod tests {
             amount: Uint128::new(100),
             denom: "uscrt".to_string(),
         }];
-        let post_init_callback = Some(PostInitCallback {
+        let post_init_callback = Some(PostInstantiateCallback {
             msg: post_init_msg.clone(),
             contract_address: "spawner".to_string(),
             code_hash: "spawner hash".to_string(),

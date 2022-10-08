@@ -19,7 +19,7 @@ use crate::inventory::{Inventory, InventoryIter};
 use crate::mint_run::{SerialNumber, StoredMintRunInfo};
 use crate::msg::{
     AccessLevel, BatchNftDossierElement, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse,
-    ExecuteMsg, HandleAnswer, InstantiateMsg, Mint, QueryAnswer, QueryMsg, QueryWithPermit, ReceiverInfo,
+    ExecuteMsg, ExecuteAnswer, InstantiateMsg, Mint, QueryAnswer, QueryMsg, QueryWithPermit, ReceiverInfo,
     ResponseStatus::Success, Send, Snip721Approval, Transfer, ViewerInfo,
 };
 use crate::rand::sha_256;
@@ -527,7 +527,7 @@ pub fn mint(
     let minted_str = minted.pop().unwrap_or_default();
     Ok(Response::new()
         .add_attributes(vec![attr("minted", &minted_str)])
-        .set_data(to_binary(&HandleAnswer::MintNft { token_id: minted_str }).unwrap())
+        .set_data(to_binary(&ExecuteAnswer::MintNft { token_id: minted_str }).unwrap())
     )
 }
 
@@ -562,7 +562,7 @@ pub fn batch_mint(
     let minted = mint_list(deps, &env, config, &sender_raw, mints)?;
     Ok(Response::new()
         .add_attributes(vec![attr("minted", format!("{:?}", &minted))])
-        .set_data(to_binary(&HandleAnswer::BatchMintNft { token_ids: minted }).unwrap())
+        .set_data(to_binary(&ExecuteAnswer::BatchMintNft { token_ids: minted }).unwrap())
     )
 }
 
@@ -661,7 +661,7 @@ pub fn mint_clones(
             attr("last_minted", &last_minted),
         ])
         .set_data(
-            to_binary(&HandleAnswer::MintNftClones { first_minted, last_minted }).unwrap()
+            to_binary(&ExecuteAnswer::MintNftClones { first_minted, last_minted }).unwrap()
         )
     )
 }
@@ -712,7 +712,7 @@ pub fn set_metadata(
         set_metadata_impl(deps.storage, &token, idx, PREFIX_PRIV_META, &private)?;
     }
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::SetMetadata { status: Success }).unwrap())
+        .set_data(to_binary(&ExecuteAnswer::SetMetadata { status: Success }).unwrap())
     )
 }
 
@@ -791,7 +791,7 @@ pub fn set_royalty_info(
     };
 
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::SetRoyaltyInfo { status: Success }).unwrap())
+        .set_data(to_binary(&ExecuteAnswer::SetRoyaltyInfo { status: Success }).unwrap())
     )
 }
 
@@ -851,7 +851,7 @@ pub fn reveal(
         }
     }
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::Reveal { status: Success }).unwrap())
+        .set_data(to_binary(&ExecuteAnswer::Reveal { status: Success }).unwrap())
     )
 }
 
@@ -924,13 +924,13 @@ pub fn approve_revoke(
         all_perm = may_list;
     }
     let mut accesses: [Option<AccessLevel>; 3] = [None, None, None];
-    let response: HandleAnswer;
+    let response: ExecuteAnswer;
     if is_approve {
         accesses[transfer_idx] = Some(AccessLevel::ApproveToken);
-        response = HandleAnswer::Approve { status: Success };
+        response = ExecuteAnswer::Approve { status: Success };
     } else {
         accesses[transfer_idx] = Some(AccessLevel::RevokeToken);
-        response = HandleAnswer::Revoke { status: Success };
+        response = ExecuteAnswer::Revoke { status: Success };
     }
     let owner = token.owner.clone();
     let mut proc_info = ProcessAccInfo {
@@ -978,7 +978,7 @@ pub fn make_owner_private(
         save(&mut priv_store, sender_raw.as_slice(), &false)?
     }
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::MakeOwnershipPrivate { status: Success }).unwrap())
+        .set_data(to_binary(&ExecuteAnswer::MakeOwnershipPrivate { status: Success }).unwrap())
     )
 }
 
@@ -1062,7 +1062,7 @@ pub fn set_global_approval(
         None,
     )?;
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::SetGlobalApproval { status: Success }).unwrap())
+        .set_data(to_binary(&ExecuteAnswer::SetGlobalApproval { status: Success }).unwrap())
     )
 }
 
@@ -1153,10 +1153,10 @@ pub fn set_whitelisted_approval(
     )?;
     let response = match response_type {
         SetAppResp::SetWhitelistedApproval => {
-            HandleAnswer::SetWhitelistedApproval { status: Success }
+            ExecuteAnswer::SetWhitelistedApproval { status: Success }
         }
-        SetAppResp::ApproveAll => HandleAnswer::ApproveAll { status: Success },
-        SetAppResp::RevokeAll => HandleAnswer::RevokeAll { status: Success },
+        SetAppResp::ApproveAll => ExecuteAnswer::ApproveAll { status: Success },
+        SetAppResp::RevokeAll => ExecuteAnswer::RevokeAll { status: Success },
     };
     let res = Response::new()
         .set_data(to_binary(&response).unwrap());
@@ -1187,7 +1187,7 @@ pub fn batch_burn_nft(
     let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
     burn_list(deps, &env.block, config, &sender_raw, burns)?;
     let res = Response::new()
-        .set_data(to_binary(&HandleAnswer::BatchBurnNft { status: Success }).unwrap());
+        .set_data(to_binary(&ExecuteAnswer::BatchBurnNft { status: Success }).unwrap());
     Ok(res)
 }
 
@@ -1221,7 +1221,7 @@ fn burn_nft(
     }];
     burn_list(deps, &env.block, config, &sender_raw, burns)?;
     let res = Response::new()
-        .set_data(to_binary(&HandleAnswer::BurnNft { status: Success }).unwrap());
+        .set_data(to_binary(&ExecuteAnswer::BurnNft { status: Success }).unwrap());
     Ok(res)
 }
 
@@ -1250,7 +1250,7 @@ pub fn batch_transfer_nft(
     let _m = send_list(deps, &env, &info, config, &sender_raw, Some(transfers), None)?;
 
     let res = Response::new()
-        .set_data(to_binary(&HandleAnswer::BatchTransferNft { status: Success }).unwrap());
+        .set_data(to_binary(&ExecuteAnswer::BatchTransferNft { status: Success }).unwrap());
     Ok(res)
 }
 
@@ -1288,7 +1288,7 @@ pub fn transfer_nft(
     let _m = send_list(deps, &env, &info, config, &sender_raw, transfers, None)?;
 
     let res = Response::new()
-        .set_data(to_binary(&HandleAnswer::TransferNft { status: Success }).unwrap());
+        .set_data(to_binary(&ExecuteAnswer::TransferNft { status: Success }).unwrap());
     Ok(res)
 }
 
@@ -1319,7 +1319,7 @@ fn batch_send_nft(
 
     let res = Response::new()
         .add_messages(messages)
-        .set_data(to_binary(&HandleAnswer::BatchSendNft { status: Success }).unwrap());
+        .set_data(to_binary(&ExecuteAnswer::BatchSendNft { status: Success }).unwrap());
     Ok(res)
 }
 
@@ -1367,7 +1367,7 @@ fn send_nft(
 
     let res = Response::new()
         .add_messages(messages)
-        .set_data(to_binary(&HandleAnswer::SendNft { status: Success }).unwrap());
+        .set_data(to_binary(&ExecuteAnswer::SendNft { status: Success }).unwrap());
     Ok(res)
 }
 
@@ -1400,7 +1400,7 @@ pub fn register_receive_nft(
     let mut store = PrefixedStorage::new(deps.storage, PREFIX_RECEIVERS);
     save(&mut store, sender_raw.as_slice(), &regrec)?;
     let res = Response::new()
-        .set_data(to_binary(&HandleAnswer::RegisterReceiveNft { status: Success }).unwrap());
+        .set_data(to_binary(&ExecuteAnswer::RegisterReceiveNft { status: Success }).unwrap());
     Ok(res)
 }
 
@@ -1431,7 +1431,7 @@ pub fn create_key(
     let mut key_store = PrefixedStorage::new(deps.storage, PREFIX_VIEW_KEY);
     save(&mut key_store, message_sender.as_slice(), &key.to_hashed())?;
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::ViewingKey { key: format!("{}", key) }).unwrap()))
+        .set_data(to_binary(&ExecuteAnswer::ViewingKey { key: format!("{}", key) }).unwrap()))
 }
 
 /// Returns StdResult<Response>
@@ -1458,7 +1458,7 @@ pub fn set_key(
     let mut key_store = PrefixedStorage::new(deps.storage, PREFIX_VIEW_KEY);
     save(&mut key_store, message_sender.as_slice(), &vk.to_hashed())?;
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::ViewingKey { key }).unwrap()))
+        .set_data(to_binary(&ExecuteAnswer::ViewingKey { key }).unwrap()))
 }
 
 /// Returns StdResult<Response>
@@ -1499,7 +1499,7 @@ pub fn add_minters(
         save(deps.storage, MINTERS_KEY, &minters)?;
     }
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::AddMinters { status: Success }).unwrap()))
+        .set_data(to_binary(&ExecuteAnswer::AddMinters { status: Success }).unwrap()))
 }
 
 /// Returns StdResult<Response>
@@ -1545,7 +1545,7 @@ pub fn remove_minters(
         }
     }
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::RemoveMinters { status: Success }).unwrap()))
+        .set_data(to_binary(&ExecuteAnswer::RemoveMinters { status: Success }).unwrap()))
 }
 
 /// Returns StdResult<Response>
@@ -1591,7 +1591,7 @@ pub fn set_minters(
         save(deps.storage, MINTERS_KEY, &minters)?;
     }
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::SetMinters { status: Success }).unwrap())
+        .set_data(to_binary(&ExecuteAnswer::SetMinters { status: Success }).unwrap())
     )
 }
 
@@ -1626,7 +1626,7 @@ pub fn change_admin(
         save(deps.storage, CONFIG_KEY, &config)?;
     }
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::ChangeAdmin { status: Success }).unwrap())
+        .set_data(to_binary(&ExecuteAnswer::ChangeAdmin { status: Success }).unwrap())
     )
 }
 
@@ -1658,7 +1658,7 @@ pub fn set_contract_status(
         save(deps.storage, CONFIG_KEY, &config)?;
     }
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::SetContractStatus { status: Success }).unwrap())
+        .set_data(to_binary(&ExecuteAnswer::SetContractStatus { status: Success }).unwrap())
     )
 }
 
@@ -1679,7 +1679,7 @@ fn revoke_permit(
     RevokedPermits::revoke_permit(storage, PREFIX_REVOKED_PERMITS, sender, permit_name);
 
     Ok(Response::new()
-        .set_data(to_binary(&HandleAnswer::RevokePermit { status: Success }).unwrap()))
+        .set_data(to_binary(&ExecuteAnswer::RevokePermit { status: Success }).unwrap()))
 }
 
 /////////////////////////////////////// Query /////////////////////////////////////

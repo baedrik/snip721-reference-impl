@@ -25,19 +25,19 @@ pub struct InstantiateMsg {
     /// minting function
     pub royalty_info: Option<RoyaltyInfo>,
     /// optional privacy configuration for the contract
-    pub config: Option<InitConfig>,
+    pub config: Option<InstantiateConfig>,
     /// optional callback message to execute after instantiation.  This will
     /// most often be used to have the token contract provide its address to a
     /// contract that instantiated it, but it could be used to execute any
     /// contract
-    pub post_init_callback: Option<PostInitCallback>,
+    pub post_init_callback: Option<PostInstantiateCallback>,
 }
 
 /// This type represents optional configuration values.
 /// All values are optional and have defaults which are more private by default,
 /// but can be overridden if necessary
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
-pub struct InitConfig {
+pub struct InstantiateConfig {
     /// indicates whether the token IDs and the number of tokens controlled by the contract are
     /// public.  If the token supply is private, only minters can view the token IDs and
     /// number of tokens controlled by the contract
@@ -72,9 +72,9 @@ pub struct InitConfig {
     pub enable_burn: Option<bool>,
 }
 
-impl Default for InitConfig {
+impl Default for InstantiateConfig {
     fn default() -> Self {
-        InitConfig {
+        InstantiateConfig {
             public_token_supply: Some(false),
             public_owner: Some(false),
             enable_sealed_metadata: Some(false),
@@ -88,7 +88,7 @@ impl Default for InitConfig {
 
 /// info needed to perform a callback message after instantiation
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
-pub struct PostInitCallback {
+pub struct PostInstantiateCallback {
     /// the callback message to execute
     pub msg: Binary,
     /// address of the contract to execute
@@ -479,7 +479,7 @@ pub struct Send {
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleAnswer {
+pub enum ExecuteAnswer {
     /// MintNft will also display the minted token's ID in the log attributes under the
     /// key `minted` in case minting was done as a callback message
     MintNft {
