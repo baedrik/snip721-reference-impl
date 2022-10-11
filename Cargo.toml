@@ -37,8 +37,8 @@ cosmwasm-storage = { git = "https://github.com/scrtlabs/cosmwasm", branch = "sec
 secret-toolkit = { git = "https://github.com/scrtlabs/secret-toolkit.git", branch = "cosmwasm-v1.0", default-features = false, features = ["storage", "serialization", "utils", "permit"] }
 serde-json-wasm = "0.4.1"
 schemars = "0.8.11"
-serde = { version = "1.0.103", default-features = false, features = ["derive"] }
-snafu = { version = "0.7.1" }
+serde = { version = "1.0.114", default-features = false, features = ["derive"] }
+snafu = { version = "0.7.2" }
 bincode2 = "2.0.1"
 subtle = { version = "2.2.3", default-features = false }
 base64 = "0.13.0"
