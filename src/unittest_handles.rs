@@ -14,7 +14,7 @@ mod tests {
     use crate::expiration::Expiration;
     use crate::inventory::Inventory;
     use crate::msg::{
-        AccessLevel, Burn, ContractStatus, ExecuteMsg, ExecuteAnswer, InstantiateConfig, InstantiateMsg, Mint,
+        AccessLevel, Burn, ContractStatus, ExecuteAnswer, ExecuteMsg, InstantiateConfig, InstantiateMsg, Mint,
         PostInstantiateCallback, QueryAnswer, QueryMsg, ReceiverInfo, Send, Transfer, Tx, TxAction,
     };
     use crate::receiver::Snip721ReceiveMsg;
@@ -241,7 +241,7 @@ mod tests {
         let mints = vec![
             Mint {
                 token_id: None,
-                owner: Some(alice.clone()),
+                owner: Some(alice.to_string()),
                 public_metadata: Some(pub1.clone()),
                 private_metadata: None,
                 royalty_info: None,
@@ -261,7 +261,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT3".to_string()),
-                owner: Some(alice.clone()),
+                owner: Some(alice.to_string()),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -271,7 +271,7 @@ mod tests {
             },
             Mint {
                 token_id: None,
-                owner: Some(admin.clone()),
+                owner: Some(admin.to_string()),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -6579,7 +6579,7 @@ mod tests {
             mints: vec![
                 Mint {
                     token_id: Some("NFT1".to_string()),
-                    owner: Some(Addr::unchecked("alice".to_string())),
+                    owner: Some("alice".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -6589,7 +6589,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT2".to_string()),
-                    owner: Some(Addr::unchecked("alice".to_string())),
+                    owner: Some("alice".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -6599,7 +6599,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT3".to_string()),
-                    owner: Some(Addr::unchecked("alice".to_string())),
+                    owner: Some("alice".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -6609,7 +6609,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT4".to_string()),
-                    owner: Some(Addr::unchecked("bob".to_string())),
+                    owner: Some("bob".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -6619,7 +6619,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT5".to_string()),
-                    owner: Some(Addr::unchecked("bob".to_string())),
+                    owner: Some("bob".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -6629,7 +6629,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT6".to_string()),
-                    owner: Some(Addr::unchecked("charlie".to_string())),
+                    owner: Some("charlie".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -7180,7 +7180,7 @@ mod tests {
             mints: vec![
                 Mint {
                     token_id: Some("NFT1".to_string()),
-                    owner: Some(Addr::unchecked("alice".to_string())),
+                    owner: Some("alice".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -7190,7 +7190,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT2".to_string()),
-                    owner: Some(Addr::unchecked("alice".to_string())),
+                    owner: Some("alice".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -7200,7 +7200,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT3".to_string()),
-                    owner: Some(Addr::unchecked("alice".to_string())),
+                    owner: Some("alice".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -7210,7 +7210,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT4".to_string()),
-                    owner: Some(Addr::unchecked("bob".to_string())),
+                    owner: Some("bob".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -7220,7 +7220,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT5".to_string()),
-                    owner: Some(Addr::unchecked("bob".to_string())),
+                    owner: Some("bob".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -7230,7 +7230,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT6".to_string()),
-                    owner: Some(Addr::unchecked("charlie".to_string())),
+                    owner: Some("charlie".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -8538,7 +8538,7 @@ mod tests {
             mints: vec![
                 Mint {
                     token_id: Some("NFT1".to_string()),
-                    owner: Some(Addr::unchecked("alice".to_string())),
+                    owner: Some("alice".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -8548,7 +8548,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT2".to_string()),
-                    owner: Some(Addr::unchecked("alice".to_string())),
+                    owner: Some("alice".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -8558,7 +8558,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT3".to_string()),
-                    owner: Some(Addr::unchecked("alice".to_string())),
+                    owner: Some("alice".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -8568,7 +8568,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT4".to_string()),
-                    owner: Some(Addr::unchecked("bob".to_string())),
+                    owner: Some("bob".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -8578,7 +8578,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT5".to_string()),
-                    owner: Some(Addr::unchecked("bob".to_string())),
+                    owner: Some("bob".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,
@@ -8588,7 +8588,7 @@ mod tests {
                 },
                 Mint {
                     token_id: Some("NFT6".to_string()),
-                    owner: Some(Addr::unchecked("charlie".to_string())),
+                    owner: Some("charlie".to_string()),
                     private_metadata: None,
                     public_metadata: None,
                     royalty_info: None,

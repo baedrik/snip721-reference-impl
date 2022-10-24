@@ -450,7 +450,7 @@ mod tests {
         let mints = vec![
             Mint {
                 token_id: Some("NFT1".to_string()),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(alice.clone()),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -460,7 +460,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT2".to_string()),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(alice.clone()),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -568,7 +568,7 @@ mod tests {
         let mints = vec![
             Mint {
                 token_id: Some("NFT1".to_string()),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(alice.clone()),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -578,7 +578,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT2".to_string()),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(alice.clone()),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -588,7 +588,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT3".to_string()),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(alice.clone()),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,

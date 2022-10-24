@@ -3754,7 +3754,7 @@ mod tests {
         let mints = vec![
             Mint {
                 token_id: Some("NFT1".to_string()),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(alice.clone()),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -3764,7 +3764,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT2".to_string()),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(alice.clone()),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -3774,7 +3774,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT3".to_string()),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(alice.clone()),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -4279,7 +4279,7 @@ mod tests {
         let mints = vec![
             Mint {
                 token_id: Some("NFT1".to_string()),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(alice.clone()),
                 public_metadata: Some(public_meta1.clone()),
                 private_metadata: Some(private_meta1.clone()),
                 royalty_info: None,
@@ -4289,7 +4289,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT2".to_string()),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(alice.clone()),
                 public_metadata: Some(public_meta2.clone()),
                 private_metadata: Some(private_meta2.clone()),
                 royalty_info: None,
@@ -4299,7 +4299,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT3".to_string()),
-                owner: Some(Addr::unchecked("bob".to_string())),
+                owner: Some("bob".to_string()),
                 public_metadata: Some(public_meta3.clone()),
                 private_metadata: Some(private_meta3.clone()),
                 royalty_info: None,

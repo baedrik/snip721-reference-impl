@@ -426,7 +426,7 @@ pub struct Mint {
     /// optional token id, if omitted, use current token index
     pub token_id: Option<String>,
     /// optional owner address, owned by the minter otherwise
-    pub owner: Option<Addr>,
+    pub owner: Option<String>,
     /// optional public metadata that can be seen by everyone
     pub public_metadata: Option<Metadata>,
     /// optional private metadata that can only be seen by owner and whitelist

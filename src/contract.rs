@@ -19,7 +19,7 @@ use crate::inventory::{Inventory, InventoryIter};
 use crate::mint_run::{SerialNumber, StoredMintRunInfo};
 use crate::msg::{
     AccessLevel, BatchNftDossierElement, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse,
-    ExecuteMsg, ExecuteAnswer, InstantiateMsg, Mint, QueryAnswer, QueryMsg, QueryWithPermit, ReceiverInfo,
+    ExecuteAnswer, ExecuteMsg, InstantiateMsg, Mint, QueryAnswer, QueryMsg, QueryWithPermit, ReceiverInfo,
     ResponseStatus::Success, Send, Snip721Approval, Transfer, ViewerInfo,
 };
 use crate::rand::sha_256;
@@ -515,7 +515,7 @@ pub fn mint(
     }
     let mints = vec![Mint {
         token_id,
-        owner: owner.clone().map(|o| deps.api.addr_validate(o.as_str()).unwrap()),
+        owner,
         public_metadata,
         private_metadata,
         serial_number,
@@ -635,7 +635,7 @@ pub fn mint_clones(
     for _ in 0..quantity {
         mints.push(Mint {
             token_id: None,
-            owner: owner.clone().map(|o| deps.api.addr_validate(o.as_str()).unwrap()),
+            owner: owner.clone(),
             public_metadata: public_metadata.clone(),
             private_metadata: private_metadata.clone(),
             serial_number: Some(serial_number.clone()),
@@ -4552,7 +4552,7 @@ fn mint_list(
         // map new token id to its index
         save(&mut map2idx, id.as_bytes(), &config.mint_cnt)?;
         let recipient = if let Some(o) = mint.owner {
-            deps.api.addr_canonicalize(&o.as_str())?
+            deps.api.addr_canonicalize(deps.api.addr_validate(&o.as_str())?.as_str())?
         } else {
             sender_raw.clone()
         };
