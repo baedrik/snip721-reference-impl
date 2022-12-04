@@ -1,8 +1,10 @@
-use crate::state::{may_load, remove, save};
-use cosmwasm_std::{CanonicalAddr, ReadonlyStorage, StdError, StdResult, Storage};
+use std::collections::HashSet;
+
+use cosmwasm_std::{CanonicalAddr, StdError, StdResult, Storage};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
+use crate::state::{may_load, remove, save};
 
 /// storage prefix for an owner's inventory information
 pub const PREFIX_INVENTORY_INFO: &[u8] = b"invinfo";
@@ -50,8 +52,8 @@ impl Inventory {
     ///
     /// * `storage` - a reference to the contract's storage
     /// * `owner` - the owner's address
-    pub fn new<S: ReadonlyStorage>(storage: &S, owner: CanonicalAddr) -> StdResult<Self> {
-        let store = ReadonlyPrefixedStorage::new(PREFIX_INVENTORY_INFO, storage);
+    pub fn new(storage: &dyn Storage, owner: CanonicalAddr) -> StdResult<Self> {
+        let store = ReadonlyPrefixedStorage::new(storage, PREFIX_INVENTORY_INFO);
         let info: InventoryInfo = may_load(&store, owner.as_slice())?.unwrap_or(InventoryInfo {
             top: 0,
             count: 0,
@@ -69,22 +71,22 @@ impl Inventory {
     /// * `storage` - a mutable reference to the contract's storage
     /// * `token_idx` - the token's idx
     /// * `save_info` - true if the inventory info should be saved
-    pub fn insert<S: Storage>(
+    pub fn insert(
         &mut self,
-        storage: &mut S,
+        storage: &mut dyn Storage,
         token_idx: u32,
         save_info: bool,
     ) -> StdResult<()> {
         let owner_slice = self.owner.as_slice();
         let map_store =
-            ReadonlyPrefixedStorage::multilevel(&[PREFIX_INVENTORY_MAP, owner_slice], storage);
+            ReadonlyPrefixedStorage::multilevel(storage, &[PREFIX_INVENTORY_MAP, owner_slice]);
         let token_key = token_idx.to_le_bytes();
         // nothing to do if the token idx is already in the inventory
-        if may_load::<u32, _>(&map_store, &token_key)?.is_some() {
+        if may_load::<u32>(&map_store, &token_key)?.is_some() {
             return Ok(());
         }
         let mut cell_store =
-            PrefixedStorage::multilevel(&[PREFIX_INVENTORY_CELL, owner_slice], storage);
+            PrefixedStorage::multilevel(storage, &[PREFIX_INVENTORY_CELL, owner_slice]);
         let inv_idx = if let Some(fr) = self.info.free {
             // grab the free cell
             let cell: Cell = may_load(&cell_store, &fr.to_le_bytes())?
@@ -114,7 +116,7 @@ impl Inventory {
         save(&mut cell_store, &inv_idx.to_le_bytes(), &new_cell)?;
         // save to the map
         let mut map_store =
-            PrefixedStorage::multilevel(&[PREFIX_INVENTORY_MAP, owner_slice], storage);
+            PrefixedStorage::multilevel(storage, &[PREFIX_INVENTORY_MAP, owner_slice]);
         save(&mut map_store, &token_key, &inv_idx)?;
         // increment the count
         self.info.count = self.info.count.checked_add(1).ok_or_else(|| {
@@ -124,7 +126,7 @@ impl Inventory {
         })?;
         // save the InventoryInfo if desired
         if save_info {
-            let mut info_store = PrefixedStorage::new(PREFIX_INVENTORY_INFO, storage);
+            let mut info_store = PrefixedStorage::new(storage, PREFIX_INVENTORY_INFO);
             save(&mut info_store, owner_slice, &self.info)?;
         }
         Ok(())
@@ -139,18 +141,18 @@ impl Inventory {
     /// * `storage` - a mutable reference to the contract's storage
     /// * `token_idx` - the token's idx
     /// * `save_info` - true if the inventory info should be saved
-    pub fn remove<S: Storage>(
+    pub fn remove(
         &mut self,
-        storage: &mut S,
+        storage: &mut dyn Storage,
         token_idx: u32,
         save_info: bool,
     ) -> StdResult<()> {
         let owner_slice = self.owner.as_slice();
         let mut map_store =
-            PrefixedStorage::multilevel(&[PREFIX_INVENTORY_MAP, owner_slice], storage);
+            PrefixedStorage::multilevel(storage, &[PREFIX_INVENTORY_MAP, owner_slice]);
         let token_key = token_idx.to_le_bytes();
         // if the token is in the inventory
-        if let Some(inv_idx) = may_load::<u32, _>(&map_store, &token_key)? {
+        if let Some(inv_idx) = may_load::<u32>(&map_store, &token_key)? {
             // remove it from the map
             remove(&mut map_store, &token_key);
             let free_cell = Cell {
@@ -163,11 +165,11 @@ impl Inventory {
             self.info.count = self.info.count.saturating_sub(1);
             // save the freed cell
             let mut cell_store =
-                PrefixedStorage::multilevel(&[PREFIX_INVENTORY_CELL, owner_slice], storage);
+                PrefixedStorage::multilevel(storage, &[PREFIX_INVENTORY_CELL, owner_slice]);
             save(&mut cell_store, &inv_idx.to_le_bytes(), &free_cell)?;
             // save the InventoryInfo if desired
             if save_info {
-                let mut info_store = PrefixedStorage::new(PREFIX_INVENTORY_INFO, storage);
+                let mut info_store = PrefixedStorage::new(storage, PREFIX_INVENTORY_INFO);
                 save(&mut info_store, owner_slice, &self.info)?;
             }
         }
@@ -181,11 +183,11 @@ impl Inventory {
     /// # Arguments
     ///
     /// * `storage` - a reference to the contract's storage
-    pub fn to_set<S: ReadonlyStorage>(&self, storage: &S) -> StdResult<HashSet<u32>> {
+    pub fn to_set(&self, storage: &dyn Storage) -> StdResult<HashSet<u32>> {
         let mut set: HashSet<u32> = HashSet::new();
         let cell_store = ReadonlyPrefixedStorage::multilevel(
-            &[PREFIX_INVENTORY_CELL, self.owner.as_slice()],
             storage,
+            &[PREFIX_INVENTORY_CELL, self.owner.as_slice()],
         );
         for idx in 0..self.info.top {
             let cell: Cell = may_load(&cell_store, &idx.to_le_bytes())?
@@ -207,12 +209,12 @@ impl Inventory {
     ///
     /// * `storage` - a reference to the contract's storage
     /// * `token_idx` - the token index in question
-    pub fn contains<S: ReadonlyStorage>(&self, storage: &S, token_idx: u32) -> StdResult<bool> {
+    pub fn contains(&self, storage: &dyn Storage, token_idx: u32) -> StdResult<bool> {
         let map_store = ReadonlyPrefixedStorage::multilevel(
-            &[PREFIX_INVENTORY_MAP, self.owner.as_slice()],
             storage,
+            &[PREFIX_INVENTORY_MAP, self.owner.as_slice()],
         );
-        Ok(may_load::<u32, _>(&map_store, &token_idx.to_le_bytes())?.is_some())
+        Ok(may_load::<u32>(&map_store, &token_idx.to_le_bytes())?.is_some())
     }
 
     /// Returns StdResult<bool>
@@ -224,14 +226,14 @@ impl Inventory {
     /// * `storage` - a reference to the contract's storage
     /// * `owner` - a reference to the presumed owner's address
     /// * `token_idx` - the token index in question
-    pub fn owns<S: ReadonlyStorage>(
-        storage: &S,
+    pub fn owns(
+        storage: &dyn Storage,
         owner: &CanonicalAddr,
         token_idx: u32,
     ) -> StdResult<bool> {
         let map_store =
-            ReadonlyPrefixedStorage::multilevel(&[PREFIX_INVENTORY_MAP, owner.as_slice()], storage);
-        Ok(may_load::<u32, _>(&map_store, &token_idx.to_le_bytes())?.is_some())
+            ReadonlyPrefixedStorage::multilevel(storage, &[PREFIX_INVENTORY_MAP, owner.as_slice()]);
+        Ok(may_load::<u32>(&map_store, &token_idx.to_le_bytes())?.is_some())
     }
 
     /// Returns StdResult<()>
@@ -241,8 +243,8 @@ impl Inventory {
     /// # Arguments
     ///
     /// * `storage` - a mutable reference to the contract's storage
-    pub fn save<S: Storage>(&self, storage: &mut S) -> StdResult<()> {
-        let mut info_store = PrefixedStorage::new(PREFIX_INVENTORY_INFO, storage);
+    pub fn save(&self, storage: &mut dyn Storage) -> StdResult<()> {
+        let mut info_store = PrefixedStorage::new(storage, PREFIX_INVENTORY_INFO);
         save(&mut info_store, self.owner.as_slice(), &self.info)
     }
 }
@@ -283,17 +285,17 @@ impl<'a> InventoryIter<'a> {
     /// * `inventory` - a reference to the Inventory to iterate over
     /// * `token_idx` - optional token_index to start iterating after
     /// * `err_msg` - error message if the token index is not in the inventory
-    pub fn start_after<S: ReadonlyStorage>(
-        storage: &S,
+    pub fn start_after(
+        storage: &dyn Storage,
         inventory: &'a Inventory,
         token_idx: u32,
         err_msg: &str,
     ) -> StdResult<Self> {
         let map_store = ReadonlyPrefixedStorage::multilevel(
-            &[PREFIX_INVENTORY_MAP, inventory.owner.as_slice()],
             storage,
+            &[PREFIX_INVENTORY_MAP, inventory.owner.as_slice()],
         );
-        let mut curr = may_load::<u32, _>(&map_store, &token_idx.to_le_bytes())?
+        let mut curr = may_load::<u32>(&map_store, &token_idx.to_le_bytes())?
             .ok_or_else(|| StdError::generic_err(err_msg))?;
         curr = curr.saturating_add(1);
         Ok(InventoryIter {
@@ -310,10 +312,10 @@ impl<'a> InventoryIter<'a> {
     /// # Arguments
     ///
     /// * `storage` - a reference to the contract's storage
-    pub fn next<S: ReadonlyStorage>(&mut self, storage: &S) -> StdResult<Option<u32>> {
+    pub fn next(&mut self, storage: &dyn Storage) -> StdResult<Option<u32>> {
         let cell_store = ReadonlyPrefixedStorage::multilevel(
-            &[PREFIX_INVENTORY_CELL, self.inventory.owner.as_slice()],
             storage,
+            &[PREFIX_INVENTORY_CELL, self.inventory.owner.as_slice()],
         );
         // get the next occupied cell
         while self.curr < self.inventory.info.top && self.retrieve_cnt < self.inventory.info.count {

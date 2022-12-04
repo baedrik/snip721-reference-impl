@@ -1,40 +1,42 @@
 #[cfg(test)]
 mod tests {
-    use crate::contract::{handle, init, query};
+    use std::any::Any;
+
+    use cosmwasm_std::{
+        Addr, Binary, BlockInfo, Env, from_binary, OwnedDeps, Response, StdError, StdResult,
+        Timestamp,
+    };
+    use cosmwasm_std::testing::*;
+
+    use crate::contract::{execute, instantiate, query};
     use crate::expiration::Expiration;
     use crate::mint_run::MintRunInfo;
     use crate::msg::{
-        AccessLevel, BatchNftDossierElement, Cw721Approval, HandleMsg, InitConfig, InitMsg, Mint,
+        AccessLevel, BatchNftDossierElement, Cw721Approval, ExecuteMsg, InstantiateConfig, InstantiateMsg, Mint,
         QueryAnswer, QueryMsg, Snip721Approval, Tx, TxAction, ViewerInfo,
     };
     use crate::token::{Extension, Metadata};
-    use cosmwasm_std::testing::*;
-    use cosmwasm_std::{
-        from_binary, Binary, BlockInfo, Env, Extern, HumanAddr, InitResponse, MessageInfo,
-        StdError, StdResult,
-    };
-    use std::any::Any;
 
-    // Helper functions
+// Helper functions
 
     fn init_helper_default() -> (
-        StdResult<InitResponse>,
-        Extern<MockStorage, MockApi, MockQuerier>,
+        StdResult<Response>,
+        OwnedDeps<MockStorage, MockApi, MockQuerier>,
     ) {
-        let mut deps = mock_dependencies(20, &[]);
-        let env = mock_env("instantiator", &[]);
-
-        let init_msg = InitMsg {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("instantiator", &[]);
+        let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
             symbol: "S721".to_string(),
-            admin: Some(HumanAddr("admin".to_string())),
+            admin: Some("admin".to_string()),
             entropy: "We're going to need a bigger boat".to_string(),
             royalty_info: None,
             config: None,
             post_init_callback: None,
         };
 
-        (init(&mut deps, env, init_msg), deps)
+        (instantiate(deps.as_mut(), env, info, init_msg), deps)
     }
 
     fn init_helper_with_config(
@@ -46,13 +48,13 @@ mod tests {
         owner_may_update_metadata: bool,
         enable_burn: bool,
     ) -> (
-        StdResult<InitResponse>,
-        Extern<MockStorage, MockApi, MockQuerier>,
+        StdResult<Response>,
+        OwnedDeps<MockStorage, MockApi, MockQuerier>,
     ) {
-        let mut deps = mock_dependencies(20, &[]);
+        let mut deps = mock_dependencies();
 
-        let env = mock_env("instantiator", &[]);
-        let init_config: InitConfig = from_binary(&Binary::from(
+        let env = mock_env();
+        let init_config: InstantiateConfig = from_binary(&Binary::from(
             format!(
                 "{{\"public_token_supply\":{},
             \"public_owner\":{},
@@ -69,20 +71,21 @@ mod tests {
                 owner_may_update_metadata,
                 enable_burn,
             )
-            .as_bytes(),
+                .as_bytes(),
         ))
-        .unwrap();
-        let init_msg = InitMsg {
+            .unwrap();
+        let info = mock_info("instantiator", &[]);
+        let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
             symbol: "S721".to_string(),
-            admin: Some(HumanAddr("admin".to_string())),
+            admin: Some("admin".to_string()),
             entropy: "We're going to need a bigger boat".to_string(),
             royalty_info: None,
             config: Some(init_config),
             post_init_callback: None,
         };
 
-        (init(&mut deps, env, init_msg), deps)
+        (instantiate(deps.as_mut(), env, info, init_msg), deps)
     }
 
     fn extract_error_msg<T: Any>(error: StdResult<T>) -> String {
@@ -105,7 +108,7 @@ mod tests {
             init_result.err().unwrap()
         );
         let query_msg = QueryMsg::ContractInfo {};
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -132,7 +135,7 @@ mod tests {
             init_result.err().unwrap()
         );
         let query_msg = QueryMsg::ContractConfig {};
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -170,9 +173,9 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let charlie = HumanAddr("charlie".to_string());
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let charlie = "charlie".to_string();
 
         let minters = vec![
             alice.clone(),
@@ -181,14 +184,14 @@ mod tests {
             bob.clone(),
             alice.clone(),
         ];
-        let handle_msg = HandleMsg::SetMinters {
+        let execute_msg = ExecuteMsg::SetMinters {
             minters: minters.clone(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
         let query_msg = QueryMsg::Minters {};
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -198,6 +201,7 @@ mod tests {
         match query_answer {
             QueryAnswer::Minters { minters } => {
                 assert_eq!(minters.len(), 3);
+                let minters: Vec<String> = minters.iter().map(|m| m.to_string()).collect();
                 assert!(minters.contains(&alice));
                 assert!(minters.contains(&bob));
                 assert!(minters.contains(&charlie));
@@ -217,9 +221,9 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -236,10 +240,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT2".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -256,12 +260,12 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg); // test burn when status prevents it
 
         // test non-minter attempt
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let charlie = HumanAddr("charlie".to_string());
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let charlie = "charlie".to_string();
 
         let minters = vec![
             alice.clone(),
@@ -270,39 +274,39 @@ mod tests {
             bob.clone(),
             alice.clone(),
         ];
-        let handle_msg = HandleMsg::SetMinters {
+        let execute_msg = ExecuteMsg::SetMinters {
             minters: minters.clone(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
         let query_msg = QueryMsg::NumTokens { viewer: None };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("The token supply of this contract is private"));
 
         // test minter with bad viewing key
         let viewer = ViewerInfo {
-            address: alice.clone(),
+            address: Addr::unchecked(alice.clone()),
             viewing_key: "key".to_string(),
         };
         let query_msg = QueryMsg::NumTokens {
             viewer: Some(viewer.clone()),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Wrong viewing key for this address or viewing key not set"));
 
         // test valid minter, valid key
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "key".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let query_msg = QueryMsg::NumTokens {
             viewer: Some(viewer.clone()),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -325,9 +329,9 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -344,10 +348,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT2".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -364,15 +368,15 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg); // test burn when status prevents it
         let viewer = ViewerInfo {
-            address: alice.clone(),
+            address: Addr::unchecked(alice.clone()),
             viewing_key: "key".to_string(),
         };
         let query_msg = QueryMsg::NumTokens {
             viewer: Some(viewer.clone()),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -398,9 +402,9 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -417,10 +421,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT2".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -437,10 +441,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT3".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -457,12 +461,12 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
         // test non-minter attempt
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let charlie = HumanAddr("charlie".to_string());
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let charlie = "charlie".to_string();
 
         let minters = vec![
             alice.clone(),
@@ -471,24 +475,24 @@ mod tests {
             bob.clone(),
             alice.clone(),
         ];
-        let handle_msg = HandleMsg::SetMinters {
+        let execute_msg = ExecuteMsg::SetMinters {
             minters: minters.clone(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
         let query_msg = QueryMsg::AllTokens {
             viewer: None,
             start_after: None,
             limit: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("The token supply of this contract is private"));
 
         // test minter with bad viewing key
         let viewer = ViewerInfo {
-            address: alice.clone(),
+            address: Addr::unchecked(alice.clone()),
             viewing_key: "key".to_string(),
         };
         let query_msg = QueryMsg::AllTokens {
@@ -496,22 +500,22 @@ mod tests {
             start_after: None,
             limit: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Wrong viewing key for this address or viewing key not set"));
 
         // test valid minter, valid key only return first two
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "key".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let query_msg = QueryMsg::AllTokens {
             viewer: Some(viewer.clone()),
             start_after: None,
             limit: Some(2),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -535,9 +539,9 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -554,10 +558,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT2".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -574,10 +578,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT3".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -594,10 +598,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT5".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -614,10 +618,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT4".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: Some(Metadata {
                 token_uri: None,
                 extension: Some(Extension {
@@ -634,9 +638,9 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         let viewer = ViewerInfo {
-            address: alice.clone(),
+            address: Addr::unchecked(alice.clone()),
             viewing_key: "key".to_string(),
         };
         let query_msg = QueryMsg::AllTokens {
@@ -644,7 +648,7 @@ mod tests {
             start_after: Some("NFT2".to_string()),
             limit: Some(10),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -665,24 +669,24 @@ mod tests {
             start_after: Some("NFT21".to_string()),
             limit: Some(10),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT21 not found"));
 
         // test burned token does not show
-        let handle_msg = HandleMsg::BurnNft {
+        let execute_msg = ExecuteMsg::BurnNft {
             token_id: "NFT3".to_string(),
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         let query_msg = QueryMsg::AllTokens {
             viewer: Some(viewer.clone()),
             start_after: None,
             limit: Some(10),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
             query_result.is_ok(),
             "query failed: {}",
@@ -720,7 +724,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT1 not found"));
 
@@ -738,7 +742,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("You are not authorized to perform this action on token NFT1"));
 
@@ -760,11 +764,11 @@ mod tests {
                 ..Extension::default()
             }),
         };
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let charlie = HumanAddr("charlie".to_string());
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let charlie = "charlie".to_string();
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
@@ -775,9 +779,9 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -786,8 +790,8 @@ mod tests {
             expires: Some(Expiration::AtHeight(5)),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: charlie.clone(),
             token_id: None,
             view_owner: None,
@@ -796,25 +800,22 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 10,
-                    time: 100,
+                    time: Timestamp::from_nanos(100),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
 
         // test viewer not given, contract has public ownership
@@ -823,7 +824,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier {
@@ -842,7 +843,7 @@ mod tests {
                 token_approvals,
                 inventory_approvals,
             } => {
-                assert_eq!(owner, Some(alice.clone()));
+                assert_eq!(owner.map(|a| a.to_string()), Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert!(private_metadata.is_none());
                 assert_eq!(
@@ -871,7 +872,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
@@ -882,17 +883,17 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: Some(AccessLevel::ApproveToken),
             expires: Some(Expiration::AtHeight(5)),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: charlie.clone(),
             token_id: None,
             view_owner: None,
@@ -901,25 +902,22 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 1,
-                    time: 100,
+                    time: Timestamp::from_nanos(100),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
 
         let query_msg = QueryMsg::NftDossier {
@@ -927,7 +925,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier {
@@ -946,7 +944,7 @@ mod tests {
                 token_approvals,
                 inventory_approvals,
             } => {
-                assert_eq!(owner, Some(alice.clone()));
+                assert_eq!(owner.map(|a| a.to_string()), Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert_eq!(private_metadata, Some(private_meta.clone()));
                 assert!(display_private_metadata_error.is_none());
@@ -967,23 +965,23 @@ mod tests {
 
         // test no viewer given, ownership and private metadata made public at the
         // inventory level
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
             expires: Some(Expiration::AtHeight(5)),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: None,
             view_private_metadata: Some(AccessLevel::All),
             expires: Some(Expiration::AtTime(1000)),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: charlie.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -992,8 +990,8 @@ mod tests {
             expires: Some(Expiration::AtHeight(5)),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -1002,25 +1000,22 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 1,
-                    time: 100,
+                    time: Timestamp::from_nanos(100),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
 
         let query_msg = QueryMsg::NftDossier {
@@ -1028,7 +1023,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier {
@@ -1047,7 +1042,7 @@ mod tests {
                 token_approvals,
                 inventory_approvals,
             } => {
-                assert_eq!(owner, Some(alice.clone()));
+                assert_eq!(owner.map(|a| a.to_string()), Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert_eq!(private_metadata, Some(private_meta.clone()));
                 assert!(transferable);
@@ -1067,62 +1062,59 @@ mod tests {
         }
 
         // test owner is the viewer including expired
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "key".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let viewer = ViewerInfo {
-            address: alice.clone(),
+            address: Addr::unchecked(alice.clone()),
             viewing_key: "key".to_string(),
         };
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             expires: Some(Expiration::AtHeight(10)),
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 10000,
-                    time: 1000000,
+                    time: Timestamp::from_nanos(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         let bob_tok_app = Snip721Approval {
-            address: bob.clone(),
+            address: Addr::unchecked(bob.clone()),
             view_owner_expiration: None,
             view_private_metadata_expiration: Some(Expiration::Never),
             transfer_expiration: None,
         };
         let char_tok_app = Snip721Approval {
-            address: charlie.clone(),
+            address: Addr::unchecked(charlie.clone()),
             view_owner_expiration: Some(Expiration::AtHeight(5)),
             view_private_metadata_expiration: None,
             transfer_expiration: None,
         };
         let bob_all_app = Snip721Approval {
-            address: bob.clone(),
+            address: Addr::unchecked(bob.clone()),
             view_owner_expiration: Some(Expiration::Never),
             view_private_metadata_expiration: None,
             transfer_expiration: Some(Expiration::Never),
         };
         let char_all_app = Snip721Approval {
-            address: charlie.clone(),
+            address: Addr::unchecked(charlie.clone()),
             view_owner_expiration: None,
             view_private_metadata_expiration: None,
             transfer_expiration: Some(Expiration::AtHeight(5)),
@@ -1132,7 +1124,7 @@ mod tests {
             viewer: Some(viewer.clone()),
             include_expired: Some(true),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier {
@@ -1151,7 +1143,7 @@ mod tests {
                 token_approvals,
                 inventory_approvals,
             } => {
-                assert_eq!(owner, Some(alice.clone()));
+                assert_eq!(owner.map(|a| a.to_string()), Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert_eq!(private_metadata, Some(private_meta.clone()));
                 assert!(transferable);
@@ -1178,7 +1170,7 @@ mod tests {
             viewer: Some(viewer.clone()),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier {
@@ -1197,7 +1189,7 @@ mod tests {
                 token_approvals,
                 inventory_approvals,
             } => {
-                assert_eq!(owner, Some(alice.clone()));
+                assert_eq!(owner.map(|a| a.to_string()), Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert_eq!(private_metadata, Some(private_meta.clone()));
                 assert!(transferable);
@@ -1221,7 +1213,7 @@ mod tests {
 
         // test bad viewing key
         let viewer = ViewerInfo {
-            address: alice.clone(),
+            address: Addr::unchecked(alice.clone()),
             viewing_key: "ky".to_string(),
         };
         let query_msg = QueryMsg::NftDossier {
@@ -1229,7 +1221,7 @@ mod tests {
             viewer: Some(viewer.clone()),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Wrong viewing key for this address or viewing key not set"));
 
@@ -1240,7 +1232,7 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
@@ -1251,18 +1243,18 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetViewingKey {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "key".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetViewingKey {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "ckey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("charlie", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: charlie.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -1271,8 +1263,8 @@ mod tests {
             expires: Some(Expiration::AtHeight(5)),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::All),
@@ -1281,37 +1273,34 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 10,
-                    time: 100,
+                    time: Timestamp::from_nanos(100),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
 
         // test owner is the viewer, but token is sealed
         let query_msg = QueryMsg::NftDossier {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: alice.clone(),
+                address: Addr::unchecked(alice.clone()),
                 viewing_key: "key".to_string(),
             }),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier {
@@ -1330,7 +1319,7 @@ mod tests {
                 token_approvals,
                 inventory_approvals,
             } => {
-                assert_eq!(owner, Some(alice.clone()));
+                assert_eq!(owner.map(|a| a.to_string()), Some(alice.clone()));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert!(private_metadata.is_none());
                 assert!(transferable);
@@ -1351,22 +1340,22 @@ mod tests {
             }
             _ => panic!("unexpected"),
         }
-        let handle_msg = HandleMsg::Reveal {
+        let execute_msg = ExecuteMsg::Reveal {
             token_id: "NFT1".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test expired view private meta approval
         let query_msg = QueryMsg::NftDossier {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: charlie.clone(),
+                address: Addr::unchecked(charlie.clone()),
                 viewing_key: "ckey".to_string(),
             }),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier {
@@ -1415,22 +1404,22 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let handle_msg = HandleMsg::SetViewingKey {
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetViewingKey {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "bkey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1439,10 +1428,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT2".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1451,10 +1440,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg); // test burn when status prevents it
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT3".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1463,10 +1452,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT4".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1475,10 +1464,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT5".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1487,10 +1476,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT6".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1499,10 +1488,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT7".to_string()),
-            owner: Some(HumanAddr("bob".to_string())),
+            owner: Some("bob".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1511,10 +1500,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT8".to_string()),
-            owner: Some(HumanAddr("charlie".to_string())),
+            owner: Some("charlie".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1523,7 +1512,7 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
         // test contract has public ownership
         let query_msg = QueryMsg::Tokens {
@@ -1533,7 +1522,7 @@ mod tests {
             start_after: None,
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
@@ -1558,7 +1547,7 @@ mod tests {
             start_after: Some("NFT10".to_string()),
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT10 is not in the specified inventory"));
 
@@ -1570,7 +1559,7 @@ mod tests {
             start_after: Some("NFT7".to_string()),
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT7 is not in the specified inventory"));
 
@@ -1582,7 +1571,7 @@ mod tests {
             start_after: None,
             limit: Some(0),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
@@ -1599,7 +1588,7 @@ mod tests {
             start_after: Some("NFT3".to_string()),
             limit: Some(1),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
@@ -1609,25 +1598,25 @@ mod tests {
             _ => panic!("unexpected"),
         }
 
-        let handle_msg = HandleMsg::MakeOwnershipPrivate { padding: None };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::MakeOwnershipPrivate { padding: None };
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT3".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -1636,7 +1625,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test no key provided should only see public tokens
         let query_msg = QueryMsg::Tokens {
@@ -1646,7 +1635,7 @@ mod tests {
             start_after: None,
             limit: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
@@ -1664,7 +1653,7 @@ mod tests {
             start_after: None,
             limit: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
@@ -1682,7 +1671,7 @@ mod tests {
             start_after: None,
             limit: Some(3),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
@@ -1698,19 +1687,19 @@ mod tests {
             start_after: Some("NFT34".to_string()),
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT34 is not in the specified inventory"));
 
         // test setting all tokens public
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let query_msg = QueryMsg::Tokens {
             owner: alice.clone(),
             viewer: None,
@@ -1718,7 +1707,7 @@ mod tests {
             start_after: None,
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
@@ -1742,26 +1731,26 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let charlie = HumanAddr("charlie".to_string());
-        let handle_msg = HandleMsg::SetViewingKey {
+        let charlie = "charlie".to_string();
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetViewingKey {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "bkey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetViewingKey {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "ckey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("charlie", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1770,10 +1759,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT2".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1782,10 +1771,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg); // test burn when status prevents it
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg); // test burn when status prevents it
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT3".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1794,10 +1783,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT4".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1806,10 +1795,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT5".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1818,10 +1807,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT6".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1830,10 +1819,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT7".to_string()),
-            owner: Some(HumanAddr("bob".to_string())),
+            owner: Some("bob".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1842,10 +1831,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT8".to_string()),
-            owner: Some(HumanAddr("charlie".to_string())),
+            owner: Some("charlie".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1854,10 +1843,10 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT9".to_string()),
-            owner: Some(HumanAddr("charlie".to_string())),
+            owner: Some("charlie".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -1866,9 +1855,9 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: Some("NFT8".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -1877,9 +1866,9 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("charlie", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: alice.clone(),
             token_id: None,
             view_owner: Some(AccessLevel::All),
@@ -1888,9 +1877,9 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("charlie", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: charlie.clone(),
             token_id: Some("NFT5".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -1899,7 +1888,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test a start after that is not in the inventory, but the viewer has permission on that token
         let query_msg = QueryMsg::Tokens {
@@ -1909,7 +1898,7 @@ mod tests {
             start_after: Some("NFT8".to_string()),
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT8 is not in the specified inventory"));
 
@@ -1921,7 +1910,7 @@ mod tests {
             start_after: Some("NFT7".to_string()),
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("You are not authorized to perform this action on token NFT7"));
 
@@ -1933,7 +1922,7 @@ mod tests {
             start_after: Some("NFT8".to_string()),
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
@@ -1950,7 +1939,7 @@ mod tests {
             start_after: Some("NFT8".to_string()),
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenList { tokens } => {
@@ -1969,7 +1958,7 @@ mod tests {
             start_after: Some("NFT3".to_string()),
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("You are not authorized to perform this action on token NFT3"));
 
@@ -1981,7 +1970,7 @@ mod tests {
             start_after: Some("NFT3".to_string()),
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Wrong viewing key for this address or viewing key not set"));
 
@@ -1993,7 +1982,7 @@ mod tests {
             start_after: Some("NFT34".to_string()),
             limit: Some(30),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("You are not authorized to perform this action on token NFT34"));
     }
@@ -2013,7 +2002,7 @@ mod tests {
         let query_msg = QueryMsg::IsUnwrapped {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT1 not found"));
 
@@ -2029,7 +2018,7 @@ mod tests {
         let query_msg = QueryMsg::IsUnwrapped {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::IsUnwrapped { token_is_unwrapped } => {
@@ -2050,7 +2039,7 @@ mod tests {
         let query_msg = QueryMsg::IsUnwrapped {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::IsUnwrapped { token_is_unwrapped } => {
@@ -2058,9 +2047,9 @@ mod tests {
             }
             _ => panic!("unexpected"),
         }
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -2069,13 +2058,13 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
         // sanity check, token sealed
         let query_msg = QueryMsg::IsUnwrapped {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::IsUnwrapped { token_is_unwrapped } => {
@@ -2084,17 +2073,17 @@ mod tests {
             _ => panic!("unexpected"),
         }
 
-        let handle_msg = HandleMsg::Reveal {
+        let execute_msg = ExecuteMsg::Reveal {
             token_id: "NFT1".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // sanity check, token unwrapped
         let query_msg = QueryMsg::IsUnwrapped {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::IsUnwrapped { token_is_unwrapped } => {
@@ -2115,9 +2104,9 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -2126,34 +2115,34 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let handle_msg = HandleMsg::SetViewingKey {
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetViewingKey {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "bkey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetViewingKey {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "ckey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("charlie", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: None,
             view_private_metadata: Some(AccessLevel::ApproveToken),
             expires: Some(Expiration::AtTime(1000000)),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -2162,7 +2151,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test no viewer given, contract has public ownership
         let query_msg = QueryMsg::OwnerOf {
@@ -2170,11 +2159,11 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::OwnerOf { owner, approvals } => {
-                assert_eq!(owner, alice.clone());
+                assert_eq!(owner.to_string(), alice.clone());
                 assert!(approvals.is_empty());
             }
             _ => panic!("unexpected"),
@@ -2188,9 +2177,9 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(HumanAddr("alice".to_string())),
+            owner: Some("alice".to_string()),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -2199,35 +2188,35 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let charlie = HumanAddr("charlie".to_string());
-        let handle_msg = HandleMsg::SetViewingKey {
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let charlie = "charlie".to_string();
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetViewingKey {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "bkey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetViewingKey {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "ckey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("charlie", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -2236,85 +2225,85 @@ mod tests {
             expires: Some(Expiration::AtHeight(100)),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test viewer with no approvals, but token has public ownership
         let query_msg = QueryMsg::OwnerOf {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: charlie.clone(),
+                address: Addr::unchecked(charlie.clone()),
                 viewing_key: "ckey".to_string(),
             }),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::OwnerOf { owner, approvals } => {
-                assert_eq!(owner, alice.clone());
+                assert_eq!(owner.to_string(), alice.clone());
                 assert!(approvals.is_empty());
             }
             _ => panic!("unexpected"),
         }
 
         // test viewer with no approval, but owner has made all his token ownership public
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let query_msg = QueryMsg::OwnerOf {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: charlie.clone(),
+                address: Addr::unchecked(charlie.clone()),
                 viewing_key: "ckey".to_string(),
             }),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::OwnerOf { owner, approvals } => {
-                assert_eq!(owner, alice.clone());
+                assert_eq!(owner.to_string(), alice.clone());
                 assert!(approvals.is_empty());
             }
             _ => panic!("unexpected"),
         }
 
         // test not permitted to view owner
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: Some(AccessLevel::None),
             view_private_metadata: None,
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         let query_msg = QueryMsg::OwnerOf {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: charlie.clone(),
+                address: Addr::unchecked(charlie.clone()),
                 viewing_key: "ckey".to_string(),
             }),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("You are not authorized to view the owner of token NFT1"));
 
         // test owner can see approvals including expired
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: None,
             view_private_metadata: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: charlie.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -2323,48 +2312,45 @@ mod tests {
             expires: Some(Expiration::AtHeight(1000)),
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 500,
-                    time: 1000000,
+                    time: Timestamp::from_nanos(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         let bob_approv = Cw721Approval {
-            spender: bob.clone(),
+            spender: Addr::unchecked(bob.clone()),
             expires: Expiration::AtHeight(100),
         };
         let char_approv = Cw721Approval {
-            spender: charlie.clone(),
+            spender: Addr::unchecked(charlie.clone()),
             expires: Expiration::AtHeight(1000),
         };
 
         let query_msg = QueryMsg::OwnerOf {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: alice.clone(),
+                address: Addr::unchecked(alice.clone()),
                 viewing_key: "akey".to_string(),
             }),
             include_expired: Some(true),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::OwnerOf { owner, approvals } => {
-                assert_eq!(owner, alice.clone());
+                assert_eq!(owner.to_string(), alice.clone());
                 assert_eq!(approvals.len(), 2);
                 assert_eq!(approvals, vec![bob_approv.clone(), char_approv.clone()])
             }
@@ -2375,16 +2361,16 @@ mod tests {
         let query_msg = QueryMsg::OwnerOf {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: alice.clone(),
+                address: Addr::unchecked(alice.clone()),
                 viewing_key: "akey".to_string(),
             }),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::OwnerOf { owner, approvals } => {
-                assert_eq!(owner, alice.clone());
+                assert_eq!(owner.to_string(), alice.clone());
                 assert_eq!(approvals, vec![char_approv.clone()])
             }
             _ => panic!("unexpected"),
@@ -2406,7 +2392,7 @@ mod tests {
         let query_msg = QueryMsg::NftInfo {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT1 not found"));
 
@@ -2422,7 +2408,7 @@ mod tests {
         let query_msg = QueryMsg::NftInfo {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftInfo {
@@ -2434,12 +2420,12 @@ mod tests {
             }
             _ => panic!("unexpected"),
         }
-        let alice = HumanAddr("alice".to_string());
+        let alice = "alice".to_string();
         let public_meta = Metadata {
             token_uri: Some("uri".to_string()),
             extension: None,
         };
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
@@ -2450,13 +2436,13 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
         // sanity check
         let query_msg = QueryMsg::NftInfo {
             token_id: "NFT1".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftInfo {
@@ -2480,13 +2466,13 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let handle_msg = HandleMsg::SetViewingKey {
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         let meta_for_fail = Metadata {
             token_uri: Some("uri".to_string()),
@@ -2509,7 +2495,7 @@ mod tests {
         };
 
         // test unable to have both token_uri and extension in the metadata
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFTfail".to_string()),
             owner: Some(alice.clone()),
             public_metadata: Some(meta_for_fail.clone()),
@@ -2520,11 +2506,11 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Metadata can not have BOTH token_uri AND extension"));
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
@@ -2535,8 +2521,8 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -2545,7 +2531,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test don't have permission to view owner, but should still be able to see
         // public metadata
@@ -2554,7 +2540,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::AllNftInfo { access, info } => {
@@ -2565,7 +2551,7 @@ mod tests {
             _ => panic!("unexpected"),
         }
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some(alice.clone()),
             public_metadata: None,
@@ -2576,8 +2562,8 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: None,
             view_owner: None,
@@ -2586,22 +2572,22 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test owner viewing all nft info, the is no public metadata
         let query_msg = QueryMsg::AllNftInfo {
             token_id: "NFT2".to_string(),
             viewer: Some(ViewerInfo {
-                address: alice.clone(),
+                address: Addr::unchecked(alice.clone()),
                 viewing_key: "akey".to_string(),
             }),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::AllNftInfo { access, info } => {
-                assert_eq!(access.owner, Some(alice.clone()));
+                assert_eq!(access.owner.map(|a| a.to_string()), Some(alice.clone()));
                 assert_eq!(access.approvals.len(), 1);
                 assert!(info.is_none());
             }
@@ -2619,12 +2605,12 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let alice = HumanAddr("alice".to_string());
-        let handle_msg = HandleMsg::SetViewingKey {
+        let alice = "alice".to_string();
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         let private_meta = Metadata {
             token_uri: None,
@@ -2635,7 +2621,7 @@ mod tests {
                 ..Extension::default()
             }),
         };
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: None,
@@ -2646,23 +2632,23 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: None,
             view_private_metadata: Some(AccessLevel::ApproveToken),
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test global approval on token
         let query_msg = QueryMsg::PrivateMetadata {
             token_id: "NFT1".to_string(),
             viewer: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::PrivateMetadata {
@@ -2675,21 +2661,21 @@ mod tests {
             _ => panic!("unexpected"),
         }
 
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: None,
             view_private_metadata: Some(AccessLevel::All),
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test global approval on all tokens
         let query_msg = QueryMsg::PrivateMetadata {
             token_id: "NFT1".to_string(),
             viewer: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::PrivateMetadata {
@@ -2709,18 +2695,18 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let handle_msg = HandleMsg::SetViewingKey {
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetViewingKey {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "bkey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
 
         let private_meta = Metadata {
             token_uri: None,
@@ -2731,7 +2717,7 @@ mod tests {
                 ..Extension::default()
             }),
         };
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: None,
@@ -2742,36 +2728,36 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
         // test trying to view sealed metadata
         let query_msg = QueryMsg::PrivateMetadata {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: alice.clone(),
+                address: Addr::unchecked(alice.clone()),
                 viewing_key: "akey".to_string(),
             }),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains(
             "Sealed metadata must be unwrapped by calling Reveal before it can be viewed"
         ));
-        let handle_msg = HandleMsg::Reveal {
+        let execute_msg = ExecuteMsg::Reveal {
             token_id: "NFT1".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test owner viewing empty metadata after the private got unwrapped to public
         let query_msg = QueryMsg::PrivateMetadata {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: alice.clone(),
+                address: Addr::unchecked(alice.clone()),
                 viewing_key: "akey".to_string(),
             }),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::PrivateMetadata {
@@ -2788,11 +2774,11 @@ mod tests {
         let query_msg = QueryMsg::PrivateMetadata {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: bob.clone(),
+                address: Addr::unchecked(bob.clone()),
                 viewing_key: "bkey".to_string(),
             }),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("You are not authorized to perform this action on token NFT1"));
     }
@@ -2807,27 +2793,27 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let charlie = HumanAddr("charlie".to_string());
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let charlie = "charlie".to_string();
 
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::ApproveAll {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::ApproveAll {
             operator: bob.clone(),
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::ApproveAll {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::ApproveAll {
             operator: charlie.clone(),
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test no viewing key supplied
         let query_msg = QueryMsg::ApprovedForAll {
@@ -2835,7 +2821,7 @@ mod tests {
             viewing_key: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::ApprovedForAll { operators } => {
@@ -2845,11 +2831,11 @@ mod tests {
         }
 
         let bob_approv = Cw721Approval {
-            spender: bob.clone(),
+            spender: Addr::unchecked(bob.clone()),
             expires: Expiration::Never,
         };
         let char_approv = Cw721Approval {
-            spender: charlie.clone(),
+            spender: Addr::unchecked(charlie.clone()),
             expires: Expiration::Never,
         };
 
@@ -2859,7 +2845,7 @@ mod tests {
             viewing_key: Some("akey".to_string()),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::ApprovedForAll { operators } => {
@@ -2880,8 +2866,8 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
 
         // test token not found when supply is public
         let query_msg = QueryMsg::TokenApprovals {
@@ -2889,7 +2875,7 @@ mod tests {
             viewing_key: "akey".to_string(),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("Token ID: NFT1 not found"));
 
@@ -2900,11 +2886,11 @@ mod tests {
             "Init failed: {}",
             init_result.err().unwrap()
         );
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // test token not found when supply is private
         let query_msg = QueryMsg::TokenApprovals {
@@ -2912,11 +2898,11 @@ mod tests {
             viewing_key: "akey".to_string(),
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let error = extract_error_msg(query_result);
         assert!(error.contains("You are not authorized to view approvals for token NFT1"));
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: None,
@@ -2927,9 +2913,9 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -2938,8 +2924,8 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: None,
             view_owner: None,
@@ -2948,41 +2934,38 @@ mod tests {
             expires: Some(Expiration::AtHeight(2000000)),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         let bob_approv = Snip721Approval {
-            address: bob.clone(),
+            address: Addr::unchecked(bob.clone()),
             view_owner_expiration: None,
             view_private_metadata_expiration: Some(Expiration::Never),
             transfer_expiration: None,
         };
 
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: None,
             view_private_metadata: Some(AccessLevel::ApproveToken),
             expires: Some(Expiration::AtHeight(1000000)),
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 500,
-                    time: 1000000,
+                    time: Timestamp::from_nanos(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
 
         // test public ownership when contract has public ownership
@@ -2992,7 +2975,7 @@ mod tests {
             viewing_key: "akey".to_string(),
             include_expired: Some(true),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenApprovals {
@@ -3013,35 +2996,32 @@ mod tests {
             }
             _ => panic!("unexpected"),
         }
-        let handle_msg = HandleMsg::MakeOwnershipPrivate { padding: None };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let execute_msg = ExecuteMsg::MakeOwnershipPrivate { padding: None };
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: Some(AccessLevel::All),
             expires: Some(Expiration::AtHeight(1000000)),
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 500,
-                    time: 1000000,
+                    time: Timestamp::from_nanos(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
 
         // test token has public ownership
@@ -3051,7 +3031,7 @@ mod tests {
             viewing_key: "akey".to_string(),
             include_expired: Some(true),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenApprovals {
@@ -3076,32 +3056,29 @@ mod tests {
             _ => panic!("unexpected"),
         }
 
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: Some(AccessLevel::All),
             view_private_metadata: Some(AccessLevel::None),
             expires: Some(Expiration::AtHeight(2000000)),
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 500,
-                    time: 1000000,
+                    time: Timestamp::from_nanos(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         // test all of alice's tokens have public ownership
         let query_msg = QueryMsg::TokenApprovals {
@@ -3109,7 +3086,7 @@ mod tests {
             viewing_key: "akey".to_string(),
             include_expired: Some(true),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TokenApprovals {
@@ -3143,41 +3120,38 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
 
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: None,
             view_private_metadata: Some(AccessLevel::All),
             expires: Some(Expiration::AtHeight(1000000)),
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 500,
-                    time: 1000000,
+                    time: Timestamp::from_nanos(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
 
         // test public ownership when contract has public ownership
@@ -3187,7 +3161,7 @@ mod tests {
             viewing_key: "akey".to_string(),
             include_expired: Some(true),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::InventoryApprovals {
@@ -3217,12 +3191,12 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: Some("NFT1".to_string()),
             view_owner: None,
@@ -3231,8 +3205,8 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: None,
             view_owner: None,
@@ -3241,41 +3215,38 @@ mod tests {
             expires: Some(Expiration::AtHeight(2000000)),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         let bob_approv = Snip721Approval {
-            address: bob.clone(),
+            address: Addr::unchecked(bob.clone()),
             view_owner_expiration: None,
             view_private_metadata_expiration: None,
             transfer_expiration: Some(Expiration::AtHeight(2000000)),
         };
 
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
             expires: Some(Expiration::AtHeight(1000000)),
             padding: None,
         };
-        let _handle_result = handle(
-            &mut deps,
+        let _handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 500,
-                    time: 1000000,
+                    time: Timestamp::from_nanos(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
 
         // test owner makes ownership public for all tokens
@@ -3284,7 +3255,7 @@ mod tests {
             viewing_key: "akey".to_string(),
             include_expired: Some(true),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::InventoryApprovals {
@@ -3318,16 +3289,16 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let alice = HumanAddr("alice".to_string());
-        let bob = HumanAddr("bob".to_string());
-        let charlie = HumanAddr("charlie".to_string());
-        let david = HumanAddr("david".to_string());
+        let alice = "alice".to_string();
+        let bob = "bob".to_string();
+        let charlie = "charlie".to_string();
+        let david = "david".to_string();
 
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "ckey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("charlie", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("charlie", &[]), execute_msg);
 
         let nft1 = "NFT1".to_string();
         let nft2 = "NFT2".to_string();
@@ -3335,7 +3306,7 @@ mod tests {
         let nft4 = "NFT4".to_string();
         let nft5 = "NFT5".to_string();
 
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some(nft1.clone()),
             owner: Some(alice.clone()),
             public_metadata: None,
@@ -3346,8 +3317,8 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some(nft2.clone()),
             owner: Some(alice.clone()),
             public_metadata: None,
@@ -3358,8 +3329,8 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some(nft3.clone()),
             owner: Some(bob.clone()),
             public_metadata: None,
@@ -3370,8 +3341,8 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some(nft4.clone()),
             owner: Some(charlie.clone()),
             public_metadata: None,
@@ -3382,8 +3353,8 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some(nft5.clone()),
             owner: Some(david.clone()),
             public_metadata: None,
@@ -3394,9 +3365,9 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: charlie.clone(),
             token_id: None,
             view_owner: None,
@@ -3405,8 +3376,8 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: charlie.clone(),
             token_id: Some(nft3.clone()),
             view_owner: None,
@@ -3415,7 +3386,7 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
 
         // test that charlie can transfer nft1 and 2 with operator approval,
         // nft3 with token approval, and nft4 because he owns it
@@ -3424,7 +3395,7 @@ mod tests {
             address: charlie.clone(),
             viewing_key: "ckey".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::VerifyTransferApproval {
@@ -3449,7 +3420,7 @@ mod tests {
             address: charlie.clone(),
             viewing_key: "ckey".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::VerifyTransferApproval {
@@ -3474,7 +3445,7 @@ mod tests {
             address: charlie.clone(),
             viewing_key: "ckey".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::VerifyTransferApproval {
@@ -3499,19 +3470,19 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let admin = HumanAddr("admin".to_string());
-        let alice = HumanAddr("alice".to_string());
-        let handle_msg = HandleMsg::SetViewingKey {
+        let admin = "admin".to_string();
+        let alice = "alice".to_string();
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "akey".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: "key".to_string(),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
         // test no txs yet
         let query_msg = QueryMsg::TransactionHistory {
@@ -3520,7 +3491,7 @@ mod tests {
             page: None,
             page_size: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TransactionHistory { total, txs } => {
@@ -3529,7 +3500,7 @@ mod tests {
             }
             _ => panic!("unexpected"),
         }
-        let handle_msg = HandleMsg::MintNft {
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: None,
             public_metadata: None,
@@ -3540,8 +3511,8 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::MintNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: None,
             public_metadata: None,
@@ -3552,63 +3523,63 @@ mod tests {
             memo: Some("Mint 2".to_string()),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::TransferNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::TransferNft {
             token_id: "NFT1".to_string(),
             recipient: alice.clone(),
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
-        let handle_msg = HandleMsg::BurnNft {
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let execute_msg = ExecuteMsg::BurnNft {
             token_id: "NFT2".to_string(),
             memo: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
 
         let mint1 = Tx {
             tx_id: 0,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT1".to_string(),
             memo: None,
             action: TxAction::Mint {
-                minter: admin.clone(),
-                recipient: admin.clone(),
+                minter: Addr::unchecked(admin.clone()),
+                recipient: Addr::unchecked(admin.clone()),
             },
         };
         let mint2 = Tx {
             tx_id: 1,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT2".to_string(),
             memo: Some("Mint 2".to_string()),
             action: TxAction::Mint {
-                minter: admin.clone(),
-                recipient: admin.clone(),
+                minter: Addr::unchecked(admin.clone()),
+                recipient: Addr::unchecked(admin.clone()),
             },
         };
         let xfer1 = Tx {
             tx_id: 2,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT1".to_string(),
             memo: None,
             action: TxAction::Transfer {
-                from: admin.clone(),
+                from: Addr::unchecked(admin.clone()),
                 sender: None,
-                recipient: alice.clone(),
+                recipient: Addr::unchecked(alice.clone()),
             },
         };
         let burn2 = Tx {
             tx_id: 3,
             block_height: 12345,
-            block_time: 1571797419,
+            block_time: 1571797419879305533,
             token_id: "NFT2".to_string(),
             memo: None,
             action: TxAction::Burn {
-                owner: admin.clone(),
+                owner: Addr::unchecked(admin.clone()),
                 burner: None,
             },
         };
@@ -3620,7 +3591,7 @@ mod tests {
             page: None,
             page_size: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TransactionHistory { total, txs } => {
@@ -3640,7 +3611,7 @@ mod tests {
             page: None,
             page_size: Some(2),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TransactionHistory { total, txs } => {
@@ -3657,7 +3628,7 @@ mod tests {
             page: Some(2),
             page_size: Some(1),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TransactionHistory { total, txs } => {
@@ -3674,7 +3645,7 @@ mod tests {
             page: None,
             page_size: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TransactionHistory { total, txs } => {
@@ -3698,9 +3669,9 @@ mod tests {
 
         // test not registered
         let query_msg = QueryMsg::RegisteredCodeHash {
-            contract: HumanAddr("alice".to_string()),
+            contract: "alice".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::RegisteredCodeHash {
@@ -3713,18 +3684,18 @@ mod tests {
             _ => panic!("unexpected"),
         }
 
-        let handle_msg = HandleMsg::RegisterReceiveNft {
+        let execute_msg = ExecuteMsg::RegisterReceiveNft {
             code_hash: "Code Hash".to_string(),
             also_implements_batch_receive_nft: None,
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
 
         // sanity check with default for implements BatchReceiveNft
         let query_msg = QueryMsg::RegisteredCodeHash {
-            contract: HumanAddr("alice".to_string()),
+            contract: "alice".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::RegisteredCodeHash {
@@ -3738,17 +3709,17 @@ mod tests {
         }
 
         // sanity check with implementing BatchRegisterReceive
-        let handle_msg = HandleMsg::RegisterReceiveNft {
+        let execute_msg = ExecuteMsg::RegisterReceiveNft {
             code_hash: "Code Hash".to_string(),
             also_implements_batch_receive_nft: Some(true),
             padding: None,
         };
-        let _handle_result = handle(&mut deps, mock_env("bob", &[]), handle_msg);
+        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
 
         let query_msg = QueryMsg::RegisteredCodeHash {
-            contract: HumanAddr("bob".to_string()),
+            contract: "bob".to_string(),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::RegisteredCodeHash {
@@ -3773,11 +3744,11 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let alice = HumanAddr("alice".to_string());
+        let alice = "alice".to_string();
         let alice_key = "akey".to_string();
-        let bob = HumanAddr("bob".to_string());
+        let bob = "bob".to_string();
         let bob_key = "bkey".to_string();
-        let charlie = HumanAddr("charlie".to_string());
+        let charlie = "charlie".to_string();
         let charlie_key = "ckey".to_string();
 
         let mints = vec![
@@ -3813,15 +3784,15 @@ mod tests {
             },
         ];
 
-        let handle_msg = HandleMsg::BatchMintNft {
+        let execute_msg = ExecuteMsg::BatchMintNft {
             mints: mints.clone(),
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
         // let charlie see the owner of NFT2 until time 55
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: charlie.clone(),
             token_id: Some("NFT2".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
@@ -3830,25 +3801,22 @@ mod tests {
             expires: Some(Expiration::AtTime(55)),
             padding: None,
         };
-        let handle_result = handle(
-            &mut deps,
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 2,
-                    time: 2,
+                    time: Timestamp::from_nanos(2),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
@@ -3858,7 +3826,7 @@ mod tests {
             viewer: None,
             viewing_key: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NumTokens { count } => {
@@ -3868,53 +3836,47 @@ mod tests {
         }
 
         // set ownership to private for alice
-        let handle_msg = HandleMsg::MakeOwnershipPrivate { padding: None };
-        let handle_result = handle(
-            &mut deps,
+        let execute_msg = ExecuteMsg::MakeOwnershipPrivate { padding: None };
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 3,
-                    time: 3,
+                    time: Timestamp::from_nanos(3),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
         // set charlie's viewing key
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: charlie_key.clone(),
             padding: None,
         };
-        let handle_result = handle(
-            &mut deps,
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 3,
-                    time: 3,
+                    time: Timestamp::from_nanos(3),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("charlie".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("charlie", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
@@ -3924,7 +3886,7 @@ mod tests {
             viewer: Some(charlie.clone()),
             viewing_key: Some(charlie_key.clone()),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NumTokens { count } => {
@@ -3934,29 +3896,26 @@ mod tests {
         }
 
         // set alice's viewing key
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: alice_key.clone(),
             padding: None,
         };
-        let handle_result = handle(
-            &mut deps,
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 4,
-                    time: 4,
+                    time: Timestamp::from_nanos(4),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
@@ -3966,7 +3925,7 @@ mod tests {
             viewer: None,
             viewing_key: Some(alice_key.clone()),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NumTokens { count } => {
@@ -3976,59 +3935,53 @@ mod tests {
         }
 
         // make ownership public until time 15
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: None,
             view_owner: Some(AccessLevel::All),
             view_private_metadata: None,
             expires: Some(Expiration::AtTime(15)),
             padding: None,
         };
-        let handle_result = handle(
-            &mut deps,
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 10,
-                    time: 10,
+                    time: Timestamp::from_nanos(10),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
         // set bob's viewing key
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: bob_key.clone(),
             padding: None,
         };
-        let handle_result = handle(
-            &mut deps,
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 10,
-                    time: 10,
+                    time: Timestamp::from_nanos(10),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("bob".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("bob", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
@@ -4038,7 +3991,7 @@ mod tests {
             viewer: Some(bob.clone()),
             viewing_key: Some(bob_key.clone()),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NumTokens { count } => {
@@ -4048,7 +4001,7 @@ mod tests {
         }
 
         // let bob see all alice ownership until time 25
-        let handle_msg = HandleMsg::SetWhitelistedApproval {
+        let execute_msg = ExecuteMsg::SetWhitelistedApproval {
             address: bob.clone(),
             token_id: None,
             view_owner: Some(AccessLevel::All),
@@ -4057,25 +4010,22 @@ mod tests {
             expires: Some(Expiration::AtTime(25)),
             padding: None,
         };
-        let handle_result = handle(
-            &mut deps,
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 20,
-                    time: 20,
+                    time: Timestamp::from_nanos(20),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
@@ -4085,7 +4035,7 @@ mod tests {
             viewer: None,
             viewing_key: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NumTokens { count } => {
@@ -4100,7 +4050,7 @@ mod tests {
             viewer: Some(bob.clone()),
             viewing_key: Some(bob_key.clone()),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NumTokens { count } => {
@@ -4110,92 +4060,83 @@ mod tests {
         }
 
         // make ownership public for NFT2 until time 25
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT2".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             expires: Some(Expiration::AtTime(25)),
             padding: None,
         };
-        let handle_result = handle(
-            &mut deps,
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 22,
-                    time: 22,
+                    time: Timestamp::from_nanos(22),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
         // make ownership public for NFT1 until time 50
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             expires: Some(Expiration::AtTime(50)),
             padding: None,
         };
-        let handle_result = handle(
-            &mut deps,
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 25,
-                    time: 25,
+                    time: Timestamp::from_nanos(25),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
         // make ownership public for NFT3 until time 60
-        let handle_msg = HandleMsg::SetGlobalApproval {
+        let execute_msg = ExecuteMsg::SetGlobalApproval {
             token_id: Some("NFT3".to_string()),
             view_owner: Some(AccessLevel::ApproveToken),
             view_private_metadata: None,
             expires: Some(Expiration::AtTime(60)),
             padding: None,
         };
-        let handle_result = handle(
-            &mut deps,
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 30,
-                    time: 30,
+                    time: Timestamp::from_nanos(30),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
@@ -4205,7 +4146,7 @@ mod tests {
             viewer: Some(charlie.clone()),
             viewing_key: Some(charlie_key.clone()),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NumTokens { count } => {
@@ -4220,7 +4161,7 @@ mod tests {
             viewer: Some(bob.clone()),
             viewing_key: Some(bob_key.clone()),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NumTokens { count } => {
@@ -4230,26 +4171,23 @@ mod tests {
         }
 
         // set ownership to private for alice again just to change the saved blockinfo
-        let handle_msg = HandleMsg::MakeOwnershipPrivate { padding: None };
-        let handle_result = handle(
-            &mut deps,
+        let execute_msg = ExecuteMsg::MakeOwnershipPrivate { padding: None };
+        let handle_result = execute(
+            deps.as_mut(),
             Env {
                 block: BlockInfo {
                     height: 57,
-                    time: 57,
+                    time: Timestamp::from_nanos(57),
                     chain_id: "cosmos-testnet-14002".to_string(),
                 },
-                message: MessageInfo {
-                    sender: HumanAddr("alice".to_string()),
-                    sent_funds: vec![],
-                },
+                transaction: None,
                 contract: cosmwasm_std::ContractInfo {
-                    address: HumanAddr::from(MOCK_CONTRACT_ADDR),
+                    address: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                    code_hash: "".to_string(),
                 },
-                contract_key: Some("".to_string()),
-                contract_code_hash: "".to_string(),
             },
-            handle_msg,
+            mock_info("alice", &[]),
+            execute_msg,
         );
         assert!(handle_result.is_ok());
 
@@ -4259,7 +4197,7 @@ mod tests {
             viewer: Some(charlie.clone()),
             viewing_key: Some(charlie_key.clone()),
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NumTokens { count } => {
@@ -4280,7 +4218,7 @@ mod tests {
             init_result.err().unwrap()
         );
 
-        let alice = HumanAddr("alice".to_string());
+        let alice = "alice".to_string();
 
         let public_meta1 = Metadata {
             token_uri: None,
@@ -4361,7 +4299,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT3".to_string()),
-                owner: Some(HumanAddr("bob".to_string())),
+                owner: Some("bob".to_string()),
                 public_metadata: Some(public_meta3.clone()),
                 private_metadata: Some(private_meta3.clone()),
                 royalty_info: None,
@@ -4371,34 +4309,34 @@ mod tests {
             },
         ];
 
-        let handle_msg = HandleMsg::BatchMintNft {
+        let execute_msg = ExecuteMsg::BatchMintNft {
             mints: mints.clone(),
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
         // test querying all 3
         let alice_key = "akey".to_string();
-        let handle_msg = HandleMsg::SetViewingKey {
+        let execute_msg = ExecuteMsg::SetViewingKey {
             key: alice_key.clone(),
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
         assert!(handle_result.is_ok());
 
         let query_msg = QueryMsg::BatchNftDossier {
             token_ids: vec!["NFT1".to_string(), "NFT2".to_string(), "NFT3".to_string()],
             viewer: Some(ViewerInfo {
-                address: alice.clone(),
+                address: Addr::unchecked(alice.clone()),
                 viewing_key: alice_key.clone(),
             }),
             include_expired: None,
         };
         let mint_run_info = MintRunInfo {
-            collection_creator: Some(HumanAddr("instantiator".to_string())),
-            token_creator: Some(HumanAddr("admin".to_string())),
-            time_of_minting: Some(1571797419),
+            collection_creator: Some("instantiator".to_string()),
+            token_creator: Some(Addr::unchecked("admin".to_string())),
+            time_of_minting: Some(1571797419879305533),
             mint_run: None,
             serial_number: None,
             quantity_minted_this_run: None,
@@ -4406,7 +4344,7 @@ mod tests {
         let expected = vec![
             BatchNftDossierElement {
                 token_id: "NFT1".to_string(),
-                owner: Some(alice.clone()),
+                owner: Some(Addr::unchecked(alice.clone())),
                 public_metadata: Some(public_meta1),
                 private_metadata: Some(private_meta1),
                 display_private_metadata_error: None,
@@ -4423,7 +4361,7 @@ mod tests {
             },
             BatchNftDossierElement {
                 token_id: "NFT2".to_string(),
-                owner: Some(alice.clone()),
+                owner: Some(Addr::unchecked(alice.clone())),
                 public_metadata: Some(public_meta2),
                 private_metadata: Some(private_meta2),
                 display_private_metadata_error: None,
@@ -4459,7 +4397,7 @@ mod tests {
                 inventory_approvals: None,
             },
         ];
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::BatchNftDossier { nft_dossiers } => {
