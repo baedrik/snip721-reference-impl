@@ -2,28 +2,28 @@
 mod tests {
     use std::any::Any;
 
-    use cosmwasm_std::{
-        Addr, Api, Binary, Coin, from_binary, OwnedDeps, Response, StdError, StdResult, SubMsg,
-        to_binary, Uint128, WasmMsg,
-    };
     use cosmwasm_std::testing::*;
+    use cosmwasm_std::{
+        from_binary, to_binary, Addr, Api, Binary, Coin, OwnedDeps, Response, StdError, StdResult,
+        SubMsg, Uint128, WasmMsg,
+    };
     use cosmwasm_storage::ReadonlyPrefixedStorage;
 
     use crate::contract::{execute, instantiate, query};
     use crate::expiration::Expiration;
     use crate::inventory::Inventory;
     use crate::msg::{
-        Burn, ContractStatus, ExecuteMsg, InstantiateConfig, InstantiateMsg, Mint, PostInstantiateCallback, QueryAnswer,
-        QueryMsg, Send, Transfer,
+        Burn, ContractStatus, ExecuteMsg, InstantiateConfig, InstantiateMsg, Mint,
+        PostInstantiateCallback, QueryAnswer, QueryMsg, Send, Transfer,
     };
     use crate::royalties::{DisplayRoyalty, DisplayRoyaltyInfo, Royalty, RoyaltyInfo};
     use crate::state::{
-        Config, CONFIG_KEY, json_may_load, load, may_load, PREFIX_INFOS, PREFIX_MAP_TO_ID,
+        json_may_load, load, may_load, Config, CONFIG_KEY, PREFIX_INFOS, PREFIX_MAP_TO_ID,
         PREFIX_MAP_TO_INDEX,
     };
     use crate::token::{Extension, Metadata, Token};
 
-// Helper functions
+    // Helper functions
 
     fn init_helper_default() -> (
         StdResult<Response>,
@@ -77,9 +77,9 @@ mod tests {
                 owner_may_update_metadata,
                 enable_burn,
             )
-                .as_bytes(),
+            .as_bytes(),
         ))
-            .unwrap();
+        .unwrap();
         let info = mock_info("instantiator", &[]);
         let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
@@ -127,9 +127,9 @@ mod tests {
                 owner_may_update_metadata,
                 enable_burn,
             )
-                .as_bytes(),
+            .as_bytes(),
         ))
-            .unwrap();
+        .unwrap();
         let info = mock_info("instantiator", &[]);
         let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
@@ -161,17 +161,12 @@ mod tests {
         // test default
         let (init_result, deps) = init_helper_default();
         assert_eq!(init_result.unwrap(), Response::default());
-        let config: Config = load(deps.as_ref().storage, CONFIG_KEY).unwrap();
+        let config: Config = load(&deps.storage, CONFIG_KEY).unwrap();
         assert_eq!(config.status, ContractStatus::Normal.to_u8());
         assert_eq!(config.mint_cnt, 0);
         assert_eq!(config.tx_cnt, 0);
         assert_eq!(config.name, "sec721".to_string());
-        assert_eq!(
-            config.admin,
-            deps.api
-                .addr_canonicalize(&("admin".to_string()))
-                .unwrap()
-        );
+        assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
         assert_eq!(config.token_supply_is_public, false);
         assert_eq!(config.owner_is_public, false);
@@ -185,17 +180,12 @@ mod tests {
         let (init_result, deps) =
             init_helper_with_config(true, true, true, true, false, true, false);
         assert_eq!(init_result.unwrap(), Response::default());
-        let config: Config = load(deps.as_ref().storage, CONFIG_KEY).unwrap();
+        let config: Config = load(&deps.storage, CONFIG_KEY).unwrap();
         assert_eq!(config.status, ContractStatus::Normal.to_u8());
         assert_eq!(config.mint_cnt, 0);
         assert_eq!(config.tx_cnt, 0);
         assert_eq!(config.name, "sec721".to_string());
-        assert_eq!(
-            config.admin,
-            deps.api
-                .addr_canonicalize(&("admin".to_string()))
-                .unwrap()
-        );
+        assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
         assert_eq!(config.token_supply_is_public, true);
         assert_eq!(config.owner_is_public, true);
@@ -282,17 +272,12 @@ mod tests {
             false,
         );
         assert_eq!(init_result.unwrap(), Response::default());
-        let config: Config = load(deps.as_ref().storage, CONFIG_KEY).unwrap();
+        let config: Config = load(&deps.storage, CONFIG_KEY).unwrap();
         assert_eq!(config.status, ContractStatus::Normal.to_u8());
         assert_eq!(config.mint_cnt, 0);
         assert_eq!(config.tx_cnt, 0);
         assert_eq!(config.name, "sec721".to_string());
-        assert_eq!(
-            config.admin,
-            deps.api
-                .addr_canonicalize(&("admin".to_string()))
-                .unwrap()
-        );
+        assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
         assert_eq!(config.token_supply_is_public, true);
         assert_eq!(config.owner_is_public, true);
@@ -379,7 +364,12 @@ mod tests {
             mints: mints.clone(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         // verify there are no royalties when trying to specify on mint
@@ -426,7 +416,12 @@ mod tests {
             royalty_info: Some(royalties.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("Non-transferable tokens can not be sold, so royalties are meaningless")
@@ -474,7 +469,12 @@ mod tests {
             mints: mints.clone(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         // verify TransferNft fails on a non-transferable token
@@ -484,19 +484,24 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT1 is non-transferable"));
 
         // verify BatchTransferNft fails on a non-transferable token
         let transfers = vec![
             Transfer {
-                recipient: Addr::unchecked(bob.clone()),
+                recipient: bob.clone(),
                 token_ids: vec!["NFT2".to_string()],
                 memo: None,
             },
             Transfer {
-                recipient: Addr::unchecked(bob.clone()),
+                recipient: bob.clone(),
                 token_ids: vec!["NFT1".to_string()],
                 memo: None,
             },
@@ -505,7 +510,12 @@ mod tests {
             transfers,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT2 is non-transferable"));
 
@@ -518,21 +528,26 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT1 is non-transferable"));
 
         // verify BatchSendNft fails on a non-transferable token
         let sends = vec![
             Send {
-                contract: Addr::unchecked(bob.clone()),
+                contract: bob.clone(),
                 receiver_info: None,
                 token_ids: vec!["NFT2".to_string()],
                 msg: None,
                 memo: None,
             },
             Send {
-                contract: Addr::unchecked(bob.clone()),
+                contract: bob.clone(),
                 receiver_info: None,
                 token_ids: vec!["NFT1".to_string()],
                 msg: None,
@@ -543,7 +558,12 @@ mod tests {
             sends,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT2 is non-transferable"));
     }
@@ -602,7 +622,12 @@ mod tests {
             mints: mints.clone(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         // verify BurnNft works on a non-transferable token even when burn is disabled
@@ -611,22 +636,27 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
         // confirm token was removed from the maps
-        let map2idx = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_INDEX);
+        let map2idx = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_MAP_TO_INDEX);
         let index: Option<u32> = may_load(&map2idx, "NFT1".as_bytes()).unwrap();
         assert!(index.is_none());
-        let map2id = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_ID);
+        let map2id = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_MAP_TO_ID);
         let id: Option<String> = may_load(&map2id, &tok_key).unwrap();
         assert!(id.is_none());
         // confirm token info was deleted from storage
-        let info_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_INFOS);
+        let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Option<Token> = json_may_load(&info_store, &tok_key).unwrap();
         assert!(token.is_none());
         // confirm the token was removed from the owner's list
-        let inventory = Inventory::new(deps.as_ref().storage, alice_raw.clone()).unwrap();
-        assert_eq!(inventory.info.count, 2);
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.cnt, 2);
         assert!(!inventory.contains(&deps.storage, 0).unwrap());
         assert!(inventory.contains(&deps.storage, 1).unwrap());
         assert!(inventory.contains(&deps.storage, 2).unwrap());
@@ -640,28 +670,33 @@ mod tests {
             burns,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
         // confirm tokens were removed from the maps
-        let map2idx = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_INDEX);
+        let map2idx = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_MAP_TO_INDEX);
         let index: Option<u32> = may_load(&map2idx, "NFT2".as_bytes()).unwrap();
         assert!(index.is_none());
         let index: Option<u32> = may_load(&map2idx, "NFT3".as_bytes()).unwrap();
         assert!(index.is_none());
-        let map2id = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_MAP_TO_ID);
+        let map2id = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_MAP_TO_ID);
         let id: Option<String> = may_load(&map2id, &tok2_key).unwrap();
         assert!(id.is_none());
         let id: Option<String> = may_load(&map2id, &tok3_key).unwrap();
         assert!(id.is_none());
         // confirm token infos were deleted from storage
-        let info_store = ReadonlyPrefixedStorage::new(deps.as_ref().storage, PREFIX_INFOS);
+        let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Option<Token> = json_may_load(&info_store, &tok2_key).unwrap();
         assert!(token.is_none());
         let token: Option<Token> = json_may_load(&info_store, &tok3_key).unwrap();
         assert!(token.is_none());
         // confirm the tokens were removed from the owner's list
-        let inventory = Inventory::new(deps.as_ref().storage, alice_raw.clone()).unwrap();
-        assert_eq!(inventory.info.count, 0);
+        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        assert_eq!(inventory.cnt, 0);
         assert!(!inventory.contains(&deps.storage, 1).unwrap());
         assert!(!inventory.contains(&deps.storage, 2).unwrap());
     }
@@ -710,7 +745,12 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         // test viewer not given, contract has public ownership
@@ -738,7 +778,7 @@ mod tests {
                 token_approvals,
                 inventory_approvals,
             } => {
-                assert_eq!(owner.map(|o| o.to_string()), Some(alice.clone()));
+                assert_eq!(owner, Some(Addr::unchecked(alice.clone())));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert!(private_metadata.is_none());
                 assert_eq!(
@@ -835,7 +875,12 @@ mod tests {
             mints: mints.clone(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         // test IsTransferable on a non-transferable token
@@ -887,14 +932,24 @@ mod tests {
             key: "akey".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         let execute_msg = ExecuteMsg::SetViewingKey {
             key: "bkey".to_string(),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bob", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         let execute_msg = ExecuteMsg::MintNft {
@@ -908,7 +963,12 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         // verify that alice does not have transfer approval despite owning the non-transferable token

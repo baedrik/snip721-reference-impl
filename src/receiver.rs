@@ -18,7 +18,7 @@ use crate::contract::BLOCK_SIZE;
 /// is actually processed like a BatchReceiveNft `from` field.  Again, apologies for any confusion
 /// caused by propagating inaccuracies, but because InterNFT is planning on using CW-721 standards,
 /// compliance with CW-721 might be necessary
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Snip721ReceiveMsg {
     /// ReceiveNft may be a HandleMsg variant of any contract that wants to implement a receiver
@@ -67,14 +67,14 @@ pub fn receive_nft_msg(
     token_id: String,
     msg: Option<Binary>,
     callback_code_hash: String,
-    contract_addr: Addr,
+    contract_addr: String,
 ) -> StdResult<CosmosMsg> {
     let msg = Snip721ReceiveMsg::ReceiveNft {
         sender,
         token_id,
         msg,
     };
-    msg.to_cosmos_msg(callback_code_hash, contract_addr.to_string(), None)
+    msg.to_cosmos_msg(callback_code_hash, contract_addr, None)
 }
 
 /// Returns a StdResult<CosmosMsg> used to call a registered contract's
@@ -95,7 +95,7 @@ pub fn batch_receive_nft_msg(
     token_ids: Vec<String>,
     msg: Option<Binary>,
     callback_code_hash: String,
-    contract_addr: Addr,
+    contract_addr: String,
 ) -> StdResult<CosmosMsg> {
     let msg = Snip721ReceiveMsg::BatchReceiveNft {
         sender,
@@ -103,5 +103,5 @@ pub fn batch_receive_nft_msg(
         token_ids,
         msg,
     };
-    msg.to_cosmos_msg(callback_code_hash, contract_addr.to_string(), None)
+    msg.to_cosmos_msg(callback_code_hash, contract_addr, None)
 }

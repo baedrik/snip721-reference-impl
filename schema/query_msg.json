@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "QueryMsg",
-  "anyOf": [
+  "oneOf": [
     {
       "description": "display the contract's name and symbol",
       "type": "object",
@@ -12,7 +12,8 @@
         "contract_info": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display the contract's configuration",
@@ -24,7 +25,8 @@
         "contract_config": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display the list of authorized minters",
@@ -36,7 +38,8 @@
         "minters": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display the number of tokens controlled by the contract.  The token supply must either be public, or the querier must be an authenticated minter",
@@ -61,7 +64,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display an optionally paginated list of all the tokens controlled by the contract. The token supply must either be public, or the querier must be an authenticated minter",
@@ -102,7 +106,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display the owner of the specified token if authorized to view it.  If the requester is also the token's owner, the response will also include a list of any addresses that can transfer this token.  The transfer approval list is for CW721 compliance, but the NftDossier query will be more complete by showing viewing approvals as well",
@@ -140,7 +145,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "displays the public metadata of a token",
@@ -160,7 +166,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "displays all the information contained in the OwnerOf and NftInfo queries",
@@ -198,7 +205,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "displays the private metadata if permitted to view it",
@@ -229,7 +237,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "displays all the information about a token that the viewer has permission to see.  This may include the owner, the public metadata, the private metadata, royalty information, mint run information, whether the token is unwrapped, whether the token is transferable, and the token and inventory approvals",
@@ -267,7 +276,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "displays all the information about multiple tokens that the viewer has permission to see.  This may include the owner, the public metadata, the private metadata, royalty information, mint run information, whether the token is unwrapped, whether the token is transferable, and the token and inventory approvals",
@@ -308,7 +318,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "list all the approvals in place for a specified token if given the owner's viewing key",
@@ -340,7 +351,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "list all the inventory-wide approvals in place for the specified address if given the the correct viewing key for the address",
@@ -357,7 +369,7 @@
           ],
           "properties": {
             "address": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "include_expired": {
               "description": "optionally include expired Approvals in the response list.  If ommitted or false, expired Approvals will be filtered out of the response",
@@ -372,7 +384,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "displays a list of all the CW721-style operators (any address that was granted approval to transfer all of the owner's tokens).  This query is provided to maintain CW721 compliance, however, approvals are private on secret network, so only the owner's viewing key will authorize the ability to see the list of operators",
@@ -395,7 +408,7 @@
               ]
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "viewing_key": {
               "description": "optional viewing key to authenticate this query.  It is \"optional\" only in the sense that a CW721 query does not have this field.  However, not providing the key will always result in an empty list",
@@ -406,7 +419,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "displays a list of all the tokens belonging to the input owner in which the viewer has view_owner permission",
@@ -431,7 +445,7 @@
               "minimum": 0.0
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "start_after": {
               "description": "paginate by providing the last token_id received in the previous query",
@@ -442,13 +456,9 @@
             },
             "viewer": {
               "description": "optional address of the querier if different from the owner",
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             },
             "viewing_key": {
@@ -460,7 +470,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "displays the number of tokens that the querier has permission to see the owner and that belong to the specified address",
@@ -476,17 +487,13 @@
           ],
           "properties": {
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "viewer": {
               "description": "optional address of the querier if different from the owner",
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             },
             "viewing_key": {
@@ -498,7 +505,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display if a token is unwrapped",
@@ -518,7 +526,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display if a token is transferable",
@@ -538,7 +547,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display that this contract implements non-transferable tokens",
@@ -550,7 +560,8 @@
         "implements_non_transferable_tokens": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display that this contract implements the use of the `token_subtype` metadata extension field",
@@ -562,7 +573,8 @@
         "implements_token_subtype": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "verify that the specified address has approval to transfer every listed token. A token will count as unapproved if it is non-transferable",
@@ -581,11 +593,7 @@
           "properties": {
             "address": {
               "description": "address that has approval",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "token_ids": {
               "description": "list of tokens to verify approval for",
@@ -600,7 +608,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display the transaction history for the specified address in reverse chronological order",
@@ -617,7 +626,7 @@
           ],
           "properties": {
             "address": {
-              "$ref": "#/definitions/HumanAddr"
+              "type": "string"
             },
             "page": {
               "description": "optional page to display",
@@ -643,7 +652,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display the code hash a contract has registered with the token contract and whether the contract implements BatchReceivenft",
@@ -660,15 +670,12 @@
           "properties": {
             "contract": {
               "description": "the contract whose receive registration info you want to view",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display the royalty information of a token if a token ID is specified, or display the contract's default royalty information in no token ID is provided",
@@ -700,7 +707,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "display the contract's creator",
@@ -712,7 +720,8 @@
         "contract_creator": {
           "type": "object"
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "perform queries by passing permits instead of viewing keys",
@@ -746,15 +755,13 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
     "Binary": {
       "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
-      "type": "string"
-    },
-    "HumanAddr": {
       "type": "string"
     },
     "PermitParams_for_TokenPermissions": {
@@ -769,7 +776,7 @@
         "allowed_tokens": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/HumanAddr"
+            "type": "string"
           }
         },
         "chain_id": {
@@ -839,7 +846,7 @@
     },
     "QueryWithPermit": {
       "description": "queries using permits instead of viewing keys",
-      "anyOf": [
+      "oneOf": [
         {
           "description": "display the royalty information of a token if a token ID is specified, or display the contract's default royalty information in no token ID is provided",
           "type": "object",
@@ -859,7 +866,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "displays the private metadata if permitted to view it",
@@ -879,7 +887,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "displays all the information about a token that the viewer has permission to see.  This may include the owner, the public metadata, the private metadata, royalty information, mint run information, whether the token is unwrapped, whether the token is transferable, and the token and inventory approvals",
@@ -906,7 +915,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "displays all the information about multiple tokens that the viewer has permission to see.  This may include the owner, the public metadata, the private metadata, royalty information, mint run information, whether the token is unwrapped, whether the token is transferable, and the token and inventory approvals",
@@ -936,7 +946,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "display the owner of the specified token if authorized to view it.  If the requester is also the token's owner, the response will also include a list of any addresses that can transfer this token.  The transfer approval list is for CW721 compliance, but the NftDossier query will be more complete by showing viewing approvals as well",
@@ -963,7 +974,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "displays all the information contained in the OwnerOf and NftInfo queries",
@@ -990,7 +1002,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "list all the inventory-wide approvals in place for the permit creator",
@@ -1011,7 +1024,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "verify that the permit creator has approval to transfer every listed token. A token will count as unapproved if it is non-transferable",
@@ -1035,7 +1049,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "display the transaction history for the permit creator in reverse chronological order",
@@ -1067,7 +1082,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "display the number of tokens controlled by the contract.  The token supply must either be public, or the querier must be an authenticated minter",
@@ -1079,7 +1095,8 @@
             "num_tokens": {
               "type": "object"
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "display an optionally paginated list of all the tokens controlled by the contract. The token supply must either be public, or the querier must be an authenticated minter",
@@ -1109,7 +1126,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "list all the approvals in place for a specified token if given the owner's permit",
@@ -1136,7 +1154,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "displays a list of all the CW721-style operators (any address that was granted approval to transfer all of the owner's tokens).  This query is provided to maintain CW721 compliance",
@@ -1157,7 +1176,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "displays a list of all the tokens belonging to the input owner in which the permit creator has view_owner permission",
@@ -1182,7 +1202,7 @@
                   "minimum": 0.0
                 },
                 "owner": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 },
                 "start_after": {
                   "description": "paginate by providing the last token_id received in the previous query",
@@ -1193,7 +1213,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "displays the number of tokens that the querier has permission to see the owner and that belong to the specified address",
@@ -1209,21 +1230,45 @@
               ],
               "properties": {
                 "owner": {
-                  "$ref": "#/definitions/HumanAddr"
+                  "type": "string"
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
     "TokenPermissions": {
-      "type": "string",
-      "enum": [
-        "allowance",
-        "balance",
-        "history",
-        "owner"
+      "oneOf": [
+        {
+          "description": "Allowance for SNIP-20 - Permission to query allowance of the owner & spender",
+          "type": "string",
+          "enum": [
+            "allowance"
+          ]
+        },
+        {
+          "description": "Balance for SNIP-20 - Permission to query balance",
+          "type": "string",
+          "enum": [
+            "balance"
+          ]
+        },
+        {
+          "description": "History for SNIP-20 - Permission to query transfer_history & transaction_hisotry",
+          "type": "string",
+          "enum": [
+            "history"
+          ]
+        },
+        {
+          "description": "Owner permission indicates that the bearer of this permit should be granted all the access of the creator/signer of the permit.  SNIP-721 uses this to grant viewing access to all data that the permit creator owns and is whitelisted for. For SNIP-721 use, a permit with Owner permission should NEVER be given to anyone else.  If someone wants to share private data, they should whitelist the address they want to share with via a SetWhitelistedApproval tx, and that address will view the data by creating their own permit with Owner permission",
+          "type": "string",
+          "enum": [
+            "owner"
+          ]
+        }
       ]
     },
     "ViewerInfo": {
@@ -1236,11 +1281,7 @@
       "properties": {
         "address": {
           "description": "querying address",
-          "allOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          ]
+          "type": "string"
         },
         "viewing_key": {
           "description": "authentication key string",

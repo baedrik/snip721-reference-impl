@@ -127,7 +127,7 @@ Message responses will be JSON encoded in the `data` field of the Cosmos respons
 |--------------------|--------------------------------------------------------|---------------------------------------------------------------------|----------|--------------------|
 | name               | string                                                 | Name of the token contract                                          | no       |                    |
 | symbol             | string                                                 | Token contract symbol                                               | no       |                    |
-| admin              | string                                     | Address to be given admin authority                                 | yes      | env.message.sender |
+| admin              | string (Addr)                                          | Address to be given admin authority                                 | yes      | env.message.sender |
 | entropy            | string                                                 | String used as entropy when generating random viewing keys          | no       |                    |
 | royalty_info       | [RoyaltyInfo (see below)](#royaltyinfo)                | Default RoyaltyInfo for the contract                                | yes      | nothing            |
 | config             | [Config (see below)](#config)                          | Privacy configuration for the contract                              | yes      | defined below      |
@@ -166,7 +166,7 @@ Royalty defines a payment address and a royalty rate to be paid when an NFT is s
 ```
 | Name      | Type               | Description                                                                                                      | Optional in Messages | Optional in Query Responses |
 |-----------|--------------------|------------------------------------------------------------------------------------------------------------------|----------------------|-----------------------------|
-| recipient | string | The address that should be paid this royalty                                                                     | no                   | yes                         |
+| recipient | string (Addr)      | The address that should be paid this royalty                                                                     | no                   | yes                         |
 | rate      | number (u16)       | The royalty rate to be paid using the number of decimals specified in the `RoyaltyInfo` containing this `Royalty`| no                   | no                          |
 
 ### <a name="config"></a>Config
@@ -220,7 +220,7 @@ The PostInitCallback object is used to have the token contract execute an option
 | Name             | Type                                  | Description                                                                                           | Optional | Value If Omitted |
 |------------------|---------------------------------------|-------------------------------------------------------------------------------------------------------|----------|------------------|
 | msg              | string (base64 encoded Binary)        | Base64 encoded Binary representation of the callback message to perform after contract initialization | no       |                  |
-| contract_address | string                    | Address of the contract to call after initialization                                                  | no       |                  |
+| contract_address | string (Addr)                         | Address of the contract to call after initialization                                                  | no       |                  |
 | code_hash        | string                                | A 32-byte hex encoded string, with the code hash of the contract to call after initialization         | no       |                  |
 | send             | array of [Coin (see below)](#coin)    | List of native Coin amounts to send with the callback message                                         | no       |                  |
 
@@ -287,7 +287,7 @@ MintNft mints a single token.  Only an authorized minting address my execute Min
 | Name             | Type                                      | Description                                                                                   | Optional | Value If Omitted     |
 |------------------|-------------------------------------------|-----------------------------------------------------------------------------------------------|----------|----------------------|
 | token_id         | string                                    | Identifier for the token to be minted                                                         | yes      | minting order number |
-| owner            | string                        | Address of the owner of the minted token                                                      | yes      | env.message.sender   |
+| owner            | string (Addr)                             | Address of the owner of the minted token                                                      | yes      | env.message.sender   |
 | public_metadata  | [Metadata (see below)](#metadata)         | The metadata that is publicly viewable                                                        | yes      | nothing              |
 | private_metadata | [Metadata (see below)](#metadata)         | The metadata that is viewable only by the token owner and addresses the owner has whitelisted | yes      | nothing              |
 | serial_number    | [SerialNumber (see below)](#serialnumber) | The SerialNumber for this token                                                               | yes      | nothing              |
@@ -561,7 +561,7 @@ The Mint object defines the data necessary to mint one token.
 | Name             | Type                                      | Description                                                                                    | Optional | Value If Omitted     |
 |------------------|-------------------------------------------|------------------------------------------------------------------------------------------------|----------|----------------------|
 | token_id         | string                                    | Identifier for the token to be minted                                                          | yes      | minting order number |
-| owner            | string                        | Address of the owner of the minted token                                                       | yes      | env.message.sender   |
+| owner            | string (Addr)                             | Address of the owner of the minted token                                                       | yes      | env.message.sender   |
 | public_metadata  | [Metadata (see above)](#metadata)         | The metadata that is publicly viewable                                                         | yes      | nothing              |
 | private_metadata | [Metadata (see above)](#metadata)         | The metadata that is viewable only by the token owner and addresses the owner has whitelisted  | yes      | nothing              |
 | serial_number    | [SerialNumber (see above)](#serialnumber) | The SerialNumber for this token                                                                | yes      | nothing              |
@@ -617,7 +617,7 @@ MintNftClones mints copies of an NFT, giving each one a [MintRunInfo](#mintrunin
 |------------------|-----------------------------------------|----------------------------------------------------------------------------------------------------------|----------|---------------------|
 | mint_run_id      | string                                  | Identifier used to track the number of mint runs these clones have had over multiple MintNftClones calls | yes      | nothing             |
 | quantity         | number (u32)                            | Number of clones to mint in this run                                                                     | no       |                     |
-| owner            | string                      | Address of the owner of the minted tokens                                                                | yes      | env.message.sender  |
+| owner            | string (Addr)                           | Address of the owner of the minted tokens                                                                | yes      | env.message.sender  |
 | public_metadata  | [Metadata (see above)](#metadata)       | The metadata that is publicly viewable                                                                   | yes      | nothing             |
 | private_metadata | [Metadata (see above)](#metadata)       | The metadata that is viewable only by the token owner and addresses the owner has whitelisted            | yes      | nothing             |
 | royalty_info     | [RoyaltyInfo (see above)](#royaltyinfo) | RoyaltyInfo for these tokens                                                                             | yes      | default RoyaltyInfo |
@@ -839,7 +839,7 @@ The owner of a token can use SetWhitelistedApproval to grant an address permissi
 ```
 | Name                  | Type                                       | Description                                                                                        | Optional | Value If Omitted |
 |-----------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------|----------|------------------|
-| address               | string                         | Address to grant or revoke approval to/from                                                        | no       |                  |
+| address               | string (Addr)                              | Address to grant or revoke approval to/from                                                        | no       |                  |
 | token_id              | string                                     | If supplying either `approve_token` or `revoke_token` access, the token whose privacy is being set | yes      | nothing          |
 | view_owner            | [AccessLevel (see above)](#accesslevel)    | Grant or revoke the address' permission to view the ownership of a token/inventory                 | yes      | nothing          |
 | view_private_metadata | [AccessLevel (see above)](#accesslevel)    | Grant or revoke the address' permission to view the private metadata of a token/inventory          | yes      | nothing          |
@@ -872,7 +872,7 @@ Approve is used to grant an address permission to transfer a single token.  This
 ```
 | Name                  | Type                                     | Description                                                                                          | Optional | Value If Omitted |
 |-----------------------|------------------------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
-| spender               | string                       | Address being granted approval to transfer the token                                                 | no       |                  |
+| spender               | string (Addr)                            | Address being granted approval to transfer the token                                                 | no       |                  |
 | token_id              | string                                   | ID of the token that the spender can now transfer                                                    | no       |                  |
 | expires               | [Expiration (see above)](#expiration)    | The expiration of this token transfer approval.  Can be a blockheight, time, or never                | yes      | "never"          |
 | padding               | string                                   | An ignored string that can be used to maintain constant message length                               | yes      | nothing          |
@@ -901,7 +901,7 @@ Revoke is used to revoke from an address the permission to transfer this single 
 ```
 | Name                  | Type                    | Description                                                                                          | Optional | Value If Omitted |
 |-----------------------|-------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
-| spender               | string      | Address no longer permitted to transfer the token                                                    | no       |                  |
+| spender               | string (Addr)           | Address no longer permitted to transfer the token                                                    | no       |                  |
 | token_id              | string                  | ID of the token that the spender can no longer transfer                                              | no       |                  |
 | padding               | string                  | An ignored string that can be used to maintain constant message length                               | yes      | nothing          |
 
@@ -929,7 +929,7 @@ ApproveAll is used to grant an address permission to transfer all the tokens in 
 ```
 | Name                  | Type                                     | Description                                                                                          | Optional | Value If Omitted |
 |-----------------------|------------------------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
-| operator              | string                       | Address being granted approval to transfer all of the message sender's tokens                        | no       |                  |
+| operator              | string (Addr)                            | Address being granted approval to transfer all of the message sender's tokens                        | no       |                  |
 | expires               | [Expiration (see above)](#expiration)    | The expiration of this inventory-wide transfer approval.  Can be a blockheight, time, or never       | yes      | "never"          |
 | padding               | string                                   | An ignored string that can be used to maintain constant message length                               | yes      | nothing          |
 
@@ -956,7 +956,7 @@ RevokeAll is used to revoke all transfer approvals granted to an address.  Revok
 ```
 | Name                  | Type                    | Description                                                                                          | Optional | Value If Omitted |
 |-----------------------|-------------------------|------------------------------------------------------------------------------------------------------|----------|------------------|
-| operator              | string      | Address being revoked all approvals to transfer the message sender's tokens                          | no       |                  |
+| operator              | string (Addr)           | Address being revoked all approvals to transfer the message sender's tokens                          | no       |                  |
 | padding               | string                  | An ignored string that can be used to maintain constant message length                               | yes      | nothing          |
 
 ##### Response
@@ -986,7 +986,7 @@ This implementation will throw an error if trying to transfer a [SNIP-722](https
 ```
 | Name      | Type               | Description                                                                                                                         | Optional | Value If Omitted |
 |-----------|--------------------|-------------------------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| recipient | string | Address receiving the token                                                                                                         | no       |                  |
+| recipient | string (Addr)      | Address receiving the token                                                                                                         | no       |                  |
 | token_id  | string             | Identifier of the token to be transferred                                                                                           | no       |                  |
 | memo      | string             | `memo` for the transfer transaction that is only viewable by addresses involved in the transfer (recipient, sender, previous owner) | yes      | nothing          |
 | padding   | string             | An ignored string that can be used to maintain constant message length                                                              | yes      | nothing          |
@@ -1054,7 +1054,7 @@ The Transfer object provides a list of tokens to transfer to one `recipient` add
 ```
 | Name      | Type               | Description                                                                                                                         | Optional | Value If Omitted |
 |-----------|--------------------|-------------------------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| recipient | string | Address receiving the listed tokens                                                                                                 | no       |                  |
+| recipient | string (Addr)      | Address receiving the listed tokens                                                                                                 | no       |                  |
 | token_ids | array of string    | List of token IDs to transfer to the `recipient`                                                                                    | no       |                  |
 | memo      | string             | `memo` for the transfer transactions that is only viewable by addresses involved in the transfer (recipient, sender, previous owner)| yes      | nothing          |
 
@@ -1085,7 +1085,7 @@ This implementation will throw an error if trying to send a [SNIP-722](https://g
 ```
 | Name          | Type                                      | Description                                                                                            | Optional | Value If Omitted |
 |---------------|-------------------------------------------|--------------------------------------------------------------------------------------------------------|----------|------------------|
-| contract      | string                        | Address receiving the token                                                                            | no       |                  |
+| contract      | string (Addr)                             | Address receiving the token                                                                            | no       |                  |
 | receiver_info | [ReceiverInfo (see below)](#receiverinfo) | Code hash and BatchReceiveNft implementation status of the recipient contract                          | yes      | nothing          |
 | token_id      | string                                    | Identifier of the token to be transferred                                                              | no       |                  |
 | msg           | string (base64 encoded Binary)            | `msg` included when calling the recipient contract's BatchReceiveNft (or ReceiveNft)                   | yes      | nothing          |
@@ -1178,7 +1178,7 @@ The Send object provides a list of tokens to transfer to one recipient address, 
 ```
 | Name          | Type                                      | Description                                                                                            | Optional | Value If Omitted |
 |---------------|-------------------------------------------|--------------------------------------------------------------------------------------------------------|----------|------------------|
-| contract      | string                        | Address receiving the token                                                                            | no       |                  |
+| contract      | string (Addr)                             | Address receiving the token                                                                            | no       |                  |
 | receiver_info | [ReceiverInfo (see above)](#receiverinfo) | Code hash and BatchReceiveNft implementation status of the recipient contract                          | yes      | nothing          |
 | token_ids     | array of string                           | List of token IDs to send to the recipient                                                             | no       |                  |
 | msg           | string (base64 encoded Binary)            | `msg` included when calling the recipient contract's BatchReceiveNft (or ReceiveNft)                   | yes      | nothing          |
@@ -1333,7 +1333,7 @@ AddMinters will add the provided addresses to the list of authorized minters.  T
 ```
 | Name    | Type                        | Description                                                                                                        | Optional | Value If Omitted |
 |---------|-----------------------------|--------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| minters | array of string | The list of addresses to add to the list of authorized minters                                                     | no       |                  |
+| minters | array of string (Addr)      | The list of addresses to add to the list of authorized minters                                                     | no       |                  |
 | padding | string                      | An ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
 
 ##### Response
@@ -1361,7 +1361,7 @@ RemoveMinters will remove the provided addresses from the list of authorized min
 ```
 | Name    | Type                        | Description                                                                                                        | Optional | Value If Omitted |
 |---------|-----------------------------|--------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| minters | array of string | The list of addresses to remove from the list of authorized minters                                                | no       |                  |
+| minters | array of string (Addr)      | The list of addresses to remove from the list of authorized minters                                                | no       |                  |
 | padding | string                      | An ignored string that can be used to maintain constant message length                                             | yes      | nothing          |
 
 ##### Response
@@ -1389,7 +1389,7 @@ SetMinters will precisely define the list of authorized minters.  This can only 
 ```
 | Name    | Type                        | Description                                                                                 | Optional | Value If Omitted |
 |---------|-----------------------------|---------------------------------------------------------------------------------------------|----------|------------------|
-| minters | array of string | The list of addresses to are allowed to mint                                                | no       |                  |
+| minters | array of string (Addr)      | The list of addresses to are allowed to mint                                                | no       |                  |
 | padding | string                      | An ignored string that can be used to maintain constant message length                      | yes      | nothing          |
 
 ##### Response
@@ -1446,7 +1446,7 @@ ChangeAdmin will allow the current admin to transfer admin privileges to another
 ```
 | Name    | Type               | Description                                                                                 | Optional | Value If Omitted |
 |---------|--------------------|---------------------------------------------------------------------------------------------|----------|------------------|
-| address | string | Address of the new contract admin                                                           | no       |                  |
+| address | string (Addr)      | Address of the new contract admin                                                           | no       |                  |
 | padding | string             | An ignored string that can be used to maintain constant message length                      | yes      | nothing          |
 
 ##### Response
@@ -1539,7 +1539,7 @@ ContractInfo returns the contract's name and symbol.  This query is not authenti
 ```
 
 ## ContractConfig
-ContractConfig returns the configuration values that were selected when the contract was instantiated.  See [Config](#config) for an explanation of the configuration options.  This query is not authenticated.
+ContractConfig returns the configuration values that were selected when the contract was instantiated.  See [Config](#config) for an explanation of the configuration options.  ContractConfig also returns whether non-transferable tokens and token subtypes are implemented.  This query is not authenticated.
 
 ##### Request
 ```
@@ -1557,19 +1557,23 @@ ContractConfig returns the configuration values that were selected when the cont
 		“unwrapped_metadata_is_private”: true | false,
 		“minter_may_update_metadata”: true | false,
 		“owner_may_update_metadata”: true | false,
-		“burn_is_enabled”: true | false
+		“burn_is_enabled”: true | false,
+		"implements_non_transferable_tokens": true | false,
+		"implements_token_subtype": true | false
 	}
 }
 ```
-| Name                          | Type | Description                                                                                | Optional |
-|-------------------------------|------|--------------------------------------------------------------------------------------------|----------|
-| token_supply_is_public        | bool | True if token IDs and the number of tokens controlled by the contract are public           | no       |
-| owner_is_public               | bool | True if newly minted coins have public ownership as default                                | no       |
-| sealed_metadata_is_enabled    | bool | True if newly minted coins have sealed metadata                                            | no       |
-| unwrapped_metadata_is_private | bool | True if sealed metadata remains private after unwrapping                                   | no       |
-| minter_may_update_metadata    | bool | True if authorized minters may alter a token's metadata                                    | no       |
-| owner_may_update_metadata     | bool | True if a token owner may alter its metadata                                               | no       |
-| burn_is_enabled               | bool | True if burn functionality is enabled                                                      | no       |
+| Name                               | Type | Description                                                                                | Optional |
+|------------------------------------|------|--------------------------------------------------------------------------------------------|----------|
+| token_supply_is_public             | bool | True if token IDs and the number of tokens controlled by the contract are public           | no       |
+| owner_is_public                    | bool | True if newly minted coins have public ownership as default                                | no       |
+| sealed_metadata_is_enabled         | bool | True if newly minted coins have sealed metadata                                            | no       |
+| unwrapped_metadata_is_private      | bool | True if sealed metadata remains private after unwrapping                                   | no       |
+| minter_may_update_metadata         | bool | True if authorized minters may alter a token's metadata                                    | no       |
+| owner_may_update_metadata          | bool | True if a token owner may alter its metadata                                               | no       |
+| burn_is_enabled                    | bool | True if burn functionality is enabled                                                      | no       |
+| implements_non_transferable_tokens | bool | True if the contract implements non-transferable tokens                                    | no       |
+| implements_token_subtype           | bool | True if the contract implements token subtypes                                             | no       |
 
 ## Minters
 Minters returns the list of addresses that are authorized to mint tokens.  This query is not authenticated.
@@ -1592,7 +1596,7 @@ Minters returns the list of addresses that are authorized to mint tokens.  This 
 ```
 | Name    | Type                        | Description                              | Optional |
 |---------|-----------------------------|------------------------------------------|----------|
-| minters | array of string | List of addresses with minting authority | no       |
+| minters | array of string (Addr)      | List of addresses with minting authority | no       |
 
 ## RegisteredCodeHash
 RegisteredCodeHash will display the code hash of the specified contract if it has registered its [receiver interface](#receiver) and will indicate whether the contract implements [BatchReceiveNft](#batchreceivenft).
@@ -1607,7 +1611,7 @@ RegisteredCodeHash will display the code hash of the specified contract if it ha
 ```
 | Name     | Type               | Description                                                           | Optional | Value If Omitted |
 |----------|--------------------|-----------------------------------------------------------------------|----------|------------------|
-| contract | string | The address of the contract whose registration info is being queried  | no       |                  |
+| contract | string (Addr)      | The address of the contract whose registration info is being queried  | no       |                  |
 
 ##### Response
 ```
@@ -1663,7 +1667,7 @@ The ViewerInfo object provides the address and viewing key of the querier.  It i
 ```
 | Name        | Type               | Description                                                                                                           | Optional | Value If Omitted |
 |-------------|--------------------|-----------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| address     | string | Address performing the query                                                                                          | no       |                  |
+| address     | string (Addr)      | Address performing the query                                                                                          | no       |                  |
 | viewing_key | string             | The querying address' viewing key                                                                                     | no       |                  |
 
 ## AllTokens
@@ -1797,7 +1801,7 @@ OwnerOf returns the owner of the specified token if the querier is the owner or 
 ```
 | Name      | Type                                                 | Description                                              | Optional |
 |-----------|------------------------------------------------------|----------------------------------------------------------|----------|
-| owner     | string                                   | Address of the token's owner                             | no       |
+| owner     | string (Addr)                                        | Address of the token's owner                             | no       |
 | approvals | array of [Cw721Approval (see below)](#cw721approval) | List of approvals to transfer this token                 | no       |
 
 ### <a name="cw721approval"></a>Cw721Approval
@@ -1810,7 +1814,7 @@ The Cw721Approval object is used to display CW-721-style approvals which are lim
 ```
 | Name    | Type                                  | Description                                                                     | Optional |
 |---------|---------------------------------------|---------------------------------------------------------------------------------|----------|
-| spender | string                    | Address whitelisted to transfer a token                                         | no       |
+| spender | string (Addr)                         | Address whitelisted to transfer a token                                         | no       |
 | expires | [Expiration (see above)](#expiration) | The expiration of this transfer approval.  Can be a blockheight, time, or never | no       |
 
 ## <a name="nftinfo"></a>NftInfo
@@ -1915,7 +1919,7 @@ The Cw721OwnerOfResponse object is used to display a token's owner if the querie
 ```
 | Name      | Type                                                 | Description                                              | Optional |
 |-----------|------------------------------------------------------|----------------------------------------------------------|----------|
-| owner     | string                                   | Address of the token's owner                             | yes      |
+| owner     | string (Addr)                                        | Address of the token's owner                             | yes      |
 | approvals | array of [Cw721Approval (see above)](#cw721approval) | List of approvals to transfer this token                 | no       |
 
 ## PrivateMetadata
@@ -2052,7 +2056,7 @@ SNIP-723 (specification to be written) adds an `unwrapped` field which is false 
 ```
 | Name                                  | Type                                                  | Description                                                                            | Optional |
 |---------------------------------------|-------------------------------------------------------|----------------------------------------------------------------------------------------|----------|
-| owner                                 | string                                    | Address of the token's owner                                                           | yes      |
+| owner                                 | string (Addr)                                         | Address of the token's owner                                                           | yes      |
 | public_metadata                       | [Metadata (see above)](#metadata)                     | The token's public metadata                                                            | yes      |
 | private_metadata                      | [Metadata (see above)](#metadata)                     | The token's private metadata                                                           | yes      |
 | display_private_metadata_error        | string                                                | If the private metadata is not displayed, the corresponding error message              | yes      |
@@ -2084,8 +2088,8 @@ MintRunInfo contains information about the minting of this token.
 ```
 | Name                     | Type               | Description                                                                                               | Optional |
 |--------------------------|--------------------|-----------------------------------------------------------------------------------------------------------|----------|
-| collection_creator       | string | The address that instantiated this contract                                                               | yes      |
-| token_creator            | string | The address that minted this token                                                                        | yes      |
+| collection_creator       | string (Addr)      | The address that instantiated this contract                                                               | yes      |
+| token_creator            | string (Addr)      | The address that minted this token                                                                        | yes      |
 | time_of_minting          | number (u64)       | The number of seconds since 01/01/1970 that this token was minted                                         | yes      |
 | mint_run                 | number (u32)       | The mint run this token was minted in.  This represents batches of NFTs released at the same time         | yes      |
 | serial_number            | number (u32)       | The serial number of this token                                                                           | yes      |
@@ -2105,7 +2109,7 @@ The Snip721Approval object is used to display all the approvals (and their expir
 ```
 | Name                             | Type                                  | Description                                                                                 | Optional |
 |----------------------------------|---------------------------------------|---------------------------------------------------------------------------------------------|----------|
-| address                          | string                    | The whitelisted address                                                                     | no       |
+| address                          | string (Addr)                         | The whitelisted address                                                                     | no       |
 | view_owner_expiration            | [Expiration (see above)](#expiration) | The expiration for view_owner permission.  Can be a blockheight, time, or never             | yes      |
 | view_private_metadata_expiration | [Expiration (see above)](#expiration) | The expiration for view__private_metadata permission.  Can be a blockheight, time, or never | yes      |
 | transfer_expiration              | [Expiration (see above)](#expiration) | The expiration for transfer permission.  Can be a blockheight, time, or never               | yes      |
@@ -2215,7 +2219,7 @@ ApprovedForAll displays all the addresses that have approval to transfer all of 
 ```
 | Name            | Type               | Description                                                                              | Optional | Value If Omitted |
 |-----------------|--------------------|------------------------------------------------------------------------------------------|----------|------------------|
-| owner           | string | The address whose approvals are being queried                                            | no       |                  |
+| owner           | string (Addr)      | The address whose approvals are being queried                                            | no       |                  |
 | viewing_key     | string             | The owner's viewing key                                                                  | yes      | nothing          |
 | include_expired | bool               | True if expired approvals should be included in the response                             | yes      | false            |
 
@@ -2254,7 +2258,7 @@ InventoryApprovals returns whether all the address' tokens have public ownership
 ```
 | Name            | Type               | Description                                                           | Optional | Value If Omitted |
 |-----------------|--------------------|-----------------------------------------------------------------------|----------|------------------|
-| address         | string | The address whose inventory-wide approvals are being queried          | no       |                  |
+| address         | string (Addr)      | The address whose inventory-wide approvals are being queried          | no       |                  |
 | viewing_key     | string             | The viewing key associated with this address                          | no       |                  |
 | include_expired | bool               | True if expired approvals should be included in the response          | yes      | false            |
 
@@ -2305,8 +2309,8 @@ Tokens displays an optionally paginated list of all the token IDs that belong to
 ```
 | Name        | Type               | Description                                                                              | Optional | Value If Omitted |
 |-------------|--------------------|------------------------------------------------------------------------------------------|----------|------------------|
-| owner       | string | The address whose inventory is being queried                                             | no       |                  |
-| viewer      | string | The querier's address if different from the `owner`                                      | yes      | nothing          |
+| owner       | string (Addr)      | The address whose inventory is being queried                                             | no       |                  |
+| viewer      | string (Addr)      | The querier's address if different from the `owner`                                      | yes      | nothing          |
 | viewing_key | string             | The querier's viewing key                                                                | yes      | nothing          |
 | start_after | string             | Results will only list token IDs that come after this token ID in the list               | yes      | nothing          |
 | limit       | number (u32)       | Number of token IDs to return                                                            | yes      | 30               |
@@ -2345,7 +2349,7 @@ Because the intent of VerifyTransferApproval is to provide contracts a way to kn
 | Name        | Type               | Description                                                                              | Optional | Value If Omitted |
 |-------------|--------------------|------------------------------------------------------------------------------------------|----------|------------------|
 | token_ids   | array of string    | List of tokens to check for the address' transfer approval                               | no       |                  |
-| address     | string | Address being checked for transfer approval                                              | no       |                  |
+| address     | string (Addr)      | Address being checked for transfer approval                                              | no       |                  |
 | viewing_key | string             | The address' viewing key                                                                 | no       |                  |
 
 ##### Response
@@ -2420,7 +2424,7 @@ TransactionHistory displays an optionally paginated list of transactions (mint, 
 ```
 | Name        | Type               | Description                                                                                                           | Optional | Value If Omitted |
 |-------------|--------------------|-----------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| address     | string | The address whose transaction history is being queried                                                                | no       |                  |
+| address     | string (Addr)      | The address whose transaction history is being queried                                                                | no       |                  |
 | viewing_key | string             | The address' viewing key                                                                                              | no       |                  |
 | page        | number (u32)       | The page number to display, where the first transaction shown skips the `page` * `page_size` most recent transactions | yes      | 0                |
 | page_size   | number (u32)       | Number of transactions to return                                                                                      | yes      | 30               |
@@ -2517,8 +2521,8 @@ The TxAction object defines the type of transaction and holds the information sp
 ```
 | Name      | Type               | Description                                                                    | Optional |
 |-----------|--------------------|--------------------------------------------------------------------------------|----------|
-| minter    | string | The address that minted the token                                              | no       |
-| recipient | string | The address of the newly minted token's owner                                  | no       |
+| minter    | string (Addr)      | The address that minted the token                                              | no       |
+| recipient | string (Addr)      | The address of the newly minted token's owner                                  | no       |
 
 * <a name="txxfer"></a>TxAction::Transfer
 ```
@@ -2531,9 +2535,9 @@ The TxAction object defines the type of transaction and holds the information sp
 ```
 | Name      | Type               | Description                                                                    | Optional |
 |-----------|--------------------|--------------------------------------------------------------------------------|----------|
-| from      | string | The previous owner of the token                                                | no       |
-| sender    | string | The address that sent the token if different than the previous owner           | yes      |
-| recipient | string | The new owner of the token                                                     | no       |
+| from      | string (Addr)      | The previous owner of the token                                                | no       |
+| sender    | string (Addr)      | The address that sent the token if different than the previous owner           | yes      |
+| recipient | string (Addr)      | The new owner of the token                                                     | no       |
 
 * <a name="txburn"></a>TxAction::Burn
 ```
@@ -2545,8 +2549,8 @@ The TxAction object defines the type of transaction and holds the information sp
 ```
 | Name      | Type               | Description                                                                    | Optional |
 |-----------|--------------------|--------------------------------------------------------------------------------|----------|
-| owner     | string | The previous owner of the token                                                | no       |
-| burner    | string | The address that burned the token if different than the previous owner         | yes      |
+| owner     | string (Addr)      | The previous owner of the token                                                | no       |
+| burner    | string (Addr)      | The address that burned the token if different than the previous owner         | yes      |
 
 ## WithPermit
 SNIP-721 contracts may optionally implement query permits as specified in [SNIP-24](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-24.md).  They are an improvement over viewing keys in that permits allow a user to query private information without first needing to send a transaction to set or create a viewing key (see [here](https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-24.md#Rationale) for more details).
@@ -2751,7 +2755,7 @@ ReceiveNft may be a HandleMsg variant of any contract that wants to implement a 
 ```
 | Name     | Type                           | Description                                                                                            | Optional | Value If Omitted |
 |----------|--------------------------------|--------------------------------------------------------------------------------------------------------|----------|------------------|
-| sender   | string             | Address of the token's previous owner ([see above](#cwsender) about this inaccurate naming convention) | no       |                  |
+| sender   | string (Addr)                  | Address of the token's previous owner ([see above](#cwsender) about this inaccurate naming convention) | no       |                  |
 | token_id | string                         | ID of the sent token                                                                                   | no       |                  |
 | msg      | string (base64 encoded Binary) | Msg used to control receiving logic                                                                    | yes      | nothing          |
 
@@ -2771,7 +2775,7 @@ BatchReceiveNft may be a HandleMsg variant of any contract that wants to impleme
 ```
 | Name      | Type                           | Description                                                                                                              | Optional | Value If Omitted |
 |-----------|--------------------------------|--------------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| sender    | string             | Address that sent the tokens (this field has no ReceiveNft equivalent, [see above](#cwsender))                           | no       |                  |
-| from      | string             | Address of the tokens' previous owner (this field is equivalent to the ReceiveNft `sender` field, [see above](#cwsender))| no       |                  |
+| sender    | string (Addr)                  | Address that sent the tokens (this field has no ReceiveNft equivalent, [see above](#cwsender))                           | no       |                  |
+| from      | string (Addr)                  | Address of the tokens' previous owner (this field is equivalent to the ReceiveNft `sender` field, [see above](#cwsender))| no       |                  |
 | token_ids | array of string                | List of the tokens sent                                                                                                  | no       |                  |
 | msg       | string (base64 encoded Binary) | Msg used to control receiving logic                                                                                      | yes      | nothing          |

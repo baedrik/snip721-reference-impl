@@ -455,7 +455,7 @@ pub struct Burn {
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Transfer {
     /// recipient of the transferred tokens
-    pub recipient: Addr,
+    pub recipient: String,
     /// tokens being transferred
     pub token_ids: Vec<String>,
     /// optional memo for the tx
@@ -466,7 +466,7 @@ pub struct Transfer {
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Send {
     /// recipient of the sent tokens
-    pub contract: Addr,
+    pub contract: String,
     /// optional code hash and BatchReceiveNft implementation status of the recipient contract
     pub receiver_info: Option<ReceiverInfo>,
     /// tokens being sent
@@ -576,16 +576,16 @@ pub enum ExecuteAnswer {
 }
 
 /// the address and viewing key making an authenticated query request
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct ViewerInfo {
     /// querying address
-    pub address: Addr,
+    pub address: String,
     /// authentication key string
     pub viewing_key: String,
 }
 
 /// a recipient contract's code hash and whether it implements BatchReceiveNft
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct ReceiverInfo {
     /// recipient's code hash
     pub recipient_code_hash: String,
@@ -595,7 +595,7 @@ pub struct ReceiverInfo {
 }
 
 /// tx type and specifics
-#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum TxAction {
     /// transferred token ownership
@@ -624,7 +624,7 @@ pub enum TxAction {
 }
 
 /// tx for display
-#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct Tx {
     /// tx id
@@ -641,7 +641,7 @@ pub struct Tx {
     pub memo: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// display the contract's name and symbol
@@ -832,7 +832,7 @@ pub enum QueryMsg {
 }
 
 /// SNIP721 Approval
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Snip721Approval {
     /// whitelisted address
     pub address: Addr,
@@ -845,7 +845,7 @@ pub struct Snip721Approval {
 }
 
 /// CW721 Approval
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Cw721Approval {
     /// address that can transfer the token
     pub spender: Addr,
@@ -854,7 +854,7 @@ pub struct Cw721Approval {
 }
 
 /// response of CW721 OwnerOf
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Cw721OwnerOfResponse {
     /// Owner of the token if permitted to view it
     pub owner: Option<Addr>,
@@ -863,7 +863,7 @@ pub struct Cw721OwnerOfResponse {
 }
 
 /// the token id and nft dossier info of a single token response in a batch query
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct BatchNftDossierElement {
     pub token_id: String,
     pub owner: Option<Addr>,
@@ -899,6 +899,8 @@ pub enum QueryAnswer {
         minter_may_update_metadata: bool,
         owner_may_update_metadata: bool,
         burn_is_enabled: bool,
+        implements_non_transferable_tokens: bool,
+        implements_token_subtype: bool,
     },
     Minters {
         minters: Vec<Addr>,
@@ -990,18 +992,18 @@ pub enum QueryAnswer {
         royalty_info: Option<DisplayRoyaltyInfo>,
     },
     ContractCreator {
-        creator: Option<String>,
+        creator: Option<Addr>,
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseStatus {
     Success,
     Failure,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ContractStatus {
     Normal,
@@ -1021,7 +1023,7 @@ impl ContractStatus {
 }
 
 /// queries using permits instead of viewing keys
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryWithPermit {
     /// display the royalty information of a token if a token ID is specified, or display the

@@ -2,14 +2,14 @@
 mod tests {
     use std::any::Any;
 
-    use cosmwasm_std::{Addr, from_binary, OwnedDeps, Response, StdError, StdResult};
     use cosmwasm_std::testing::*;
+    use cosmwasm_std::{from_binary, Addr, OwnedDeps, Response, StdError, StdResult};
 
     use crate::contract::{execute, instantiate, query};
     use crate::mint_run::MintRunInfo;
     use crate::msg::{ExecuteMsg, InstantiateMsg, QueryAnswer, QueryMsg};
 
-// Helper functions
+    // Helper functions
 
     fn init_helper() -> (
         StdResult<Response>,
@@ -62,7 +62,12 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Only designated minters are allowed to mint"));
 
@@ -77,7 +82,12 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Quantity can not be zero"));
 
@@ -92,30 +102,35 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
         let instantiator = "instantiator".to_string();
         let admin = "admin".to_string();
         let run_info_0 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419879305533),
+            time_of_minting: Some(1571797419),
             mint_run: None,
             serial_number: Some(1),
             quantity_minted_this_run: Some(3),
         };
         let run_info_1 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419879305533),
+            time_of_minting: Some(1571797419),
             mint_run: None,
             serial_number: Some(2),
             quantity_minted_this_run: Some(3),
         };
         let run_info_2 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419879305533),
+            time_of_minting: Some(1571797419),
             mint_run: None,
             serial_number: Some(3),
             quantity_minted_this_run: Some(3),
@@ -171,13 +186,18 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         let run_info_3 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419879305533),
+            time_of_minting: Some(1571797419),
             mint_run: Some(1),
             serial_number: Some(1),
             quantity_minted_this_run: Some(1),
@@ -207,13 +227,18 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         let run_info_4 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419879305533),
+            time_of_minting: Some(1571797419),
             mint_run: Some(2),
             serial_number: Some(1),
             quantity_minted_this_run: Some(2),
@@ -232,9 +257,9 @@ mod tests {
             _ => panic!("unexpected"),
         }
         let run_info_5 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
             token_creator: Some(Addr::unchecked(admin.clone())),
-            time_of_minting: Some(1571797419879305533),
+            time_of_minting: Some(1571797419),
             mint_run: Some(2),
             serial_number: Some(2),
             quantity_minted_this_run: Some(2),

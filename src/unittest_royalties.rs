@@ -2,21 +2,21 @@
 mod tests {
     use std::any::Any;
 
-    use cosmwasm_std::{
-        Addr, Api, Binary, Coin, from_binary, OwnedDeps, Response, StdError, StdResult,
-        SubMsg, to_binary, Uint128, WasmMsg,
-    };
     use cosmwasm_std::testing::*;
+    use cosmwasm_std::{
+        from_binary, to_binary, Addr, Api, Binary, Coin, OwnedDeps, Response, StdError, StdResult,
+        SubMsg, Uint128, WasmMsg,
+    };
 
     use crate::contract::{execute, instantiate, query};
     use crate::msg::{
-        AccessLevel, ContractStatus, ExecuteMsg, InstantiateConfig, InstantiateMsg, PostInstantiateCallback, QueryAnswer,
-        QueryMsg, ViewerInfo,
+        AccessLevel, ContractStatus, ExecuteMsg, InstantiateConfig, InstantiateMsg,
+        PostInstantiateCallback, QueryAnswer, QueryMsg, ViewerInfo,
     };
     use crate::royalties::{DisplayRoyalty, DisplayRoyaltyInfo, Royalty, RoyaltyInfo};
-    use crate::state::{Config, CONFIG_KEY, load};
+    use crate::state::{load, Config, CONFIG_KEY};
 
-// Helper functions
+    // Helper functions
 
     fn init_helper_royalties(
         royalty_info: Option<RoyaltyInfo>,
@@ -73,9 +73,9 @@ mod tests {
                 owner_may_update_metadata,
                 enable_burn,
             )
-                .as_bytes(),
+            .as_bytes(),
         ))
-            .unwrap();
+        .unwrap();
         let info = mock_info("instantiator", &[]);
         let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
@@ -121,17 +121,12 @@ mod tests {
         // test default config
         let (init_result, mut deps) = init_helper_royalties(Some(royalties.clone()));
         assert_eq!(init_result.unwrap(), Response::default());
-        let config: Config = load(deps.as_ref().storage, CONFIG_KEY).unwrap();
+        let config: Config = load(&deps.storage, CONFIG_KEY).unwrap();
         assert_eq!(config.status, ContractStatus::Normal.to_u8());
         assert_eq!(config.mint_cnt, 0);
         assert_eq!(config.tx_cnt, 0);
         assert_eq!(config.name, "sec721".to_string());
-        assert_eq!(
-            config.admin,
-            deps.api
-                .addr_canonicalize(&("admin".to_string()))
-                .unwrap()
-        );
+        assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
         assert_eq!(config.token_supply_is_public, false);
         assert_eq!(config.owner_is_public, false);
@@ -192,13 +187,18 @@ mod tests {
             key: "key".to_string(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let _handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
 
         // test viewer is permitted to see default royatly addresses
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: None,
             viewer: Some(ViewerInfo {
-                address: Addr::unchecked("admin".to_string()),
+                address: "admin".to_string(),
                 viewing_key: "key".to_string(),
             }),
         };
@@ -228,17 +228,12 @@ mod tests {
             false,
         );
         assert_eq!(init_result.unwrap(), Response::default());
-        let config: Config = load(deps.as_ref().storage, CONFIG_KEY).unwrap();
+        let config: Config = load(&deps.storage, CONFIG_KEY).unwrap();
         assert_eq!(config.status, ContractStatus::Normal.to_u8());
         assert_eq!(config.mint_cnt, 0);
         assert_eq!(config.tx_cnt, 0);
         assert_eq!(config.name, "sec721".to_string());
-        assert_eq!(
-            config.admin,
-            deps.api
-                .addr_canonicalize(&("admin".to_string()))
-                .unwrap()
-        );
+        assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
         assert_eq!(config.token_supply_is_public, true);
         assert_eq!(config.owner_is_public, true);
@@ -334,7 +329,12 @@ mod tests {
             royalty_info: Some(royalties.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(
             error.contains("Only designated minters can set default royalties for the contract")
@@ -363,7 +363,12 @@ mod tests {
             royalty_info: Some(royalty_info_for_failure.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("The sum of royalty rates must not exceed 100%"));
 
@@ -425,19 +430,34 @@ mod tests {
             key: admin_key.clone(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let _handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
 
         let execute_msg = ExecuteMsg::SetViewingKey {
             key: alice_key.clone(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let _handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
 
         let execute_msg = ExecuteMsg::SetViewingKey {
             key: bob_key.clone(),
             padding: None,
         };
-        let _handle_result = execute(deps.as_mut(), mock_env(), mock_info("bob", &[]), execute_msg);
+        let _handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bob", &[]),
+            execute_msg,
+        );
 
         // set default royalties sanity check
         let execute_msg = ExecuteMsg::SetRoyaltyInfo {
@@ -445,7 +465,12 @@ mod tests {
             royalty_info: Some(royalties.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: None,
@@ -468,7 +493,7 @@ mod tests {
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: None,
             viewer: Some(ViewerInfo {
-                address: Addr::unchecked(admin.clone()),
+                address: admin.clone(),
                 viewing_key: admin_key.clone(),
             }),
         };
@@ -508,7 +533,7 @@ mod tests {
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: Some("NFT".to_string()),
             viewer: Some(ViewerInfo {
-                address: Addr::unchecked(admin.clone()),
+                address: admin.clone(),
                 viewing_key: admin_key.clone(),
             }),
         };
@@ -522,7 +547,12 @@ mod tests {
             royalty_info: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: None,
@@ -548,7 +578,12 @@ mod tests {
             royalty_info: Some(royalties.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("A token's RoyaltyInfo may only be set by the token creator when they are also the token owner"));
 
@@ -599,7 +634,12 @@ mod tests {
             royalty_info: Some(default.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         let execute_msg = ExecuteMsg::MintNft {
@@ -613,14 +653,19 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         // verify it has the default royalties with hidden addresses for bob
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: Some("default".to_string()),
             viewer: Some(ViewerInfo {
-                address: Addr::unchecked(bob.clone()),
+                address: bob.clone(),
                 viewing_key: bob_key.clone(),
             }),
         };
@@ -637,7 +682,7 @@ mod tests {
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: Some("default".to_string()),
             viewer: Some(ViewerInfo {
-                address: Addr::unchecked(alice.clone()),
+                address: alice.clone(),
                 viewing_key: alice_key.clone(),
             }),
         };
@@ -661,7 +706,12 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         // verify whitelisting bob for anything but transfer does not reveal addresses
@@ -674,14 +724,19 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         // verify it has the individual royalties with hidden addresses
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: Some("specified".to_string()),
             viewer: Some(ViewerInfo {
-                address: Addr::unchecked(bob.clone()),
+                address: bob.clone(),
                 viewing_key: bob_key.clone(),
             }),
         };
@@ -698,7 +753,7 @@ mod tests {
         let query_msg = QueryMsg::NftDossier {
             token_id: "specified".to_string(),
             viewer: Some(ViewerInfo {
-                address: Addr::unchecked(bob.clone()),
+                address: bob.clone(),
                 viewing_key: bob_key.clone(),
             }),
             include_expired: None,
@@ -722,13 +777,18 @@ mod tests {
             expires: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         let query_msg = QueryMsg::NftDossier {
             token_id: "specified".to_string(),
             viewer: Some(ViewerInfo {
-                address: Addr::unchecked(bob.clone()),
+                address: bob.clone(),
                 viewing_key: bob_key.clone(),
             }),
             include_expired: None,
@@ -746,7 +806,7 @@ mod tests {
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: None,
             viewer: Some(ViewerInfo {
-                address: Addr::unchecked(admin.clone()),
+                address: admin.clone(),
                 viewing_key: admin_key.clone(),
             }),
         };
@@ -765,7 +825,12 @@ mod tests {
             royalty_info: Some(individual.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("A token's RoyaltyInfo may only be set by the token creator when they are also the token owner"));
 
@@ -775,7 +840,12 @@ mod tests {
             royalty_info: Some(individual.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("alice", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("A token's RoyaltyInfo may only be set by the token creator when they are also the token owner"));
 
@@ -785,12 +855,17 @@ mod tests {
             royalty_info: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
         let query_msg = QueryMsg::NftDossier {
             token_id: "specified".to_string(),
             viewer: Some(ViewerInfo {
-                address: Addr::unchecked(bob.clone()),
+                address: bob.clone(),
                 viewing_key: bob_key.clone(),
             }),
             include_expired: None,
@@ -810,7 +885,12 @@ mod tests {
             royalty_info: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         // test that deleting a token's royalties when there is no default, results in no royalties
@@ -819,7 +899,12 @@ mod tests {
             royalty_info: None,
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: Some("specified".to_string()),
@@ -852,7 +937,12 @@ mod tests {
             royalty_info: Some(royalties.clone()),
             padding: None,
         };
-        let handle_result = execute(deps.as_mut(), mock_env(), mock_info("admin", &[]), execute_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Token ID: NFT not found"));
 

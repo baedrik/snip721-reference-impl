@@ -3,7 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// data for a single royalty
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct Royalty {
     /// address to send royalties to
     pub recipient: String,
@@ -19,14 +19,14 @@ impl Royalty {
     /// * `api` - a reference to the Api used to convert human and canonical addresses
     pub fn to_stored(&self, api: &dyn Api) -> StdResult<StoredRoyalty> {
         Ok(StoredRoyalty {
-            recipient: api.addr_canonicalize(&self.recipient)?,
+            recipient: api.addr_canonicalize(api.addr_validate(&self.recipient)?.as_str())?,
             rate: self.rate,
         })
     }
 }
 
 /// all royalty information
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct RoyaltyInfo {
     /// decimal places in royalty rates
     pub decimal_places_in_rates: u8,
@@ -53,7 +53,7 @@ impl RoyaltyInfo {
 }
 
 /// display for a single royalty
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct DisplayRoyalty {
     /// address to send royalties to.  Can be None to keep addresses private
     pub recipient: Option<Addr>,
@@ -62,7 +62,7 @@ pub struct DisplayRoyalty {
 }
 
 /// display all royalty information
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct DisplayRoyaltyInfo {
     /// decimal places in royalty rates
     pub decimal_places_in_rates: u8,
@@ -71,7 +71,7 @@ pub struct DisplayRoyaltyInfo {
 }
 
 /// data for storing a single royalty
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct StoredRoyalty {
     /// address to send royalties to
     pub recipient: CanonicalAddr,
@@ -100,7 +100,7 @@ impl StoredRoyalty {
 }
 
 /// all stored royalty information
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct StoredRoyaltyInfo {
     /// decimal places in royalty rates
     pub decimal_places_in_rates: u8,

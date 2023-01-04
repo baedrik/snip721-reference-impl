@@ -1,17 +1,18 @@
-use std::borrow::Borrow;
 /// This contract implements SNIP-721 standard:
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
 use std::collections::HashSet;
 
 use cosmwasm_std::{
-    Addr, Api, attr, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps, DepsMut, entry_point, Env,
-    MessageInfo, Response, StdError, StdResult, Storage, Timestamp, to_binary, WasmMsg,
+    attr, entry_point, to_binary, Addr, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps,
+    DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage, WasmMsg,
 };
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
 use primitive_types::U256;
 use secret_toolkit::{
-    permit::{Permit, RevokedPermits, validate},
+    crypto::sha_256,
+    permit::{validate, Permit, RevokedPermits},
     utils::{pad_handle_result, pad_query_result},
+    viewing_key::{ViewingKey, ViewingKeyStore},
 };
 
 use crate::expiration::Expiration;
@@ -19,22 +20,20 @@ use crate::inventory::{Inventory, InventoryIter};
 use crate::mint_run::{SerialNumber, StoredMintRunInfo};
 use crate::msg::{
     AccessLevel, BatchNftDossierElement, Burn, ContractStatus, Cw721Approval, Cw721OwnerOfResponse,
-    ExecuteAnswer, ExecuteMsg, InstantiateMsg, Mint, QueryAnswer, QueryMsg, QueryWithPermit, ReceiverInfo,
-    ResponseStatus::Success, Send, Snip721Approval, Transfer, ViewerInfo,
+    ExecuteAnswer, ExecuteMsg, InstantiateMsg, Mint, QueryAnswer, QueryMsg, QueryWithPermit,
+    ReceiverInfo, ResponseStatus::Success, Send, Snip721Approval, Transfer, ViewerInfo,
 };
-use crate::rand::sha_256;
 use crate::receiver::{batch_receive_nft_msg, receive_nft_msg};
 use crate::royalties::{RoyaltyInfo, StoredRoyaltyInfo};
 use crate::state::{
-    AuthList, BLOCK_KEY, Config, CONFIG_KEY, CREATOR_KEY, DEFAULT_ROYALTY_KEY, get_txs, json_may_load, json_save,
-    load, may_load, MINTERS_KEY, MY_ADDRESS_KEY, Permission, PermissionType, PREFIX_ALL_PERMISSIONS,
+    get_txs, json_may_load, json_save, load, may_load, remove, save, store_burn, store_mint,
+    store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, CONFIG_KEY,
+    CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, MY_ADDRESS_KEY, PREFIX_ALL_PERMISSIONS,
     PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN,
     PREFIX_MINT_RUN_NUM, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS,
-    PREFIX_REVOKED_PERMITS, PREFIX_ROYALTY_INFO, PREFIX_VIEW_KEY, PRNG_SEED_KEY, ReceiveRegistration,
-    remove, save, store_burn, store_mint, store_transfer,
+    PREFIX_REVOKED_PERMITS, PREFIX_ROYALTY_INFO, VIEWING_KEY_ERR_MSG,
 };
 use crate::token::{Metadata, Token};
-use crate::viewing_key::{VIEWING_KEY_SIZE, ViewingKey};
 
 /// pad handle responses and log attributes to blocks of 256 bytes to prevent leaking info based on
 /// response size
@@ -65,14 +64,19 @@ pub fn instantiate(
     save(
         deps.storage,
         MY_ADDRESS_KEY,
-        &deps.api.addr_canonicalize(&env.contract.address.as_ref())?,
+        &deps.api.addr_canonicalize(env.contract.address.as_str())?,
     )?;
     let admin_raw = msg
         .admin
-        .map(|a| deps.api.addr_canonicalize(&a))
+        .map(|a| {
+            deps.api
+                .addr_canonicalize(deps.api.addr_validate(&a)?.as_str())
+        })
         .transpose()?
         .unwrap_or(creator_raw);
-    let prng_seed: Vec<u8> = sha_256(base64::encode(msg.entropy).as_bytes()).to_vec();
+    let prng_seed = sha_256(base64::encode(msg.entropy).as_bytes());
+    ViewingKey::set_seed(deps.storage, &prng_seed);
+
     let init_config = msg.config.unwrap_or_default();
 
     let config = Config {
@@ -95,9 +99,6 @@ pub fn instantiate(
     let minters = vec![admin_raw];
     save(deps.storage, CONFIG_KEY, &config)?;
     save(deps.storage, MINTERS_KEY, &minters)?;
-    save(deps.storage, PRNG_SEED_KEY, &prng_seed)?;
-    // TODO remove this after BlockInfo becomes available to queries
-    save(deps.storage, BLOCK_KEY, &env.block)?;
 
     if msg.royalty_info.is_some() {
         store_royalties(
@@ -121,9 +122,7 @@ pub fn instantiate(
     } else {
         Vec::new()
     };
-    Ok(Response::new()
-        .add_messages(messages)
-    )
+    Ok(Response::new().add_messages(messages))
 }
 
 ///////////////////////////////////// Handle //////////////////////////////////////
@@ -136,14 +135,7 @@ pub fn instantiate(
 /// * `info` - contract execution info for authorization - identity of the call, and payment.
 /// * `msg` - HandleMsg passed in with the execute message
 #[entry_point]
-pub fn execute(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    msg: ExecuteMsg,
-) -> StdResult<Response> {
-    // TODO remove this after BlockInfo becomes available to queries
-    save(deps.storage, BLOCK_KEY, &env.block)?;
+pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> StdResult<Response> {
     let mut config: Config = load(deps.storage, CONFIG_KEY)?;
 
     let response = match msg {
@@ -159,8 +151,8 @@ pub fn execute(
             ..
         } => mint(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &mut config,
             ContractStatus::Normal.to_u8(),
             token_id,
@@ -174,8 +166,8 @@ pub fn execute(
         ),
         ExecuteMsg::BatchMintNft { mints, .. } => batch_mint(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &mut config,
             ContractStatus::Normal.to_u8(),
             mints,
@@ -191,8 +183,8 @@ pub fn execute(
             ..
         } => mint_clones(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &mut config,
             ContractStatus::Normal.to_u8(),
             mint_run_id.as_ref(),
@@ -210,10 +202,10 @@ pub fn execute(
             ..
         } => set_metadata(
             deps,
-            info,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
-            token_id.borrow(),
+            &token_id,
             public_metadata,
             private_metadata,
         ),
@@ -223,7 +215,7 @@ pub fn execute(
             ..
         } => set_royalty_info(
             deps,
-            info,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             token_id.as_deref(),
@@ -231,14 +223,17 @@ pub fn execute(
         ),
         ExecuteMsg::Reveal { token_id, .. } => reveal(
             deps,
-            info,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
-            token_id.borrow(),
+            &token_id,
         ),
-        ExecuteMsg::MakeOwnershipPrivate { .. } => {
-            make_owner_private(deps, info, &config, ContractStatus::StopTransactions.to_u8())
-        }
+        ExecuteMsg::MakeOwnershipPrivate { .. } => make_owner_private(
+            deps,
+            &info.sender,
+            &config,
+            ContractStatus::StopTransactions.to_u8(),
+        ),
         ExecuteMsg::SetGlobalApproval {
             token_id,
             view_owner,
@@ -247,8 +242,8 @@ pub fn execute(
             ..
         } => set_global_approval(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             token_id,
@@ -266,8 +261,8 @@ pub fn execute(
             ..
         } => set_whitelisted_approval(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             &address,
@@ -285,12 +280,12 @@ pub fn execute(
             ..
         } => approve_revoke(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             &spender,
-            token_id.borrow(),
+            &token_id,
             expires,
             true,
         ),
@@ -298,12 +293,12 @@ pub fn execute(
             spender, token_id, ..
         } => approve_revoke(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             &spender,
-            token_id.borrow(),
+            &token_id,
             None,
             false,
         ),
@@ -311,8 +306,8 @@ pub fn execute(
             operator, expires, ..
         } => set_whitelisted_approval(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             &operator,
@@ -325,8 +320,8 @@ pub fn execute(
         ),
         ExecuteMsg::RevokeAll { operator, .. } => set_whitelisted_approval(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             &operator,
@@ -344,8 +339,8 @@ pub fn execute(
             ..
         } => transfer_nft(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &mut config,
             ContractStatus::Normal.to_u8(),
             recipient,
@@ -354,8 +349,8 @@ pub fn execute(
         ),
         ExecuteMsg::BatchTransferNft { transfers, .. } => batch_transfer_nft(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &mut config,
             ContractStatus::Normal.to_u8(),
             transfers,
@@ -369,8 +364,8 @@ pub fn execute(
             ..
         } => send_nft(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &mut config,
             ContractStatus::Normal.to_u8(),
             contract,
@@ -381,8 +376,8 @@ pub fn execute(
         ),
         ExecuteMsg::BatchSendNft { sends, .. } => batch_send_nft(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &mut config,
             ContractStatus::Normal.to_u8(),
             sends,
@@ -393,7 +388,7 @@ pub fn execute(
             ..
         } => register_receive_nft(
             deps,
-            info,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             code_hash,
@@ -401,8 +396,8 @@ pub fn execute(
         ),
         ExecuteMsg::BurnNft { token_id, memo, .. } => burn_nft(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &mut config,
             ContractStatus::Normal.to_u8(),
             token_id,
@@ -410,60 +405,60 @@ pub fn execute(
         ),
         ExecuteMsg::BatchBurnNft { burns, .. } => batch_burn_nft(
             deps,
-            env,
-            info,
+            &env,
+            &info.sender,
             &mut config,
             ContractStatus::Normal.to_u8(),
             burns,
         ),
         ExecuteMsg::CreateViewingKey { entropy, .. } => create_key(
             deps,
-            env,
-            info,
+            &env,
+            &info,
             &config,
             ContractStatus::StopTransactions.to_u8(),
-            entropy.borrow(),
+            &entropy,
         ),
         ExecuteMsg::SetViewingKey { key, .. } => set_key(
             deps,
-            info,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             key,
         ),
         ExecuteMsg::AddMinters { minters, .. } => add_minters(
             deps,
-            info,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             &minters,
         ),
         ExecuteMsg::RemoveMinters { minters, .. } => remove_minters(
             deps,
-            info,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             &minters,
         ),
         ExecuteMsg::SetMinters { minters, .. } => set_minters(
             deps,
-            info,
+            &info.sender,
             &config,
             ContractStatus::StopTransactions.to_u8(),
             &minters,
         ),
         ExecuteMsg::ChangeAdmin { address, .. } => change_admin(
             deps,
-            info,
+            &info.sender,
             &mut config,
             ContractStatus::StopTransactions.to_u8(),
             &address,
         ),
         ExecuteMsg::SetContractStatus { level, .. } => {
-            set_contract_status(deps, info, &mut config, level)
+            set_contract_status(deps, &info.sender, &mut config, level)
         }
         ExecuteMsg::RevokePermit { permit_name, .. } => {
-            revoke_permit(deps.storage, &info.sender.to_string(), permit_name.borrow())
+            revoke_permit(deps.storage, &info.sender, &permit_name)
         }
     };
     pad_handle_result(response, BLOCK_SIZE)
@@ -476,10 +471,9 @@ pub fn execute(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
 /// * `priority` - u8 representation of highest status level this action is permitted at
 /// * `token_id` - optional token id, if not specified, use token index
 /// * `owner` - optional owner of this token, if not specified, use the minter's address
@@ -492,8 +486,8 @@ pub fn execute(
 #[allow(clippy::too_many_arguments)]
 pub fn mint(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &mut Config,
     priority: u8,
     token_id: Option<String>,
@@ -506,7 +500,7 @@ pub fn mint(
     memo: Option<String>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
     if !minters.contains(&sender_raw) {
         return Err(StdError::generic_err(
@@ -523,12 +517,13 @@ pub fn mint(
         transferable,
         memo,
     }];
-    let mut minted = mint_list(deps, &env, config, &sender_raw, mints)?;
+    let mut minted = mint_list(deps, env, config, &sender_raw, mints)?;
     let minted_str = minted.pop().unwrap_or_default();
     Ok(Response::new()
         .add_attributes(vec![attr("minted", &minted_str)])
-        .set_data(to_binary(&ExecuteAnswer::MintNft { token_id: minted_str }).unwrap())
-    )
+        .set_data(to_binary(&ExecuteAnswer::MintNft {
+            token_id: minted_str,
+        })?))
 }
 
 /// Returns StdResult<Response>
@@ -538,32 +533,33 @@ pub fn mint(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `mints` - the list of mints to perform
 pub fn batch_mint(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &mut Config,
     priority: u8,
     mints: Vec<Mint>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
     if !minters.contains(&sender_raw) {
         return Err(StdError::generic_err(
             "Only designated minters are allowed to mint",
         ));
     }
-    let minted = mint_list(deps, &env, config, &sender_raw, mints)?;
+    let minted = mint_list(deps, env, config, &sender_raw, mints)?;
     Ok(Response::new()
         .add_attributes(vec![attr("minted", format!("{:?}", &minted))])
-        .set_data(to_binary(&ExecuteAnswer::BatchMintNft { token_ids: minted }).unwrap())
-    )
+        .set_data(to_binary(&ExecuteAnswer::BatchMintNft {
+            token_ids: minted,
+        })?))
 }
 
 /// Returns StdResult<Response>
@@ -573,10 +569,9 @@ pub fn batch_mint(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
 /// * `priority` - u8 representation of highest status level this action is permitted at
 /// * `mint_run_id` - optional id used to track subsequent mint runs
 /// * `quantity` - number of clones to mint
@@ -588,8 +583,8 @@ pub fn batch_mint(
 #[allow(clippy::too_many_arguments)]
 pub fn mint_clones(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &mut Config,
     priority: u8,
     mint_run_id: Option<&String>,
@@ -601,7 +596,7 @@ pub fn mint_clones(
     memo: Option<String>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
     if !minters.contains(&sender_raw) {
         return Err(StdError::generic_err(
@@ -645,7 +640,7 @@ pub fn mint_clones(
         });
         serial_number.serial_number += 1;
     }
-    let mut minted = mint_list(deps, &env, config, &sender_raw, mints)?;
+    let mut minted = mint_list(deps, env, config, &sender_raw, mints)?;
     // if mint_list did not error, there must be at least one token id
     let first_minted = minted
         .first()
@@ -660,10 +655,10 @@ pub fn mint_clones(
             attr("first_minted", &first_minted),
             attr("last_minted", &last_minted),
         ])
-        .set_data(
-            to_binary(&ExecuteAnswer::MintNftClones { first_minted, last_minted }).unwrap()
-        )
-    )
+        .set_data(to_binary(&ExecuteAnswer::MintNftClones {
+            first_minted,
+            last_minted,
+        })?))
 }
 
 /// Returns StdResult<Response>
@@ -673,7 +668,7 @@ pub fn mint_clones(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest status level this action is permitted at
 /// * `token_id` - token id String slice of token whose metadata should be updated
@@ -681,7 +676,7 @@ pub fn mint_clones(
 /// * `private_metadata` - the optional new private metadata viewable by everyone
 pub fn set_metadata(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &Config,
     priority: u8,
     token_id: &str,
@@ -698,7 +693,7 @@ pub fn set_metadata(
         Some(&*custom_err)
     };
     let (token, idx) = get_token(deps.storage, token_id, opt_err)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     if !(token.owner == sender_raw && config.owner_may_update_metadata) {
         let minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
         if !(minters.contains(&sender_raw) && config.minter_may_update_metadata) {
@@ -711,9 +706,7 @@ pub fn set_metadata(
     if let Some(private) = private_metadata {
         set_metadata_impl(deps.storage, &token, idx, PREFIX_PRIV_META, &private)?;
     }
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::SetMetadata { status: Success }).unwrap())
-    )
+    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::SetMetadata { status: Success })?))
 }
 
 /// Returns StdResult<Response>
@@ -724,21 +717,21 @@ pub fn set_metadata(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest status level this action is permitted at
 /// * `token_id` - optional token id String slice of token whose royalty info should be updated
 /// * `royalty_info` - a optional reference to the new RoyaltyInfo
 pub fn set_royalty_info(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &Config,
     priority: u8,
     token_id: Option<&str>,
     royalty_info: Option<&RoyaltyInfo>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     // set a token's royalties
     if let Some(id) = token_id {
         let custom_err = "A token's RoyaltyInfo may only be set by the token creator when they are also the token owner";
@@ -790,8 +783,10 @@ pub fn set_royalty_info(
         )?;
     };
 
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::SetRoyaltyInfo { status: Success }).unwrap())
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::SetRoyaltyInfo {
+            status: Success,
+        })?),
     )
 }
 
@@ -802,13 +797,13 @@ pub fn set_royalty_info(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest status level this action is permitted at
 /// * `token_id` - token id String slice of token whose metadata should be updated
 pub fn reveal(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &Config,
     priority: u8,
     token_id: &str,
@@ -819,7 +814,7 @@ pub fn reveal(
             "Sealed metadata functionality is not enabled for this contract",
         ));
     }
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     let custom_err = format!("You do not own token {}", token_id);
     // if token supply is private, don't leak that the token id does not exist
     // instead just say they do not own that token
@@ -850,9 +845,7 @@ pub fn reveal(
             save(&mut pub_store, &token_key, &metadata)?;
         }
     }
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::Reveal { status: Success }).unwrap())
-    )
+    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::Reveal { status: Success })?))
 }
 
 /// Returns StdResult<Response>
@@ -862,8 +855,8 @@ pub fn reveal(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest status level this action is permitted at
 /// * `spender` - a reference to the address being granted permission
@@ -873,18 +866,20 @@ pub fn reveal(
 #[allow(clippy::too_many_arguments)]
 pub fn approve_revoke(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &Config,
     priority: u8,
-    spender: &String,
+    spender: &str,
     token_id: &str,
     expires: Option<Expiration>,
     is_approve: bool,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let address_raw = deps.api.addr_canonicalize(spender)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let address_raw = deps
+        .api
+        .addr_canonicalize(deps.api.addr_validate(spender)?.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     let custom_err = format!(
         "Not authorized to grant/revoke transfer permission for token {}",
         token_id
@@ -943,14 +938,13 @@ pub fn approve_revoke(
     };
     process_accesses(
         deps.storage,
-        &env,
+        env,
         &address_raw,
         &owner,
         &mut proc_info,
         all_perm,
     )?;
-    let res = Response::new()
-        .set_data(to_binary(&response).unwrap());
+    let res = Response::new().set_data(to_binary(&response)?);
     Ok(res)
 }
 
@@ -961,24 +955,26 @@ pub fn approve_revoke(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest status level this action is permitted at
 pub fn make_owner_private(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &Config,
     priority: u8,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     // only need to do this if the contract has public ownership
     if config.owner_is_public {
         let mut priv_store = PrefixedStorage::new(deps.storage, PREFIX_OWNER_PRIV);
         save(&mut priv_store, sender_raw.as_slice(), &false)?
     }
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::MakeOwnershipPrivate { status: Success }).unwrap())
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::MakeOwnershipPrivate {
+            status: Success,
+        })?),
     )
 }
 
@@ -989,8 +985,8 @@ pub fn make_owner_private(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest status level this action is permitted at
 /// * `token_id` - optional token id to apply approvals to
@@ -1000,8 +996,8 @@ pub fn make_owner_private(
 #[allow(clippy::too_many_arguments)]
 pub fn set_global_approval(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &Config,
     priority: u8,
     token_id: Option<String>,
@@ -1013,7 +1009,7 @@ pub fn set_global_approval(
     let token_given: bool;
     // use this "address" to represent global permission
     let global_raw = CanonicalAddr(Binary::from(b"public"));
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     let mut custom_err = String::new();
     let (token, idx) = if let Some(id) = token_id {
         token_given = true;
@@ -1055,14 +1051,16 @@ pub fn set_global_approval(
     };
     process_accesses(
         deps.storage,
-        &env,
+        env,
         &global_raw,
         &sender_raw,
         &mut proc_info,
         None,
     )?;
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::SetGlobalApproval { status: Success }).unwrap())
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::SetGlobalApproval {
+            status: Success,
+        })?),
     )
 }
 
@@ -1073,8 +1071,8 @@ pub fn set_global_approval(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest status level this action is permitted at
 /// * `address` - a reference to the address being granted permission
@@ -1087,11 +1085,11 @@ pub fn set_global_approval(
 #[allow(clippy::too_many_arguments)]
 pub fn set_whitelisted_approval(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &Config,
     priority: u8,
-    address: &String,
+    address: &str,
     token_id: Option<String>,
     view_owner: Option<AccessLevel>,
     view_private_metadata: Option<AccessLevel>,
@@ -1101,8 +1099,10 @@ pub fn set_whitelisted_approval(
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
     let token_given: bool;
-    let address_raw = deps.api.addr_canonicalize(address)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let address_raw = deps
+        .api
+        .addr_canonicalize(deps.api.addr_validate(address)?.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     let mut custom_err = String::new();
     let (token, idx) = if let Some(id) = token_id {
         token_given = true;
@@ -1145,7 +1145,7 @@ pub fn set_whitelisted_approval(
     };
     process_accesses(
         deps.storage,
-        &env,
+        env,
         &address_raw,
         &sender_raw,
         &mut proc_info,
@@ -1158,8 +1158,7 @@ pub fn set_whitelisted_approval(
         SetAppResp::ApproveAll => ExecuteAnswer::ApproveAll { status: Success },
         SetAppResp::RevokeAll => ExecuteAnswer::RevokeAll { status: Success },
     };
-    let res = Response::new()
-        .set_data(to_binary(&response).unwrap());
+    let res = Response::new().set_data(to_binary(&response)?);
     Ok(res)
 }
 
@@ -1170,24 +1169,24 @@ pub fn set_whitelisted_approval(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `burns` - the list of burns to perform
 pub fn batch_burn_nft(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &mut Config,
     priority: u8,
     burns: Vec<Burn>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     burn_list(deps, &env.block, config, &sender_raw, burns)?;
-    let res = Response::new()
-        .set_data(to_binary(&ExecuteAnswer::BatchBurnNft { status: Success }).unwrap());
+    let res =
+        Response::new().set_data(to_binary(&ExecuteAnswer::BatchBurnNft { status: Success })?);
     Ok(res)
 }
 
@@ -1198,30 +1197,29 @@ pub fn batch_burn_nft(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `token_id` - token id String of token to be burnt
 /// * `memo` - optional memo for the burn tx
 fn burn_nft(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &mut Config,
     priority: u8,
     token_id: String,
     memo: Option<String>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     let burns = vec![Burn {
         token_ids: vec![token_id],
         memo,
     }];
     burn_list(deps, &env.block, config, &sender_raw, burns)?;
-    let res = Response::new()
-        .set_data(to_binary(&ExecuteAnswer::BurnNft { status: Success }).unwrap());
+    let res = Response::new().set_data(to_binary(&ExecuteAnswer::BurnNft { status: Success })?);
     Ok(res)
 }
 
@@ -1232,25 +1230,25 @@ fn burn_nft(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `transfers` - list of transfers to perform
 pub fn batch_transfer_nft(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &mut Config,
     priority: u8,
     transfers: Vec<Transfer>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
-    let _m = send_list(deps, &env, &info, config, &sender_raw, Some(transfers), None)?;
+    let _m = send_list(deps, env, sender, config, Some(transfers), None)?;
 
-    let res = Response::new()
-        .set_data(to_binary(&ExecuteAnswer::BatchTransferNft { status: Success }).unwrap());
+    let res = Response::new().set_data(to_binary(&ExecuteAnswer::BatchTransferNft {
+        status: Success,
+    })?);
     Ok(res)
 }
 
@@ -1261,17 +1259,18 @@ pub fn batch_transfer_nft(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `recipient` - the address receiving the token
 /// * `token_id` - token id String of token to be transferred
 /// * `memo` - optional memo for the mint tx
+#[allow(clippy::too_many_arguments)]
 pub fn transfer_nft(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &mut Config,
     priority: u8,
     recipient: String,
@@ -1279,16 +1278,14 @@ pub fn transfer_nft(
     memo: Option<String>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
     let transfers = Some(vec![Transfer {
-        recipient: deps.api.addr_validate(recipient.as_str())?,
+        recipient,
         token_ids: vec![token_id],
         memo,
     }]);
-    let _m = send_list(deps, &env, &info, config, &sender_raw, transfers, None)?;
+    let _m = send_list(deps, env, sender, config, transfers, None)?;
 
-    let res = Response::new()
-        .set_data(to_binary(&ExecuteAnswer::TransferNft { status: Success }).unwrap());
+    let res = Response::new().set_data(to_binary(&ExecuteAnswer::TransferNft { status: Success })?);
     Ok(res)
 }
 
@@ -1300,26 +1297,25 @@ pub fn transfer_nft(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `sends` - list of SendNfts to perform
 fn batch_send_nft(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &mut Config,
     priority: u8,
     sends: Vec<Send>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
-    let messages = send_list(deps, &env, &info, config, &sender_raw, None, Some(sends))?;
+    let messages = send_list(deps, env, sender, config, None, Some(sends))?;
 
     let res = Response::new()
         .add_messages(messages)
-        .set_data(to_binary(&ExecuteAnswer::BatchSendNft { status: Success }).unwrap());
+        .set_data(to_binary(&ExecuteAnswer::BatchSendNft { status: Success })?);
     Ok(res)
 }
 
@@ -1331,8 +1327,8 @@ fn batch_send_nft(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `env` - a reference to the Env of contract's environment
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `contract` - the address of the contract receiving the token
@@ -1344,8 +1340,8 @@ fn batch_send_nft(
 #[allow(clippy::too_many_arguments)]
 fn send_nft(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    sender: &Addr,
     config: &mut Config,
     priority: u8,
     contract: String,
@@ -1355,19 +1351,18 @@ fn send_nft(
     memo: Option<String>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
     let sends = Some(vec![Send {
-        contract: deps.api.addr_validate(contract.as_str())?,
+        contract,
         receiver_info,
         token_ids: vec![token_id],
         msg,
         memo,
     }]);
-    let messages = send_list(deps, &env, &info, config, &sender_raw, None, sends)?;
+    let messages = send_list(deps, env, sender, config, None, sends)?;
 
     let res = Response::new()
         .add_messages(messages)
-        .set_data(to_binary(&ExecuteAnswer::SendNft { status: Success }).unwrap());
+        .set_data(to_binary(&ExecuteAnswer::SendNft { status: Success })?);
     Ok(res)
 }
 
@@ -1378,29 +1373,30 @@ fn send_nft(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `code_hash` - code hash String of the registering contract
 /// * `impl_batch` - optionally true if the contract also implements BatchReceiveNft
 pub fn register_receive_nft(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &Config,
     priority: u8,
     code_hash: String,
     impl_batch: Option<bool>,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     let regrec = ReceiveRegistration {
         code_hash,
         impl_batch: impl_batch.unwrap_or(false),
     };
     let mut store = PrefixedStorage::new(deps.storage, PREFIX_RECEIVERS);
     save(&mut store, sender_raw.as_slice(), &regrec)?;
-    let res = Response::new()
-        .set_data(to_binary(&ExecuteAnswer::RegisterReceiveNft { status: Success }).unwrap());
+    let res = Response::new().set_data(to_binary(&ExecuteAnswer::RegisterReceiveNft {
+        status: Success,
+    })?);
     Ok(res)
 }
 
@@ -1411,27 +1407,29 @@ pub fn register_receive_nft(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `env` - Env of contract's environment
+/// * `env` - a reference to the Env of contract's environment
 /// * `info` - contract execution info for authorization - identity of the call, and payment.
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `entropy` - string slice of the input String to be used as entropy in randomization
 pub fn create_key(
     deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
+    env: &Env,
+    info: &MessageInfo,
     config: &Config,
     priority: u8,
     entropy: &str,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let prng_seed: Vec<u8> = load(deps.storage, PRNG_SEED_KEY)?;
-    let key = ViewingKey::new(&env, &info, &prng_seed, entropy.as_ref());
-    let message_sender = deps.api.addr_canonicalize(info.sender.as_str())?;
-    let mut key_store = PrefixedStorage::new(deps.storage, PREFIX_VIEW_KEY);
-    save(&mut key_store, message_sender.as_slice(), &key.to_hashed())?;
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::ViewingKey { key: format!("{}", key) }).unwrap()))
+    let key = ViewingKey::create(
+        deps.storage,
+        info,
+        env,
+        info.sender.as_str(),
+        entropy.as_ref(),
+    );
+
+    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::ViewingKey { key })?))
 }
 
 /// Returns StdResult<Response>
@@ -1441,24 +1439,20 @@ pub fn create_key(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `key` - String to be used as the viewing key
 pub fn set_key(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &Config,
     priority: u8,
     key: String,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let vk = ViewingKey(key.clone());
-    let message_sender = deps.api.addr_canonicalize(info.sender.as_str())?;
-    let mut key_store = PrefixedStorage::new(deps.storage, PREFIX_VIEW_KEY);
-    save(&mut key_store, message_sender.as_slice(), &vk.to_hashed())?;
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::ViewingKey { key }).unwrap()))
+    ViewingKey::set(deps.storage, sender.as_str(), &key);
+    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::ViewingKey { key })?))
 }
 
 /// Returns StdResult<Response>
@@ -1468,38 +1462,40 @@ pub fn set_key(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `new_minters` - list of minter addresses to add
 pub fn add_minters(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &Config,
     priority: u8,
     new_minters: &[String],
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     if config.admin != sender_raw {
         return Err(StdError::generic_err(
             "This is an admin command and can only be run from the admin address",
         ));
     }
     let mut minters: Vec<CanonicalAddr> = may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-    let old_len = minters.len();
+    let mut update = false;
     for minter in new_minters {
-        let minter_raw = deps.api.addr_canonicalize(minter)?;
+        let minter_raw = deps
+            .api
+            .addr_canonicalize(deps.api.addr_validate(minter)?.as_str())?;
         if !minters.contains(&minter_raw) {
             minters.push(minter_raw);
+            update = true;
         }
     }
     // only save if the list changed
-    if old_len != minters.len() {
+    if update {
         save(deps.storage, MINTERS_KEY, &minters)?;
     }
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::AddMinters { status: Success }).unwrap()))
+    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::AddMinters { status: Success })?))
 }
 
 /// Returns StdResult<Response>
@@ -1509,19 +1505,19 @@ pub fn add_minters(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `no_minters` - list of minter addresses to remove
 pub fn remove_minters(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &Config,
     priority: u8,
     no_minters: &[String],
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     if config.admin != sender_raw {
         return Err(StdError::generic_err(
             "This is an admin command and can only be run from the admin address",
@@ -1532,7 +1528,10 @@ pub fn remove_minters(
         let old_len = minters.len();
         let no_raw: Vec<CanonicalAddr> = no_minters
             .iter()
-            .map(|x| deps.api.addr_canonicalize(x))
+            .map(|x| {
+                deps.api
+                    .addr_canonicalize(deps.api.addr_validate(x)?.as_str())
+            })
             .collect::<StdResult<Vec<CanonicalAddr>>>()?;
         minters.retain(|m| !no_raw.contains(m));
         let new_len = minters.len();
@@ -1544,8 +1543,11 @@ pub fn remove_minters(
             remove(deps.storage, MINTERS_KEY);
         }
     }
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::RemoveMinters { status: Success }).unwrap()))
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::RemoveMinters {
+            status: Success,
+        })?),
+    )
 }
 
 /// Returns StdResult<Response>
@@ -1555,19 +1557,19 @@ pub fn remove_minters(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `human_minters` - exact list of minter addresses
 pub fn set_minters(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &Config,
     priority: u8,
     human_minters: &[String],
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     if config.admin != sender_raw {
         return Err(StdError::generic_err(
             "This is an admin command and can only be run from the admin address",
@@ -1576,7 +1578,10 @@ pub fn set_minters(
     // remove duplicates from the minters list
     let minters_raw: Vec<CanonicalAddr> = human_minters
         .iter()
-        .map(|x| deps.api.addr_canonicalize(x))
+        .map(|x| {
+            deps.api
+                .addr_canonicalize(deps.api.addr_validate(x)?.as_str())
+        })
         .collect::<StdResult<Vec<CanonicalAddr>>>()?;
     let mut sortable: Vec<&[u8]> = minters_raw.iter().map(|x| x.as_slice()).collect();
     sortable.sort_unstable();
@@ -1590,9 +1595,7 @@ pub fn set_minters(
     } else {
         save(deps.storage, MINTERS_KEY, &minters)?;
     }
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::SetMinters { status: Success }).unwrap())
-    )
+    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::SetMinters { status: Success })?))
 }
 
 /// Returns StdResult<Response>
@@ -1602,32 +1605,32 @@ pub fn set_minters(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
 /// * `priority` - u8 representation of highest ContractStatus level this action is permitted
 /// * `address` - new admin address
 pub fn change_admin(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &mut Config,
     priority: u8,
-    address: &String,
+    address: &str,
 ) -> StdResult<Response> {
     check_status(config.status, priority)?;
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     if config.admin != sender_raw {
         return Err(StdError::generic_err(
             "This is an admin command and can only be run from the admin address",
         ));
     }
-    let new_admin = deps.api.addr_canonicalize(address)?;
+    let new_admin = deps
+        .api
+        .addr_canonicalize(deps.api.addr_validate(address)?.as_str())?;
     if new_admin != config.admin {
         config.admin = new_admin;
         save(deps.storage, CONFIG_KEY, &config)?;
     }
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::ChangeAdmin { status: Success }).unwrap())
-    )
+    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::ChangeAdmin { status: Success })?))
 }
 
 /// Returns StdResult<Response>
@@ -1637,16 +1640,16 @@ pub fn change_admin(
 /// # Arguments
 ///
 /// * `deps` - mutable reference to Extern containing all the contract's external dependencies
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `sender` - a reference to the message sender address
 /// * `config` - a mutable reference to the Config
 /// * `level` - new ContractStatus
 pub fn set_contract_status(
     deps: DepsMut,
-    info: MessageInfo,
+    sender: &Addr,
     config: &mut Config,
     level: ContractStatus,
 ) -> StdResult<Response> {
-    let sender_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
+    let sender_raw = deps.api.addr_canonicalize(sender.as_str())?;
     if config.admin != sender_raw {
         return Err(StdError::generic_err(
             "This is an admin command and can only be run from the admin address",
@@ -1657,8 +1660,10 @@ pub fn set_contract_status(
         config.status = new_status;
         save(deps.storage, CONFIG_KEY, &config)?;
     }
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::SetContractStatus { status: Success }).unwrap())
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::SetContractStatus {
+            status: Success,
+        })?),
     )
 }
 
@@ -1669,17 +1674,21 @@ pub fn set_contract_status(
 /// # Arguments
 ///
 /// * `storage` - mutable reference to the contract's storage
-/// * `sender` - a reference to the message sender
+/// * `sender` - a reference to the message sender address
 /// * `permit_name` - string slice of the name of the permit to revoke
 fn revoke_permit(
     storage: &mut dyn Storage,
-    sender: &String,
+    sender: &Addr,
     permit_name: &str,
 ) -> StdResult<Response> {
-    RevokedPermits::revoke_permit(storage, PREFIX_REVOKED_PERMITS, sender, permit_name);
+    RevokedPermits::revoke_permit(
+        storage,
+        PREFIX_REVOKED_PERMITS,
+        sender.as_str(),
+        permit_name,
+    );
 
-    Ok(Response::new()
-        .set_data(to_binary(&ExecuteAnswer::RevokePermit { status: Success }).unwrap()))
+    Ok(Response::new().set_data(to_binary(&ExecuteAnswer::RevokePermit { status: Success })?))
 }
 
 /////////////////////////////////////// Query /////////////////////////////////////
@@ -1688,14 +1697,15 @@ fn revoke_permit(
 /// # Arguments
 ///
 /// * `deps` - reference to Extern containing all the contract's external dependencies
+/// * `env` - Env of contract's environment
 /// * `msg` - QueryMsg passed in with the query call
 #[entry_point]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     let response = match msg {
         QueryMsg::ContractInfo {} => query_contract_info(deps.storage),
         QueryMsg::ContractCreator {} => query_contract_creator(deps),
         QueryMsg::RoyaltyInfo { token_id, viewer } => {
-            query_royalty(deps, token_id.as_deref(), viewer, None)
+            query_royalty(deps, &env.block, token_id.as_deref(), viewer, None)
         }
         QueryMsg::ContractConfig {} => query_config(deps.storage),
         QueryMsg::Minters {} => query_minters(deps),
@@ -1704,76 +1714,104 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             viewer,
             start_after,
             limit,
-        } => query_all_tokens(deps, viewer, start_after, limit, None),
+        } => query_all_tokens(deps, viewer, start_after.as_deref(), limit, None),
         QueryMsg::OwnerOf {
             token_id,
             viewer,
             include_expired,
-        } => query_owner_of(deps, &token_id, viewer, include_expired, None),
+        } => query_owner_of(deps, &env.block, &token_id, viewer, include_expired, None),
         QueryMsg::NftInfo { token_id } => query_nft_info(deps.storage, &token_id),
         QueryMsg::PrivateMetadata { token_id, viewer } => {
-            query_private_meta(deps, &token_id, viewer, None)
+            query_private_meta(deps, &env.block, &token_id, viewer, None)
         }
         QueryMsg::AllNftInfo {
             token_id,
             viewer,
             include_expired,
-        } => query_all_nft_info(deps, &token_id, viewer, include_expired, None),
+        } => query_all_nft_info(deps, &env.block, &token_id, viewer, include_expired, None),
         QueryMsg::NftDossier {
             token_id,
             viewer,
             include_expired,
-        } => query_nft_dossier(deps, token_id, viewer, include_expired, None),
+        } => query_nft_dossier(deps, &env.block, token_id, viewer, include_expired, None),
         QueryMsg::BatchNftDossier {
             token_ids,
             viewer,
             include_expired,
-        } => query_batch_nft_dossier(deps, token_ids, viewer, include_expired, None),
+        } => query_batch_nft_dossier(deps, &env.block, token_ids, viewer, include_expired, None),
         QueryMsg::TokenApprovals {
             token_id,
             viewing_key,
             include_expired,
-        } => query_token_approvals(deps, &token_id, Some(viewing_key), include_expired, None),
+        } => query_token_approvals(
+            deps,
+            &env.block,
+            &token_id,
+            Some(&viewing_key),
+            include_expired,
+            None,
+        ),
         QueryMsg::InventoryApprovals {
             address,
             viewing_key,
             include_expired,
         } => {
-            let address = deps.api.addr_validate(address.as_str())?;
             let viewer = Some(ViewerInfo {
                 address,
                 viewing_key,
             });
-            query_inventory_approvals(deps, viewer, include_expired, None)
+            query_inventory_approvals(deps, &env.block, viewer, include_expired, None)
         }
         QueryMsg::ApprovedForAll {
             owner,
             viewing_key,
             include_expired,
-        } => query_approved_for_all(deps, Some(&owner), viewing_key, include_expired, None),
+        } => query_approved_for_all(
+            deps,
+            &env.block,
+            Some(&owner),
+            viewing_key.as_deref(),
+            include_expired,
+            None,
+        ),
         QueryMsg::Tokens {
             owner,
             viewer,
             viewing_key,
             start_after,
             limit,
-        } => query_tokens(deps, &owner, viewer, viewing_key, start_after, limit, None),
+        } => query_tokens(
+            deps,
+            &env.block,
+            &owner,
+            viewer.as_deref(),
+            viewing_key.as_deref(),
+            start_after.as_deref(),
+            limit,
+            None,
+        ),
         QueryMsg::NumTokensOfOwner {
             owner,
             viewer,
             viewing_key,
-        } => query_num_owner_tokens(deps, &owner, viewer, viewing_key, None),
+        } => query_num_owner_tokens(
+            deps,
+            &env.block,
+            &owner,
+            viewer.as_deref(),
+            viewing_key.as_deref(),
+            None,
+        ),
         QueryMsg::VerifyTransferApproval {
             token_ids,
             address,
             viewing_key,
         } => {
-            let address = deps.api.addr_validate(address.as_str())?;
             let viewer = Some(ViewerInfo {
                 address,
                 viewing_key,
             });
-            query_verify_approval(deps, token_ids, viewer, None)
+            query_verify_approval(deps, &env.block, token_ids, viewer, None)
         }
         QueryMsg::IsUnwrapped { token_id } => query_is_unwrapped(deps.storage, &token_id),
         QueryMsg::IsTransferable { token_id } => query_is_transferable(deps.storage, &token_id),
@@ -1789,7 +1827,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             page,
             page_size,
         } => {
-            let address = deps.api.addr_validate(address.as_str())?;
             let viewer = Some(ViewerInfo {
                 address,
                 viewing_key,
@@ -1797,7 +1834,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             query_transactions(deps, viewer, page, page_size, None)
         }
         QueryMsg::RegisteredCodeHash { contract } => query_code_hash(deps, &contract),
-        QueryMsg::WithPermit { permit, query } => permit_queries(deps, permit, query),
+        QueryMsg::WithPermit { permit, query } => permit_queries(deps, &env.block, permit, query),
     };
     pad_query_result(response, BLOCK_SIZE)
 }
@@ -1808,10 +1845,12 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `permit` - the permit used to authentic the query
 /// * `query` - the query to perform
 pub fn permit_queries(
     deps: Deps,
+    block: &BlockInfo,
     permit: Permit,
     query: QueryWithPermit,
 ) -> StdResult<Binary> {
@@ -1819,13 +1858,17 @@ pub fn permit_queries(
     let my_address = deps
         .api
         .addr_humanize(&load::<CanonicalAddr>(deps.storage, MY_ADDRESS_KEY)?)?;
-    let querier = deps.api.addr_canonicalize(&(validate(
-        deps,
-        PREFIX_REVOKED_PERMITS,
-        &permit,
-        my_address.to_string(),
-        Some("secret"),
-    )?))?;
+    let querier = deps.api.addr_canonicalize(
+        deps.api
+            .addr_validate(&validate(
+                deps,
+                PREFIX_REVOKED_PERMITS,
+                &permit,
+                my_address.to_string(),
+                Some("secret"),
+            )?)?
+            .as_str(),
+    )?;
     if !permit.check_permission(&secret_toolkit::permit::TokenPermissions::Owner) {
         return Err(StdError::generic_err(format!(
             "Owner permission is required for SNIP-721 queries, got permissions {:?}",
@@ -1835,54 +1878,63 @@ pub fn permit_queries(
     // permit validated, process query
     match query {
         QueryWithPermit::RoyaltyInfo { token_id } => {
-            query_royalty(deps, token_id.as_deref(), None, Some(querier))
+            query_royalty(deps, block, token_id.as_deref(), None, Some(querier))
         }
         QueryWithPermit::PrivateMetadata { token_id } => {
-            query_private_meta(deps, &token_id, None, Some(querier))
+            query_private_meta(deps, block, &token_id, None, Some(querier))
         }
         QueryWithPermit::NftDossier {
             token_id,
             include_expired,
-        } => query_nft_dossier(deps, token_id, None, include_expired, Some(querier)),
+        } => query_nft_dossier(deps, block, token_id, None, include_expired, Some(querier)),
         QueryWithPermit::BatchNftDossier {
             token_ids,
             include_expired,
-        } => query_batch_nft_dossier(deps, token_ids, None, include_expired, Some(querier)),
+        } => query_batch_nft_dossier(deps, block, token_ids, None, include_expired, Some(querier)),
         QueryWithPermit::OwnerOf {
             token_id,
             include_expired,
-        } => query_owner_of(deps, &token_id, None, include_expired, Some(querier)),
+        } => query_owner_of(deps, block, &token_id, None, include_expired, Some(querier)),
         QueryWithPermit::AllNftInfo {
             token_id,
             include_expired,
-        } => query_all_nft_info(deps, &token_id, None, include_expired, Some(querier)),
+        } => query_all_nft_info(deps, block, &token_id, None, include_expired, Some(querier)),
         QueryWithPermit::InventoryApprovals { include_expired } => {
-            query_inventory_approvals(deps, None, include_expired, Some(querier))
+            query_inventory_approvals(deps, block, None, include_expired, Some(querier))
         }
         QueryWithPermit::VerifyTransferApproval { token_ids } => {
-            query_verify_approval(deps, token_ids, None, Some(querier))
+            query_verify_approval(deps, block, token_ids, None, Some(querier))
         }
         QueryWithPermit::TransactionHistory { page, page_size } => {
             query_transactions(deps, None, page, page_size, Some(querier))
         }
         QueryWithPermit::NumTokens {} => query_num_tokens(deps, None, Some(querier)),
         QueryWithPermit::AllTokens { start_after, limit } => {
-            query_all_tokens(deps, None, start_after, limit, Some(querier))
+            query_all_tokens(deps, None, start_after.as_deref(), limit, Some(querier))
         }
         QueryWithPermit::TokenApprovals {
             token_id,
             include_expired,
-        } => query_token_approvals(deps, &token_id, None, include_expired, Some(querier)),
+        } => query_token_approvals(deps, block, &token_id, None, include_expired, Some(querier)),
         QueryWithPermit::ApprovedForAll { include_expired } => {
-            query_approved_for_all(deps, None, None, include_expired, Some(querier))
+            query_approved_for_all(deps, block, None, None, include_expired, Some(querier))
         }
         QueryWithPermit::Tokens {
             owner,
             start_after,
             limit,
-        } => query_tokens(deps, &owner, None, None, start_after, limit, Some(querier)),
+        } => query_tokens(
+            deps,
+            block,
+            &owner,
+            None,
+            None,
+            start_after.as_deref(),
+            limit,
+            Some(querier),
+        ),
         QueryWithPermit::NumTokensOfOwner { owner } => {
-            query_num_owner_tokens(deps, &owner, None, None, Some(querier))
+            query_num_owner_tokens(deps, block, &owner, None, None, Some(querier))
         }
     }
 }
@@ -1892,12 +1944,10 @@ pub fn permit_queries(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
-pub fn query_contract_creator(
-    deps: Deps,
-) -> StdResult<Binary> {
+pub fn query_contract_creator(deps: Deps) -> StdResult<Binary> {
     let creator_raw: CanonicalAddr = load(deps.storage, CREATOR_KEY)?;
     to_binary(&QueryAnswer::ContractCreator {
-        creator: Some(deps.api.addr_humanize(&creator_raw)?.to_string()),
+        creator: Some(deps.api.addr_humanize(&creator_raw)?),
     })
 }
 
@@ -1921,28 +1971,24 @@ pub fn query_contract_info(storage: &dyn Storage) -> StdResult<Binary> {
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `token_id` - optional token id whose RoyaltyInfo is being requested
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_royalty(
     deps: Deps,
+    block: &BlockInfo,
     token_id: Option<&str>,
     viewer: Option<ViewerInfo>,
     from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
     let viewer_raw = get_querier(deps, viewer, from_permit)?;
     let (royalty, hide_addr) = if let Some(id) = token_id {
-        // TODO remove this when BlockInfo becomes available to queries
-        let block: BlockInfo = may_load(deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
-            height: 1,
-            time: Timestamp::from_nanos(1),
-            chain_id: "not used".to_string(),
-        });
         // if the token id was found
         if let Ok((token, idx)) = get_token(deps.storage, id, None) {
             let hide_addr = check_perm_core(
                 deps,
-                &block,
+                block,
                 &token,
                 id,
                 viewer_raw.as_ref(),
@@ -1951,7 +1997,7 @@ pub fn query_royalty(
                 &mut Vec::new(),
                 "",
             )
-                .is_err();
+            .is_err();
             // get the royalty information if present
             let roy_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_ROYALTY_INFO);
             (
@@ -2006,6 +2052,8 @@ pub fn query_config(storage: &dyn Storage) -> StdResult<Binary> {
         minter_may_update_metadata: config.minter_may_update_metadata,
         owner_may_update_metadata: config.owner_may_update_metadata,
         burn_is_enabled: config.burn_is_enabled,
+        implements_non_transferable_tokens: true,
+        implements_token_subtype: true,
     })
 }
 
@@ -2057,7 +2105,7 @@ pub fn query_num_tokens(
 pub fn query_all_tokens(
     deps: Deps,
     viewer: Option<ViewerInfo>,
-    start_after: Option<String>,
+    start_after: Option<&str>,
     limit: Option<u32>,
     from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
@@ -2097,19 +2145,21 @@ pub fn query_all_tokens(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `token_id` - string slice of the token id
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_owner_of(
     deps: Deps,
+    block: &BlockInfo,
     token_id: &str,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
     from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
     let (may_owner, approvals, _idx) =
-        process_cw721_owner_of(deps, token_id, viewer, include_expired, from_permit)?;
+        process_cw721_owner_of(deps, block, token_id, viewer, include_expired, from_permit)?;
     if let Some(owner) = may_owner {
         return to_binary(&QueryAnswer::OwnerOf { owner, approvals });
     }
@@ -2162,11 +2212,13 @@ pub fn query_nft_info(storage: &dyn Storage, token_id: &str) -> StdResult<Binary
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `token_id` - string slice of the token id
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_private_meta(
     deps: Deps,
+    block: &BlockInfo,
     token_id: &str,
     viewer: Option<ViewerInfo>,
     from_permit: Option<CanonicalAddr>,
@@ -2174,7 +2226,7 @@ pub fn query_private_meta(
     let prep_info = query_token_prep(deps, token_id, viewer, from_permit)?;
     check_perm_core(
         deps,
-        &prep_info.block,
+        block,
         &prep_info.token,
         token_id,
         prep_info.viewer_raw.as_ref(),
@@ -2205,19 +2257,21 @@ pub fn query_private_meta(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `token_id` - string slice of the token id
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_all_nft_info(
     deps: Deps,
+    block: &BlockInfo,
     token_id: &str,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
     from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
     let (owner, approvals, idx) =
-        process_cw721_owner_of(deps, token_id, viewer, include_expired, from_permit)?;
+        process_cw721_owner_of(deps, block, token_id, viewer, include_expired, from_permit)?;
     let meta_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_PUB_META);
     let info: Option<Metadata> = may_load(&meta_store, &idx.to_le_bytes())?;
     let access = Cw721OwnerOfResponse { owner, approvals };
@@ -2232,22 +2286,29 @@ pub fn query_all_nft_info(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `token_id` - the token id
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_nft_dossier(
     deps: Deps,
+    block: &BlockInfo,
     token_id: String,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
     from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
-    let dossier = dossier_list(deps, vec![token_id], viewer, include_expired, from_permit)?
-        .pop()
-        .ok_or_else(|| {
-            StdError::generic_err("NftDossier can never return an empty dossier list")
-        })?;
+    let dossier = dossier_list(
+        deps,
+        block,
+        vec![token_id],
+        viewer,
+        include_expired,
+        from_permit,
+    )?
+    .pop()
+    .ok_or_else(|| StdError::generic_err("NftDossier can never return an empty dossier list"))?;
 
     to_binary(&QueryAnswer::NftDossier {
         owner: dossier.owner,
@@ -2275,18 +2336,20 @@ pub fn query_nft_dossier(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `token_ids` - list of token ids whose info should be retrieved
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_batch_nft_dossier(
     deps: Deps,
+    block: &BlockInfo,
     token_ids: Vec<String>,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
     from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
-    let nft_dossiers = dossier_list(deps, token_ids, viewer, include_expired, from_permit)?;
+    let nft_dossiers = dossier_list(deps, block, token_ids, viewer, include_expired, from_permit)?;
 
     to_binary(&QueryAnswer::BatchNftDossier { nft_dossiers })
 }
@@ -2296,14 +2359,16 @@ pub fn query_batch_nft_dossier(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `token_id` - string slice of the token id
-/// * `viewing_key` - the optional token owner's viewing key String
+/// * `viewing_key` - the optional token owner's viewing key
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_token_approvals(
     deps: Deps,
+    block: &BlockInfo,
     token_id: &str,
-    viewing_key: Option<String>,
+    viewing_key: Option<&str>,
     include_expired: Option<bool>,
     from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
@@ -2329,18 +2394,14 @@ pub fn query_token_approvals(
         let key = viewing_key.ok_or_else(|| {
             StdError::generic_err("This is being called incorrectly if there is no viewing key")
         })?;
-        check_key(deps.storage, &token.owner, key)?;
+        let owner_addr = deps.api.addr_humanize(&token.owner)?;
+        ViewingKey::check(deps.storage, owner_addr.as_str(), key)
+            .map_err(|_| StdError::generic_err(VIEWING_KEY_ERR_MSG))?;
     }
     let owner_slice = token.owner.as_slice();
     let own_priv_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_OWNER_PRIV);
     let global_pass: bool =
         may_load(&own_priv_store, owner_slice)?.unwrap_or(config.owner_is_public);
-    // TODO remove this when BlockInfo becomes available to queries
-    let block: BlockInfo = may_load(deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
-        height: 1,
-        time: Timestamp::from_nanos(1),
-        chain_id: "not used".to_string(),
-    });
     let perm_type_info = PermissionTypeInfo {
         view_owner_idx: PermissionType::ViewOwner.to_usize(),
         view_meta_idx: PermissionType::ViewMetadata.to_usize(),
@@ -2350,7 +2411,7 @@ pub fn query_token_approvals(
     let incl_exp = include_expired.unwrap_or(false);
     let (token_approvals, token_owner_exp, token_meta_exp) = gen_snip721_approvals(
         deps.api,
-        &block,
+        block,
         &mut token.permissions,
         incl_exp,
         &perm_type_info,
@@ -2358,7 +2419,7 @@ pub fn query_token_approvals(
     let all_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_ALL_PERMISSIONS);
     let mut all_perm: Vec<Permission> = json_may_load(&all_store, owner_slice)?.unwrap_or_default();
     let (_inventory_approv, all_owner_exp, all_meta_exp) =
-        gen_snip721_approvals(deps.api, &block, &mut all_perm, incl_exp, &perm_type_info)?;
+        gen_snip721_approvals(deps.api, block, &mut all_perm, incl_exp, &perm_type_info)?;
     // determine if ownership is public
     let (public_ownership_expiration, owner_is_public) = if global_pass {
         (Some(Expiration::Never), true)
@@ -2388,11 +2449,13 @@ pub fn query_token_approvals(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_inventory_approvals(
     deps: Deps,
+    block: &BlockInfo,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
     from_permit: Option<CanonicalAddr>,
@@ -2405,12 +2468,6 @@ pub fn query_inventory_approvals(
     let config: Config = load(deps.storage, CONFIG_KEY)?;
     let global_pass: bool =
         may_load(&own_priv_store, owner_slice)?.unwrap_or(config.owner_is_public);
-    // TODO remove this when BlockInfo becomes available to queries
-    let block: BlockInfo = may_load(deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
-        height: 1,
-        time: Timestamp::from_nanos(1),
-        chain_id: "not used".to_string(),
-    });
     let all_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_ALL_PERMISSIONS);
     let mut all_perm: Vec<Permission> = json_may_load(&all_store, owner_slice)?.unwrap_or_default();
     let perm_type_info = PermissionTypeInfo {
@@ -2425,7 +2482,7 @@ pub fn query_inventory_approvals(
         private_metadata_is_public_expiration,
     ) = gen_snip721_approvals(
         deps.api,
-        &block,
+        block,
         &mut all_perm,
         include_expired.unwrap_or(false),
         &perm_type_info,
@@ -2452,14 +2509,16 @@ pub fn query_inventory_approvals(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `owner` - an optional reference to the address whose transfer ALL list should be displayed
-/// * `viewing_key` - optional String of the owner's viewing key
+/// * `viewing_key` - optional owner's viewing key
 /// * `include_expired` - optionally true if the Approval list should include expired Approvals
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_approved_for_all(
     deps: Deps,
-    owner: Option<&String>,
-    viewing_key: Option<String>,
+    block: &BlockInfo,
+    owner: Option<&str>,
+    viewing_key: Option<&str>,
     include_expired: Option<bool>,
     from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
@@ -2467,11 +2526,13 @@ pub fn query_approved_for_all(
     let owner_raw = if let Some(pmt) = from_permit {
         pmt
     } else {
-        let raw = deps.api.addr_canonicalize(owner.ok_or_else(|| {
+        let owner_addr = deps.api.addr_validate(owner.ok_or_else(|| {
             StdError::generic_err("This is being called incorrectly if there is no owner address")
         })?)?;
+        let raw = deps.api.addr_canonicalize(owner_addr.as_str())?;
         if let Some(key) = viewing_key {
-            check_key(deps.storage, &raw, key)?;
+            ViewingKey::check(deps.storage, owner_addr.as_str(), key)
+                .map_err(|_| StdError::generic_err(VIEWING_KEY_ERR_MSG))?;
             // didn't supply a viewing key so just return an empty list of approvals
         } else {
             return to_binary(&QueryAnswer::ApprovedForAll {
@@ -2480,19 +2541,13 @@ pub fn query_approved_for_all(
         }
         raw
     };
-    // TODO remove this when BlockInfo becomes available to queries
-    let block: BlockInfo = may_load(deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
-        height: 1,
-        time: Timestamp::from_nanos(1),
-        chain_id: "not used".to_string(),
-    });
     let mut operators: Vec<Cw721Approval> = Vec::new();
     let all_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_ALL_PERMISSIONS);
     let all_perm: Vec<Permission> =
         json_may_load(&all_store, owner_raw.as_slice())?.unwrap_or_default();
     gen_cw721_approvals(
         deps.api,
-        &block,
+        block,
         &all_perm,
         &mut operators,
         PermissionType::Transfer.to_usize(),
@@ -2509,6 +2564,7 @@ pub fn query_approved_for_all(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `owner` - a reference to the address whose tokens should be displayed
 /// * `viewer` - optional address of the querier if different from the owner
 /// * `viewing_key` - optional viewing key String
@@ -2516,16 +2572,19 @@ pub fn query_approved_for_all(
 ///                   lexicographical order
 /// * `limit` - optional max number of tokens to display
 /// * `from_permit` - address derived from an Owner permit, if applicable
+#[allow(clippy::too_many_arguments)]
 pub fn query_tokens(
     deps: Deps,
-    owner: &String,
-    viewer: Option<String>,
-    viewing_key: Option<String>,
-    start_after: Option<String>,
+    block: &BlockInfo,
+    owner: &str,
+    viewer: Option<&str>,
+    viewing_key: Option<&str>,
+    start_after: Option<&str>,
     limit: Option<u32>,
     from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
-    let owner_raw = deps.api.addr_canonicalize(owner)?;
+    let owner_addr = deps.api.addr_validate(owner)?;
+    let owner_raw = deps.api.addr_canonicalize(owner_addr.as_str())?;
     let cut_off = limit.unwrap_or(30);
     // determine the querier
     let (is_owner, may_querier) = if let Some(pmt) = from_permit.as_ref() {
@@ -2535,20 +2594,24 @@ pub fn query_tokens(
     } else if let Some(key) = viewing_key {
         // if there is a viewer
         viewer
-            // convert to canonical
-            .map(|v| deps.api.addr_canonicalize(&v))
+            // validate the viewer address
+            .map(|v| deps.api.addr_validate(v))
             .transpose()?
             // only keep the viewer address if the viewing key matches
-            .filter(|v| check_key(deps.storage, v, key.clone()).is_ok())
+            .filter(|v| ViewingKey::check(deps.storage, v.as_str(), key).is_ok())
             .map_or_else(
                 // no viewer or key did not match
                 || {
                     // check if the key matches the owner, and error if it fails this last chance
-                    check_key(deps.storage, &owner_raw, key)?;
+                    ViewingKey::check(deps.storage, owner_addr.as_str(), key)
+                        .map_err(|_| StdError::generic_err(VIEWING_KEY_ERR_MSG))?;
                     Ok::<(bool, Option<CanonicalAddr>), StdError>((true, Some(owner_raw.clone())))
                 },
                 // we know the querier is the viewer, so check if someone put the same address for both
-                |v| Ok((v == owner_raw, Some(v))),
+                |v| {
+                    let viewer_raw = deps.api.addr_canonicalize(v.as_str())?;
+                    Ok((viewer_raw == owner_raw, Some(viewer_raw)))
+                },
             )?
         // no permit, no viewing key, so querier is unknown
     } else {
@@ -2574,28 +2637,13 @@ pub fn query_tokens(
     } else {
         true
     };
-    // TODO remove this when BlockInfo becomes available to queries
-    let block = if !known_pass {
-        let b: BlockInfo = may_load(deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
-            height: 1,
-            time: Timestamp::from_nanos(1),
-            chain_id: "not used".to_string(),
-        });
-        b
-    } else {
-        BlockInfo {
-            height: 1,
-            time: Timestamp::from_nanos(1),
-            chain_id: "not used".to_string(),
-        }
-    };
     let exp_idx = PermissionType::ViewOwner.to_usize();
     let info_store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_INFOS);
     let mut list_it: bool;
     let mut oper_for: Vec<CanonicalAddr> = Vec::new();
     let mut tokens: Vec<String> = Vec::new();
     let map2id = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_MAP_TO_ID);
-    let mut inv_iter = if let Some(after) = start_after.as_ref() {
+    let mut inv_iter = if let Some(after) = start_after {
         // load the config if we haven't already
         let config = may_config.map_or_else(|| load::<Config>(deps.storage, CONFIG_KEY), Ok)?;
         // if the querier is allowed to view all of the owner's tokens, let them know if the token
@@ -2630,7 +2678,7 @@ pub fn query_tokens(
             };
             check_perm_core(
                 deps,
-                &block,
+                block,
                 &token,
                 after,
                 querier,
@@ -2657,7 +2705,7 @@ pub fn query_tokens(
                 if let Some(token) = json_may_load::<Token>(&info_store, &idx.to_le_bytes())? {
                     list_it = check_perm_core(
                         deps,
-                        &block,
+                        block,
                         &token,
                         &id,
                         querier,
@@ -2666,7 +2714,7 @@ pub fn query_tokens(
                         &mut oper_for,
                         "",
                     )
-                        .is_ok();
+                    .is_ok();
                     // if querier is found to have ALL permission, no need to check permission ever again
                     if !oper_for.is_empty() {
                         known_pass = true;
@@ -2693,18 +2741,21 @@ pub fn query_tokens(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `owner` - a reference to the address whose tokens should be displayed
 /// * `viewer` - optional address of the querier if different from the owner
 /// * `viewing_key` - optional viewing key String
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_num_owner_tokens(
     deps: Deps,
-    owner: &String,
-    viewer: Option<String>,
-    viewing_key: Option<String>,
+    block: &BlockInfo,
+    owner: &str,
+    viewer: Option<&str>,
+    viewing_key: Option<&str>,
     from_permit: Option<CanonicalAddr>,
 ) -> StdResult<Binary> {
-    let owner_raw = deps.api.addr_canonicalize(owner)?;
+    let owner_addr = deps.api.addr_validate(owner)?;
+    let owner_raw = deps.api.addr_canonicalize(owner_addr.as_str())?;
     // determine the querier
     let (is_owner, may_querier) = if let Some(pmt) = from_permit.as_ref() {
         // permit tells you who is querying, so also check if he is the owner
@@ -2713,20 +2764,24 @@ pub fn query_num_owner_tokens(
     } else if let Some(key) = viewing_key {
         // if there is a viewer
         viewer
-            // convert to canonical
-            .map(|v| deps.api.addr_canonicalize(&v))
+            // validate the viewer address
+            .map(|v| deps.api.addr_validate(v))
             .transpose()?
             // only keep the viewer address if the viewing key matches
-            .filter(|v| check_key(deps.storage, v, key.clone()).is_ok())
+            .filter(|v| ViewingKey::check(deps.storage, v.as_str(), key).is_ok())
             .map_or_else(
                 // no viewer or key did not match
                 || {
                     // check if the key matches the owner, and error if it fails this last chance
-                    check_key(deps.storage, &owner_raw, key)?;
+                    ViewingKey::check(deps.storage, owner_addr.as_str(), key)
+                        .map_err(|_| StdError::generic_err(VIEWING_KEY_ERR_MSG))?;
                     Ok::<(bool, Option<CanonicalAddr>), StdError>((true, Some(owner_raw.clone())))
                 },
                 // we know the querier is the viewer, so check if someone put the same address for both
-                |v| Ok((v == owner_raw, Some(v))),
+                |v| {
+                    let viewer_raw = deps.api.addr_canonicalize(v.as_str())?;
+                    Ok((viewer_raw == owner_raw, Some(viewer_raw)))
+                },
             )?
         // no permit, no viewing key, so querier is unknown
     } else {
@@ -2746,21 +2801,6 @@ pub fn query_num_owner_tokens(
     } else {
         true
     };
-    // TODO remove this when BlockInfo becomes available to queries
-    let block = if !known_pass {
-        let b: BlockInfo = may_load(deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
-            height: 1,
-            time: Timestamp::from_nanos(1),
-            chain_id: "not used".to_string(),
-        });
-        b
-    } else {
-        BlockInfo {
-            height: 1,
-            time: Timestamp::from_nanos(1),
-            chain_id: "not used".to_string(),
-        }
-    };
     let exp_idx = PermissionType::ViewOwner.to_usize();
     let global_raw = CanonicalAddr(Binary::from(b"public"));
     let (sender, only_public) = if let Some(sdr) = may_querier.as_ref() {
@@ -2777,7 +2817,7 @@ pub fn query_num_owner_tokens(
             for perm in &list {
                 if perm.address == *sender || perm.address == global_raw {
                     if let Some(exp) = perm.expirations[exp_idx] {
-                        if !exp.is_expired(&block) {
+                        if !exp.is_expired(block) {
                             known_pass = true;
                             break;
                         }
@@ -2795,9 +2835,7 @@ pub fn query_num_owner_tokens(
     // if it is either the owner, ownership is public, or the querier has inventory-wide view owner permission,
     // let them see the full count
     if known_pass {
-        return to_binary(&QueryAnswer::NumTokens {
-            count: own_inv.info.count,
-        });
+        return to_binary(&QueryAnswer::NumTokens { count: own_inv.cnt });
     }
 
     // get the list of tokens that might have viewable ownership for this querier
@@ -2824,7 +2862,7 @@ pub fn query_num_owner_tokens(
             for perm in token.permissions.iter() {
                 if perm.address == *sender || perm.address == global_raw {
                     if let Some(exp) = perm.expirations[exp_idx] {
-                        if !exp.is_expired(&block) {
+                        if !exp.is_expired(block) {
                             count += 1;
                             break;
                         }
@@ -2857,12 +2895,12 @@ pub fn query_is_unwrapped(storage: &dyn Storage, token_id: &str) -> StdResult<Bi
             // if the token id is not found, but token supply is private, just say
             // the token's wrapped state is the same as a newly minted token
             StdError::GenericErr { msg, .. }
-            if !config.token_supply_is_public && msg.contains("Token ID") =>
-                {
-                    to_binary(&QueryAnswer::IsUnwrapped {
-                        token_is_unwrapped: !config.sealed_metadata_is_enabled,
-                    })
-                }
+                if !config.token_supply_is_public && msg.contains("Token ID") =>
+            {
+                to_binary(&QueryAnswer::IsUnwrapped {
+                    token_is_unwrapped: !config.sealed_metadata_is_enabled,
+                })
+            }
             _ => Err(err),
         },
         Ok((token, _idx)) => to_binary(&QueryAnswer::IsUnwrapped {
@@ -2884,12 +2922,12 @@ pub fn query_is_transferable(storage: &dyn Storage, token_id: &str) -> StdResult
             // if the token id is not found, but token supply is private, just say
             // the token is transferable
             StdError::GenericErr { msg, .. }
-            if !config.token_supply_is_public && msg.contains("Token ID") =>
-                {
-                    to_binary(&QueryAnswer::IsTransferable {
-                        token_is_transferable: true,
-                    })
-                }
+                if !config.token_supply_is_public && msg.contains("Token ID") =>
+            {
+                to_binary(&QueryAnswer::IsTransferable {
+                    token_is_transferable: true,
+                })
+            }
             _ => Err(err),
         },
         Ok((token, _idx)) => to_binary(&QueryAnswer::IsTransferable {
@@ -2935,11 +2973,13 @@ pub fn query_transactions(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `token_ids` - a list of token ids to check if the address has transfer approval
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn query_verify_approval(
     deps: Deps,
+    block: &BlockInfo,
     token_ids: Vec<String>,
     viewer: Option<ViewerInfo>,
     from_permit: Option<CanonicalAddr>,
@@ -2948,19 +2988,13 @@ pub fn query_verify_approval(
         StdError::generic_err("This is being called incorrectly if there is no querier address")
     })?;
     let config: Config = load(deps.storage, CONFIG_KEY)?;
-    // TODO remove this when BlockInfo becomes available to queries
-    let block: BlockInfo = may_load(deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
-        height: 1,
-        time: Timestamp::from_nanos(1),
-        chain_id: "not used".to_string(),
-    });
     let mut oper_for: Vec<CanonicalAddr> = Vec::new();
     for id in token_ids.into_iter() {
         // cargo fmt creates the and_then block, but clippy doesn't like it
         #[allow(clippy::blocks_in_if_conditions)]
         if get_token_if_permitted(
             deps,
-            &block,
+            block,
             &id,
             Some(&address_raw),
             PermissionType::Transfer,
@@ -2968,14 +3002,15 @@ pub fn query_verify_approval(
             &config,
             // the and_then forces an error if the token is not transferable
         )
-            .and_then(|(t, _)| {
-                if t.transferable {
-                    Ok(())
-                } else {
-                    Err(StdError::generic_err("Address does not have transfer approval for all tokens."))
-                }
-            })
-            .is_err()
+        .and_then(|(t, _)| {
+            if t.transferable {
+                Ok(())
+            } else {
+                // the msg is never seen
+                Err(StdError::generic_err(""))
+            }
+        })
+        .is_err()
         {
             return to_binary(&QueryAnswer::VerifyTransferApproval {
                 approved_for_all: false,
@@ -2996,11 +3031,10 @@ pub fn query_verify_approval(
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
 /// * `contract` - a reference to the contract's address whose code hash is being requested
-pub fn query_code_hash(
-    deps: Deps,
-    contract: &String,
-) -> StdResult<Binary> {
-    let contract_raw = deps.api.addr_canonicalize(contract)?;
+pub fn query_code_hash(deps: Deps, contract: &str) -> StdResult<Binary> {
+    let contract_raw = deps
+        .api
+        .addr_canonicalize(deps.api.addr_validate(contract)?.as_str())?;
     let store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_RECEIVERS);
     let may_reg_rec: Option<ReceiveRegistration> = may_load(&store, contract_raw.as_slice())?;
     if let Some(reg_rec) = may_reg_rec {
@@ -3019,8 +3053,6 @@ pub fn query_code_hash(
 pub struct TokenQueryInfo {
     // querier's address
     viewer_raw: Option<CanonicalAddr>,
-    // TODO remove this when BlockInfo becomes available to queries
-    block: BlockInfo,
     // error message String
     err_msg: String,
     // the requested token
@@ -3048,12 +3080,6 @@ fn query_token_prep(
 ) -> StdResult<TokenQueryInfo> {
     let viewer_raw = get_querier(deps, viewer, from_permit)?;
     let config: Config = load(deps.storage, CONFIG_KEY)?;
-    // TODO remove this when BlockInfo becomes available to queries
-    let block: BlockInfo = may_load(deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
-        height: 1,
-        time: Timestamp::from_nanos(1),
-        chain_id: "not used".to_string(),
-    });
     let err_msg = format!(
         "You are not authorized to perform this action on token {}",
         token_id
@@ -3068,7 +3094,6 @@ fn query_token_prep(
     let (token, idx) = get_token(deps.storage, token_id, opt_err)?;
     Ok(TokenQueryInfo {
         viewer_raw,
-        block,
         err_msg,
         token,
         idx,
@@ -3082,12 +3107,14 @@ fn query_token_prep(
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `token_id` - string slice of the token id
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
 /// * `from_permit` - address derived from an Owner permit, if applicable
 fn process_cw721_owner_of(
     deps: Deps,
+    block: &BlockInfo,
     token_id: &str,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
@@ -3097,7 +3124,7 @@ fn process_cw721_owner_of(
     let opt_viewer = prep_info.viewer_raw.as_ref();
     if check_permission(
         deps,
-        &prep_info.block,
+        block,
         &prep_info.token,
         token_id,
         opt_viewer,
@@ -3106,11 +3133,11 @@ fn process_cw721_owner_of(
         &prep_info.err_msg,
         prep_info.owner_is_public,
     )
-        .is_ok()
+    .is_ok()
     {
         let (owner, mut approvals, mut operators) = get_owner_of_resp(
             deps,
-            &prep_info.block,
+            block,
             &prep_info.token,
             opt_viewer,
             include_expired.unwrap_or(false),
@@ -3304,32 +3331,6 @@ fn check_view_supply(
         }
     }
     Ok(())
-}
-
-/// Returns StdResult<bool> result of validating an address' viewing key
-///
-/// # Arguments
-///
-/// * `storage` - a reference to the contract's storage
-/// * `address` - a reference to the address whose key should be validated
-/// * `viewing_key` - String key used for authentication
-fn check_key(
-    storage: &dyn Storage,
-    address: &CanonicalAddr,
-    viewing_key: String,
-) -> StdResult<()> {
-    // load the address' key
-    let read_key = ReadonlyPrefixedStorage::new(storage, PREFIX_VIEW_KEY);
-    let load_key: [u8; VIEWING_KEY_SIZE] =
-        may_load(&read_key, address.as_slice())?.unwrap_or([0u8; VIEWING_KEY_SIZE]);
-    let input_key = ViewingKey(viewing_key);
-    // if key matches
-    if input_key.check_viewing_key(&load_key) {
-        return Ok(());
-    }
-    Err(StdError::generic_err(
-        "Wrong viewing key for this address or viewing key not set",
-    ))
 }
 
 /// Returns StdResult<()>
@@ -3917,12 +3918,12 @@ fn process_accesses(
                     // shouldn't ever fail this ownership check, but let's be safe
                     if load_tok.owner == *owner
                         && alter_perm_list(
-                        &mut load_tok.permissions,
-                        &alt_load_tok_perm,
-                        address,
-                        &load_all_exp,
-                        num_perm_types,
-                    )
+                            &mut load_tok.permissions,
+                            &alt_load_tok_perm,
+                            address,
+                            &load_all_exp,
+                            num_perm_types,
+                        )
                     {
                         json_save(&mut info_store, &tok_key, &load_tok)?;
                     }
@@ -4086,7 +4087,7 @@ pub struct CacheReceiverInfo {
 ///
 /// # Arguments
 ///
-/// * `storage` - a reference to this contract's storage
+/// * `deps` - the contract's mutable external dependencies
 /// * `contract_human` - a reference to the human address of the contract receiving the tokens
 /// * `contract` - a reference to the canonical address of the contract receiving the tokens
 /// * `receiver_info` - optional code hash and BatchReceiveNft implementation status of recipient contract
@@ -4097,8 +4098,8 @@ pub struct CacheReceiverInfo {
 ///                 info
 #[allow(clippy::too_many_arguments)]
 fn receiver_callback_msgs(
-    storage: &dyn Storage,
-    contract_human: &Addr,
+    deps: &mut DepsMut,
+    contract_human: &str,
     contract: &CanonicalAddr,
     receiver_info: Option<ReceiverInfo>,
     send_from_list: Vec<SendFrom>,
@@ -4117,7 +4118,7 @@ fn receiver_callback_msgs(
             receiver.registration.impl_batch,
         )
     } else {
-        let store = ReadonlyPrefixedStorage::new(storage, PREFIX_RECEIVERS);
+        let store = ReadonlyPrefixedStorage::new(deps.storage, PREFIX_RECEIVERS);
         let registration: ReceiveRegistration =
             may_load(&store, contract.as_slice())?.unwrap_or(ReceiveRegistration {
                 code_hash: String::new(),
@@ -4139,21 +4140,21 @@ fn receiver_callback_msgs(
         if impl_batch {
             callbacks.push(batch_receive_nft_msg(
                 sender.clone(),
-                send_from.owner,
+                deps.api.addr_humanize(&send_from.owner)?,
                 send_from.token_ids,
                 msg.clone(),
                 code_hash.clone(),
-                contract_human.clone(),
+                contract_human.to_string(),
             )?);
             //otherwise do a bunch of BatchReceiveNft
         } else {
             for token_id in send_from.token_ids.into_iter() {
                 callbacks.push(receive_nft_msg(
-                    send_from.owner.clone(),
+                    deps.api.addr_humanize(&send_from.owner)?,
                     token_id,
                     msg.clone(),
                     code_hash.clone(),
-                    contract_human.clone(),
+                    contract_human.to_string(),
                 )?);
             }
         }
@@ -4317,7 +4318,7 @@ fn transfer_impl(
 // list of tokens sent from one previous owner
 pub struct SendFrom {
     // the owner's address
-    pub owner: Addr,
+    pub owner: CanonicalAddr,
     // the tokens that were sent
     pub token_ids: Vec<String>,
 }
@@ -4328,19 +4329,17 @@ pub struct SendFrom {
 ///
 /// # Arguments
 ///
-/// * `deps` - a mutable reference to Extern containing all the contract's external dependencies
+/// * `deps` - the contract's mutable external dependencies
 /// * `env` - a reference to the Env of the contract's environment
-/// * `info` - contract execution info for authorization - identity of the call, and payment.
+/// * `msg_sender` - a reference to the message sender's address
 /// * `config` - a mutable reference to the Config
-/// * `sender` - a reference to the message sender address
 /// * `transfers` - optional list of transfers to perform
 /// * `sends` - optional list of sends to perform
 fn send_list(
     mut deps: DepsMut,
     env: &Env,
-    info: &MessageInfo,
+    msg_sender: &Addr,
     config: &mut Config,
-    sender: &CanonicalAddr,
     transfers: Option<Vec<Transfer>>,
     sends: Option<Vec<Send>>,
 ) -> StdResult<Vec<CosmosMsg>> {
@@ -4348,15 +4347,18 @@ fn send_list(
     let mut oper_for: Vec<CanonicalAddr> = Vec::new();
     let mut inv_updates: Vec<InventoryUpdate> = Vec::new();
     let num_perm_types = PermissionType::ViewOwner.num_types();
+    let sender = deps.api.addr_canonicalize(msg_sender.as_str())?;
     if let Some(xfers) = transfers {
         for xfer in xfers.into_iter() {
-            let recipient_raw = deps.api.addr_canonicalize(&xfer.recipient.as_str())?;
+            let recipient_raw = deps
+                .api
+                .addr_canonicalize(deps.api.addr_validate(&xfer.recipient)?.as_str())?;
             for token_id in xfer.token_ids.into_iter() {
                 let _o = transfer_impl(
                     &mut deps,
                     &env.block,
                     config,
-                    sender,
+                    &sender,
                     token_id,
                     recipient_raw.clone(),
                     &mut oper_for,
@@ -4368,14 +4370,16 @@ fn send_list(
     } else if let Some(snds) = sends {
         let mut receivers = Vec::new();
         for send in snds.into_iter() {
-            let contract_raw = deps.api.addr_canonicalize(&send.contract.as_str())?;
+            let contract_raw = deps
+                .api
+                .addr_canonicalize(deps.api.addr_validate(&send.contract)?.as_str())?;
             let mut send_from_list: Vec<SendFrom> = Vec::new();
             for token_id in send.token_ids.into_iter() {
                 let owner_raw = transfer_impl(
                     &mut deps,
                     &env.block,
                     config,
-                    sender,
+                    &sender,
                     token_id.clone(),
                     contract_raw.clone(),
                     &mut oper_for,
@@ -4383,12 +4387,11 @@ fn send_list(
                     send.memo.clone(),
                 )?;
                 // compile list of all tokens being sent from each owner in this Send
-                let owner = deps.api.addr_humanize(&owner_raw)?;
-                if let Some(sd_fm) = send_from_list.iter_mut().find(|s| s.owner == owner) {
+                if let Some(sd_fm) = send_from_list.iter_mut().find(|s| s.owner == owner_raw) {
                     sd_fm.token_ids.push(token_id.clone());
                 } else {
                     let new_sd_fm = SendFrom {
-                        owner,
+                        owner: owner_raw,
                         token_ids: vec![token_id.clone()],
                     };
                     send_from_list.push(new_sd_fm);
@@ -4396,13 +4399,13 @@ fn send_list(
             }
             // get BatchReceiveNft and ReceiveNft msgs for all the tokens sent in this Send
             messages.extend(receiver_callback_msgs(
-                deps.storage,
+                &mut deps,
                 &send.contract,
                 &contract_raw,
                 send.receiver_info,
                 send_from_list,
                 &send.msg,
-                &info.sender,
+                msg_sender,
                 &mut receivers,
             )?);
         }
@@ -4552,7 +4555,8 @@ fn mint_list(
         // map new token id to its index
         save(&mut map2idx, id.as_bytes(), &config.mint_cnt)?;
         let recipient = if let Some(o) = mint.owner {
-            deps.api.addr_canonicalize(deps.api.addr_validate(&o.as_str())?.as_str())?
+            deps.api
+                .addr_canonicalize(deps.api.addr_validate(&o)?.as_str())?
         } else {
             sender_raw.clone()
         };
@@ -4612,7 +4616,7 @@ fn mint_list(
             };
         let mint_info = StoredMintRunInfo {
             token_creator: sender_raw.clone(),
-            time_of_minting: env.block.time.nanos(),
+            time_of_minting: env.block.time.seconds(),
             mint_run,
             serial_number,
             quantity_minted_this_run,
@@ -4737,8 +4741,10 @@ fn get_querier(
     }
     let viewer_raw = viewer
         .map(|v| {
-            let raw = deps.api.addr_canonicalize(&v.address.as_str())?;
-            check_key(deps.storage, &raw, v.viewing_key)?;
+            let addr = deps.api.addr_validate(&v.address)?;
+            let raw = deps.api.addr_canonicalize(addr.as_str())?;
+            ViewingKey::check(deps.storage, addr.as_str(), &v.viewing_key)
+                .map_err(|_| StdError::generic_err(VIEWING_KEY_ERR_MSG))?;
             Ok::<CanonicalAddr, StdError>(raw)
         })
         .transpose()?;
@@ -4767,12 +4773,14 @@ pub struct OwnerInfo {
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
+/// * `block` - a reference to the BlockInfo
 /// * `token_ids` - list of token ids to retrieve the info of
 /// * `viewer` - optional address and key making an authenticated query request
 /// * `include_expired` - optionally true if the Approval lists should include expired Approvals
 /// * `from_permit` - address derived from an Owner permit, if applicable
 pub fn dossier_list(
     deps: Deps,
+    block: &BlockInfo,
     token_ids: Vec<String>,
     viewer: Option<ViewerInfo>,
     include_expired: Option<bool>,
@@ -4786,12 +4794,6 @@ pub fn dossier_list(
         .api
         .addr_humanize(&load::<CanonicalAddr>(deps.storage, CREATOR_KEY)?)?;
 
-    // TODO remove this when BlockInfo becomes available to queries
-    let block: BlockInfo = may_load(deps.storage, BLOCK_KEY)?.unwrap_or_else(|| BlockInfo {
-        height: 1,
-        time: Timestamp::from_nanos(1),
-        chain_id: "not used".to_string(),
-    });
     let perm_type_info = PermissionTypeInfo {
         view_owner_idx: PermissionType::ViewOwner.to_usize(),
         view_meta_idx: PermissionType::ViewMetadata.to_usize(),
@@ -4835,7 +4837,7 @@ pub fn dossier_list(
             let mut all_perm: Vec<Permission> =
                 json_may_load(&all_store, owner_slice)?.unwrap_or_default();
             let (inventory_approvals, view_owner_exp, view_meta_exp) =
-                gen_snip721_approvals(deps.api, &block, &mut all_perm, incl_exp, &perm_type_info)?;
+                gen_snip721_approvals(deps.api, block, &mut all_perm, incl_exp, &perm_type_info)?;
             owner_cache.push(OwnerInfo {
                 owner: token.owner.clone(),
                 owner_is_public,
@@ -4851,16 +4853,16 @@ pub fn dossier_list(
         // get the owner if permitted
         let owner = if global_pass
             || check_perm_core(
-            deps,
-            &block,
-            &token,
-            &id,
-            opt_viewer,
-            owner_slice,
-            perm_type_info.view_owner_idx,
-            &mut owner_oper_for,
-            &err_msg,
-        )
+                deps,
+                block,
+                &token,
+                &id,
+                opt_viewer,
+                owner_slice,
+                perm_type_info.view_owner_idx,
+                &mut owner_oper_for,
+                &err_msg,
+            )
             .is_ok()
         {
             Some(deps.api.addr_humanize(&token.owner)?)
@@ -4874,7 +4876,7 @@ pub fn dossier_list(
         let mut display_private_metadata_error = None;
         let private_metadata = if let Err(err) = check_perm_core(
             deps,
-            &block,
+            block,
             &token,
             &id,
             opt_viewer,
@@ -4902,7 +4904,7 @@ pub fn dossier_list(
             .map(|r| {
                 let hide_addr = check_perm_core(
                     deps,
-                    &block,
+                    block,
                     &token,
                     &id,
                     opt_viewer,
@@ -4911,7 +4913,7 @@ pub fn dossier_list(
                     &mut xfer_oper_for,
                     &err_msg,
                 )
-                    .is_err();
+                .is_err();
                 r.to_human(deps.api, hide_addr)
             })
             .transpose()?;
@@ -4920,7 +4922,7 @@ pub fn dossier_list(
         // get the token approvals
         let (token_approv, token_owner_exp, token_meta_exp) = gen_snip721_approvals(
             deps.api,
-            &block,
+            block,
             &mut token.permissions,
             incl_exp,
             &perm_type_info,
@@ -4963,7 +4965,7 @@ pub fn dossier_list(
             public_metadata,
             private_metadata,
             royalty_info,
-            mint_run_info: Some(mint_run.to_human(deps.api, contract_creator.clone().to_string())?),
+            mint_run_info: Some(mint_run.to_human(deps.api, contract_creator.clone())?),
             transferable: token.transferable,
             unwrapped: token.unwrapped,
             display_private_metadata_error,
