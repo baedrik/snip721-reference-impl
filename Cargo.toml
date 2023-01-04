@@ -1,8 +1,8 @@
 [package]
 name = "snip721-reference-impl"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["bill wincer"]
-edition = "2018"
+edition = "2021"
 
 exclude = [
   # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
@@ -32,21 +32,14 @@ overflow-checks = true
 backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
-cosmwasm-std = { version = "0.10", package = "secret-cosmwasm-std" }
-cosmwasm-storage = { version = "0.10", package = "secret-cosmwasm-storage" }
-secret-toolkit = { version = "0.3", default-features = false, features = ["storage", "serialization", "utils", "permit"] }
-serde-json-wasm = "0.2.1"
-schemars = "0.7"
-serde = { version = "1.0.103", default-features = false, features = ["derive"] }
-snafu = { version = "0.6.3" }
+cosmwasm-std = { package = "secret-cosmwasm-std", version = "1.0.0", default-features = false }
+cosmwasm-storage = { package = "secret-cosmwasm-storage", version = "1.0.0" }
+secret-toolkit = { version = "0.7.0", default-features = false, features = ["storage", "serialization", "utils", "permit", "viewing-key", "crypto"] }
+schemars = "0.8.11"
+serde = { version = "1.0.114", default-features = false, features = ["derive"] }
 bincode2 = "2.0.1"
-subtle = { version = "2.2.3", default-features = false }
-base64 = "0.12.3"
-hex = "0.4.2"
-primitive-types = { version = "0.9.0", default-features = false }
-rand_chacha = { version = "0.2.2", default-features = false }
-rand_core = { version =  "0.5.1", default-features = false }
-sha2 = { version = "0.9.1", default-features = false }
+base64 = "0.13.0"
+primitive-types = { version = "0.11.1", default-features = false }
 
 [dev-dependencies]
-cosmwasm-schema = "0.10.1"
+cosmwasm-schema = { version = "1.1.8" }

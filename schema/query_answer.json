@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "QueryAnswer",
-  "anyOf": [
+  "oneOf": [
     {
       "type": "object",
       "required": [
@@ -23,7 +23,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -35,6 +36,8 @@
           "type": "object",
           "required": [
             "burn_is_enabled",
+            "implements_non_transferable_tokens",
+            "implements_token_subtype",
             "minter_may_update_metadata",
             "owner_is_public",
             "owner_may_update_metadata",
@@ -44,6 +47,12 @@
           ],
           "properties": {
             "burn_is_enabled": {
+              "type": "boolean"
+            },
+            "implements_non_transferable_tokens": {
+              "type": "boolean"
+            },
+            "implements_token_subtype": {
               "type": "boolean"
             },
             "minter_may_update_metadata": {
@@ -66,7 +75,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -83,12 +93,13 @@
             "minters": {
               "type": "array",
               "items": {
-                "$ref": "#/definitions/HumanAddr"
+                "$ref": "#/definitions/Addr"
               }
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -109,7 +120,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -131,7 +143,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -153,11 +166,12 @@
               }
             },
             "owner": {
-              "$ref": "#/definitions/HumanAddr"
+              "$ref": "#/definitions/Addr"
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -207,7 +221,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -257,7 +272,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -286,7 +302,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -315,7 +332,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -344,7 +362,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -389,7 +408,7 @@
             "owner": {
               "anyOf": [
                 {
-                  "$ref": "#/definitions/HumanAddr"
+                  "$ref": "#/definitions/Addr"
                 },
                 {
                   "type": "null"
@@ -469,7 +488,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -491,7 +511,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -513,7 +534,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -532,7 +554,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -551,7 +574,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -570,7 +594,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -589,7 +614,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -614,7 +640,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -643,7 +670,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -668,7 +696,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -691,7 +720,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "type": "object",
@@ -705,7 +735,7 @@
             "creator": {
               "anyOf": [
                 {
-                  "$ref": "#/definitions/HumanAddr"
+                  "$ref": "#/definitions/Addr"
                 },
                 {
                   "type": "null"
@@ -714,10 +744,15 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
+    "Addr": {
+      "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+      "type": "string"
+    },
     "Authentication": {
       "description": "media file authentication",
       "type": "object",
@@ -777,7 +812,7 @@
         "owner": {
           "anyOf": [
             {
-              "$ref": "#/definitions/HumanAddr"
+              "$ref": "#/definitions/Addr"
             },
             {
               "type": "null"
@@ -882,7 +917,7 @@
           "description": "address that can transfer the token",
           "allOf": [
             {
-              "$ref": "#/definitions/HumanAddr"
+              "$ref": "#/definitions/Addr"
             }
           ]
         }
@@ -906,7 +941,7 @@
           "description": "Owner of the token if permitted to view it",
           "anyOf": [
             {
-              "$ref": "#/definitions/HumanAddr"
+              "$ref": "#/definitions/Addr"
             },
             {
               "type": "null"
@@ -932,7 +967,7 @@
           "description": "address to send royalties to.  Can be None to keep addresses private",
           "anyOf": [
             {
-              "$ref": "#/definitions/HumanAddr"
+              "$ref": "#/definitions/Addr"
             },
             {
               "type": "null"
@@ -966,13 +1001,7 @@
     },
     "Expiration": {
       "description": "at the given point in time and after, Expiration will be considered expired",
-      "anyOf": [
-        {
-          "type": "string",
-          "enum": [
-            "never"
-          ]
-        },
+      "oneOf": [
         {
           "description": "expires at this block height",
           "type": "object",
@@ -985,7 +1014,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "expires at the time in seconds since 01/01/1970",
@@ -999,7 +1029,15 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "never expires",
+          "type": "string",
+          "enum": [
+            "never"
+          ]
         }
       ]
     },
@@ -1102,9 +1140,6 @@
         }
       }
     },
-    "HumanAddr": {
-      "type": "string"
-    },
     "MediaFile": {
       "description": "media file",
       "type": "object",
@@ -1175,7 +1210,7 @@
           "description": "optional address of the SNIP-721 contract creator",
           "anyOf": [
             {
-              "$ref": "#/definitions/HumanAddr"
+              "$ref": "#/definitions/Addr"
             },
             {
               "type": "null"
@@ -1222,7 +1257,7 @@
           "description": "optional address of this NFT's creator",
           "anyOf": [
             {
-              "$ref": "#/definitions/HumanAddr"
+              "$ref": "#/definitions/Addr"
             },
             {
               "type": "null"
@@ -1242,7 +1277,7 @@
           "description": "whitelisted address",
           "allOf": [
             {
-              "$ref": "#/definitions/HumanAddr"
+              "$ref": "#/definitions/Addr"
             }
           ]
         },
@@ -1367,7 +1402,7 @@
     },
     "TxAction": {
       "description": "tx type and specifics",
-      "anyOf": [
+      "oneOf": [
         {
           "description": "transferred token ownership",
           "type": "object",
@@ -1386,7 +1421,7 @@
                   "description": "previous owner",
                   "allOf": [
                     {
-                      "$ref": "#/definitions/HumanAddr"
+                      "$ref": "#/definitions/Addr"
                     }
                   ]
                 },
@@ -1394,7 +1429,7 @@
                   "description": "new owner",
                   "allOf": [
                     {
-                      "$ref": "#/definitions/HumanAddr"
+                      "$ref": "#/definitions/Addr"
                     }
                   ]
                 },
@@ -1402,7 +1437,7 @@
                   "description": "optional sender if not owner",
                   "anyOf": [
                     {
-                      "$ref": "#/definitions/HumanAddr"
+                      "$ref": "#/definitions/Addr"
                     },
                     {
                       "type": "null"
@@ -1411,7 +1446,8 @@
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "minted new token",
@@ -1431,7 +1467,7 @@
                   "description": "minter's address",
                   "allOf": [
                     {
-                      "$ref": "#/definitions/HumanAddr"
+                      "$ref": "#/definitions/Addr"
                     }
                   ]
                 },
@@ -1439,13 +1475,14 @@
                   "description": "token's first owner",
                   "allOf": [
                     {
-                      "$ref": "#/definitions/HumanAddr"
+                      "$ref": "#/definitions/Addr"
                     }
                   ]
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "burned a token",
@@ -1464,7 +1501,7 @@
                   "description": "burner's address if not owner",
                   "anyOf": [
                     {
-                      "$ref": "#/definitions/HumanAddr"
+                      "$ref": "#/definitions/Addr"
                     },
                     {
                       "type": "null"
@@ -1475,13 +1512,14 @@
                   "description": "previous owner",
                   "allOf": [
                     {
-                      "$ref": "#/definitions/HumanAddr"
+                      "$ref": "#/definitions/Addr"
                     }
                   ]
                 }
               }
             }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     }

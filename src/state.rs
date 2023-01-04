@@ -1,13 +1,11 @@
 use std::any::type_name;
 
-use cosmwasm_std::{Api, BlockInfo, CanonicalAddr, ReadonlyStorage, StdError, StdResult, Storage};
+use cosmwasm_std::{Api, BlockInfo, CanonicalAddr, StdError, StdResult, Storage};
 use cosmwasm_storage::{PrefixedStorage, ReadonlyPrefixedStorage};
-
 use secret_toolkit::{
     serialization::{Bincode2, Json, Serde},
-    storage::{AppendStore, AppendStoreMut},
+    storage::AppendStore,
 };
-
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::expiration::Expiration;
@@ -15,14 +13,10 @@ use crate::msg::{Tx, TxAction};
 
 /// storage key for config
 pub const CONFIG_KEY: &[u8] = b"config";
-/// storage key for the BlockInfo when the last handle was executed
-pub const BLOCK_KEY: &[u8] = b"blockinfo";
 /// storage key for minters
 pub const MINTERS_KEY: &[u8] = b"minters";
 /// storage key for this contract's address
 pub const MY_ADDRESS_KEY: &[u8] = b"myaddr";
-/// storage key for prng seed
-pub const PRNG_SEED_KEY: &[u8] = b"prngseed";
 /// storage key for the contract instantiator
 pub const CREATOR_KEY: &[u8] = b"creator";
 /// storage key for the default RoyaltyInfo to use if none is supplied when minting
@@ -43,16 +37,12 @@ pub const PREFIX_ROYALTY_INFO: &[u8] = b"royalty";
 pub const PREFIX_MINT_RUN: &[u8] = b"mintrun";
 /// prefix for storage of txs
 pub const PREFIX_TXS: &[u8] = b"rawtxs";
-/// prefix for storage of tx ids
-pub const PREFIX_TX_IDS: &[u8] = b"txids";
 /// prefix for storage of owner's list of "all" permissions
 pub const PREFIX_ALL_PERMISSIONS: &[u8] = b"allpermissions";
 /// prefix for storage of owner's list of tokens permitted to addresses
 pub const PREFIX_AUTHLIST: &[u8] = b"authlist";
 /// prefix for storage of an address' ownership prvicacy
 pub const PREFIX_OWNER_PRIV: &[u8] = b"ownerpriv";
-/// prefix for storage of viewing keys
-pub const PREFIX_VIEW_KEY: &[u8] = b"viewkeys";
 /// prefix for the storage of the code hashes of contract's that have implemented ReceiveNft
 pub const PREFIX_RECEIVERS: &[u8] = b"receivers";
 /// prefix for the storage of mint run numbers
@@ -60,8 +50,14 @@ pub const PREFIX_MINT_RUN_NUM: &[u8] = b"runnum";
 /// prefix for the storage of revoked permits
 pub const PREFIX_REVOKED_PERMITS: &str = "revoke";
 
+/// viewing key error message
+pub const VIEWING_KEY_ERR_MSG: &str = "Wrong viewing key for this address or viewing key not set";
+
+// append store for user's list of tx ids
+pub static TX_ID_STORE: AppendStore<u64> = AppendStore::new(b"txid");
+
 /// Token contract config
-#[derive(Serialize, Debug, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Debug, Deserialize, Clone, PartialEq, Eq)]
 pub struct Config {
     /// name of token contract
     pub name: String,
@@ -146,7 +142,7 @@ impl StoredTx {
     /// # Arguments
     ///
     /// * `api` - a reference to the Api used to convert human and canonical addresses
-    pub fn into_humanized<A: Api>(self, api: &A) -> StdResult<Tx> {
+    pub fn into_humanized(self, api: &dyn Api) -> StdResult<Tx> {
         let action = match self.action {
             StoredTxAction::Transfer {
                 from,
@@ -154,28 +150,28 @@ impl StoredTx {
                 recipient,
             } => {
                 let sndr = if let Some(s) = sender {
-                    Some(api.human_address(&s)?)
+                    Some(api.addr_humanize(&s)?)
                 } else {
                     None
                 };
                 TxAction::Transfer {
-                    from: api.human_address(&from)?,
+                    from: api.addr_humanize(&from)?,
                     sender: sndr,
-                    recipient: api.human_address(&recipient)?,
+                    recipient: api.addr_humanize(&recipient)?,
                 }
             }
             StoredTxAction::Mint { minter, recipient } => TxAction::Mint {
-                minter: api.human_address(&minter)?,
-                recipient: api.human_address(&recipient)?,
+                minter: api.addr_humanize(&minter)?,
+                recipient: api.addr_humanize(&recipient)?,
             },
             StoredTxAction::Burn { owner, burner } => {
                 let bnr = if let Some(b) = burner {
-                    Some(api.human_address(&b)?)
+                    Some(api.addr_humanize(&b)?)
                 } else {
                     None
                 };
                 TxAction::Burn {
-                    owner: api.human_address(&owner)?,
+                    owner: api.addr_humanize(&owner)?,
                     burner: bnr,
                 }
             }
@@ -206,8 +202,8 @@ impl StoredTx {
 /// * `recipient` - the recipient's address
 /// * `memo` - optional memo for the tx
 #[allow(clippy::too_many_arguments)]
-pub fn store_transfer<S: Storage>(
-    storage: &mut S,
+pub fn store_transfer(
+    storage: &mut dyn Storage,
     config: &mut Config,
     block: &BlockInfo,
     token_id: String,
@@ -224,12 +220,12 @@ pub fn store_transfer<S: Storage>(
     let tx = StoredTx {
         tx_id: config.tx_cnt,
         block_height: block.height,
-        block_time: block.time,
+        block_time: block.time.seconds(),
         token_id,
         action,
         memo,
     };
-    let mut tx_store = PrefixedStorage::new(PREFIX_TXS, storage);
+    let mut tx_store = PrefixedStorage::new(storage, PREFIX_TXS);
     json_save(&mut tx_store, &config.tx_cnt.to_le_bytes(), &tx)?;
     if let StoredTxAction::Transfer {
         from,
@@ -260,8 +256,8 @@ pub fn store_transfer<S: Storage>(
 /// * `minter` - the minter's address
 /// * `recipient` - the recipient's address
 /// * `memo` - optional memo for the tx
-pub fn store_mint<S: Storage>(
-    storage: &mut S,
+pub fn store_mint(
+    storage: &mut dyn Storage,
     config: &mut Config,
     block: &BlockInfo,
     token_id: String,
@@ -273,12 +269,12 @@ pub fn store_mint<S: Storage>(
     let tx = StoredTx {
         tx_id: config.tx_cnt,
         block_height: block.height,
-        block_time: block.time,
+        block_time: block.time.seconds(),
         token_id,
         action,
         memo,
     };
-    let mut tx_store = PrefixedStorage::new(PREFIX_TXS, storage);
+    let mut tx_store = PrefixedStorage::new(storage, PREFIX_TXS);
     json_save(&mut tx_store, &config.tx_cnt.to_le_bytes(), &tx)?;
     if let StoredTxAction::Mint { minter, recipient } = tx.action {
         append_tx_for_addr(storage, config.tx_cnt, &recipient)?;
@@ -301,8 +297,8 @@ pub fn store_mint<S: Storage>(
 /// * `owner` - the previous owner's address
 /// * `burner` - optional address that burnt the token
 /// * `memo` - optional memo for the tx
-pub fn store_burn<S: Storage>(
-    storage: &mut S,
+pub fn store_burn(
+    storage: &mut dyn Storage,
     config: &mut Config,
     block: &BlockInfo,
     token_id: String,
@@ -314,12 +310,12 @@ pub fn store_burn<S: Storage>(
     let tx = StoredTx {
         tx_id: config.tx_cnt,
         block_height: block.height,
-        block_time: block.time,
+        block_time: block.time.seconds(),
         token_id,
         action,
         memo,
     };
-    let mut tx_store = PrefixedStorage::new(PREFIX_TXS, storage);
+    let mut tx_store = PrefixedStorage::new(storage, PREFIX_TXS);
     json_save(&mut tx_store, &config.tx_cnt.to_le_bytes(), &tx)?;
     if let StoredTxAction::Burn { owner, burner } = tx.action {
         append_tx_for_addr(storage, config.tx_cnt, &owner)?;
@@ -338,14 +334,13 @@ pub fn store_burn<S: Storage>(
 /// * `storage` - a mutable reference to the storage this item should go to
 /// * `tx_id` - the tx id to store
 /// * `address` - a reference to the address for which to store this tx id
-fn append_tx_for_addr<S: Storage>(
-    storage: &mut S,
+fn append_tx_for_addr(
+    storage: &mut dyn Storage,
     tx_id: u64,
     address: &CanonicalAddr,
 ) -> StdResult<()> {
-    let mut store = PrefixedStorage::multilevel(&[PREFIX_TX_IDS, address.as_slice()], storage);
-    let mut store = AppendStoreMut::attach_or_create(&mut store)?;
-    store.push(&tx_id)
+    let addr_store = TX_ID_STORE.add_suffix(address.as_slice());
+    addr_store.push(storage, &tx_id)
 }
 
 /// Returns StdResult<(Vec<Tx>, u64)> of the txs to display and the total count of txs
@@ -357,39 +352,30 @@ fn append_tx_for_addr<S: Storage>(
 /// * `address` - a reference to the address whose txs to display
 /// * `page` - page to start displaying
 /// * `page_size` - number of txs per page
-pub fn get_txs<A: Api, S: ReadonlyStorage>(
-    api: &A,
-    storage: &S,
+pub fn get_txs(
+    api: &dyn Api,
+    storage: &dyn Storage,
     address: &CanonicalAddr,
     page: u32,
     page_size: u32,
 ) -> StdResult<(Vec<Tx>, u64)> {
-    let id_store =
-        ReadonlyPrefixedStorage::multilevel(&[PREFIX_TX_IDS, address.as_slice()], storage);
+    let addr_store = TX_ID_STORE.add_suffix(address.as_slice());
 
-    // Try to access the storage of tx ids for the account.
-    // If it doesn't exist yet, return an empty list of txs.
-    let id_store = if let Some(result) = AppendStore::<u64, _>::attach(&id_store) {
-        result?
-    } else {
-        return Ok((vec![], 0));
-    };
-    let count = id_store.len() as u64;
+    let count = addr_store.get_len(storage)? as u64;
     // access tx storage
-    let tx_store = ReadonlyPrefixedStorage::new(PREFIX_TXS, storage);
+    let tx_store = ReadonlyPrefixedStorage::new(storage, PREFIX_TXS);
     // Take `page_size` txs starting from the latest tx, potentially skipping `page * page_size`
     // txs from the start.
-    let txs: StdResult<Vec<Tx>> = id_store
-        .iter()
+    let txs: StdResult<Vec<Tx>> = addr_store
+        .iter(storage)?
         .rev()
         .skip((page * page_size) as usize)
         .take(page_size as usize)
         .map(|id| {
-            id.map(|id| {
+            id.and_then(|id| {
                 json_load(&tx_store, &id.to_le_bytes())
                     .and_then(|tx: StoredTx| tx.into_humanized(api))
             })
-            .and_then(|x| x)
         })
         .collect();
 
@@ -397,7 +383,7 @@ pub fn get_txs<A: Api, S: ReadonlyStorage>(
 }
 
 /// permission to view token info/transfer tokens
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Permission {
     /// permitted address
     pub address: CanonicalAddr,
@@ -454,7 +440,7 @@ pub struct ReceiveRegistration {
 /// * `storage` - a mutable reference to the storage this item should go to
 /// * `key` - a byte slice representing the key to access the stored item
 /// * `value` - a reference to the item to store
-pub fn save<T: Serialize, S: Storage>(storage: &mut S, key: &[u8], value: &T) -> StdResult<()> {
+pub fn save<T: Serialize>(storage: &mut dyn Storage, key: &[u8], value: &T) -> StdResult<()> {
     storage.set(key, &Bincode2::serialize(value)?);
     Ok(())
 }
@@ -465,7 +451,7 @@ pub fn save<T: Serialize, S: Storage>(storage: &mut S, key: &[u8], value: &T) ->
 ///
 /// * `storage` - a mutable reference to the storage this item is in
 /// * `key` - a byte slice representing the key that accesses the stored item
-pub fn remove<S: Storage>(storage: &mut S, key: &[u8]) {
+pub fn remove(storage: &mut dyn Storage, key: &[u8]) {
     storage.remove(key);
 }
 
@@ -476,7 +462,7 @@ pub fn remove<S: Storage>(storage: &mut S, key: &[u8]) {
 ///
 /// * `storage` - a reference to the storage this item is in
 /// * `key` - a byte slice representing the key that accesses the stored item
-pub fn load<T: DeserializeOwned, S: ReadonlyStorage>(storage: &S, key: &[u8]) -> StdResult<T> {
+pub fn load<T: DeserializeOwned>(storage: &dyn Storage, key: &[u8]) -> StdResult<T> {
     Bincode2::deserialize(
         &storage
             .get(key)
@@ -491,10 +477,7 @@ pub fn load<T: DeserializeOwned, S: ReadonlyStorage>(storage: &S, key: &[u8]) ->
 ///
 /// * `storage` - a reference to the storage this item is in
 /// * `key` - a byte slice representing the key that accesses the stored item
-pub fn may_load<T: DeserializeOwned, S: ReadonlyStorage>(
-    storage: &S,
-    key: &[u8],
-) -> StdResult<Option<T>> {
+pub fn may_load<T: DeserializeOwned>(storage: &dyn Storage, key: &[u8]) -> StdResult<Option<T>> {
     match storage.get(key) {
         Some(value) => Bincode2::deserialize(&value).map(Some),
         None => Ok(None),
@@ -509,24 +492,20 @@ pub fn may_load<T: DeserializeOwned, S: ReadonlyStorage>(
 /// * `storage` - a mutable reference to the storage this item should go to
 /// * `key` - a byte slice representing the key to access the stored item
 /// * `value` - a reference to the item to store
-pub fn json_save<T: Serialize, S: Storage>(
-    storage: &mut S,
-    key: &[u8],
-    value: &T,
-) -> StdResult<()> {
+pub fn json_save<T: Serialize>(storage: &mut dyn Storage, key: &[u8], value: &T) -> StdResult<()> {
     storage.set(key, &Json::serialize(value)?);
     Ok(())
 }
 
 /// Returns StdResult<T> from retrieving the item with the specified key using Json
-/// (de)serialization because bincode2 annoyingly uses a float op when deserializing an enum.  
+/// (de)serialization because bincode2 annoyingly uses a float op when deserializing an enum.
 /// Returns a StdError::NotFound if there is no item with that key
 ///
 /// # Arguments
 ///
 /// * `storage` - a reference to the storage this item is in
 /// * `key` - a byte slice representing the key that accesses the stored item
-pub fn json_load<T: DeserializeOwned, S: ReadonlyStorage>(storage: &S, key: &[u8]) -> StdResult<T> {
+pub fn json_load<T: DeserializeOwned>(storage: &dyn Storage, key: &[u8]) -> StdResult<T> {
     Json::deserialize(
         &storage
             .get(key)
@@ -542,8 +521,8 @@ pub fn json_load<T: DeserializeOwned, S: ReadonlyStorage>(storage: &S, key: &[u8
 ///
 /// * `storage` - a reference to the storage this item is in
 /// * `key` - a byte slice representing the key that accesses the stored item
-pub fn json_may_load<T: DeserializeOwned, S: ReadonlyStorage>(
-    storage: &S,
+pub fn json_may_load<T: DeserializeOwned>(
+    storage: &dyn Storage,
     key: &[u8],
 ) -> StdResult<Option<T>> {
     match storage.get(key) {

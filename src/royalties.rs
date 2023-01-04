@@ -1,12 +1,12 @@
-use cosmwasm_std::{Api, CanonicalAddr, HumanAddr, StdResult};
+use cosmwasm_std::{Addr, Api, CanonicalAddr, StdResult};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// data for a single royalty
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct Royalty {
     /// address to send royalties to
-    pub recipient: HumanAddr,
+    pub recipient: String,
     /// royalty rate
     pub rate: u16,
 }
@@ -17,16 +17,16 @@ impl Royalty {
     /// # Arguments
     ///
     /// * `api` - a reference to the Api used to convert human and canonical addresses
-    pub fn to_stored<A: Api>(&self, api: &A) -> StdResult<StoredRoyalty> {
+    pub fn to_stored(&self, api: &dyn Api) -> StdResult<StoredRoyalty> {
         Ok(StoredRoyalty {
-            recipient: api.canonical_address(&self.recipient)?,
+            recipient: api.addr_canonicalize(api.addr_validate(&self.recipient)?.as_str())?,
             rate: self.rate,
         })
     }
 }
 
 /// all royalty information
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct RoyaltyInfo {
     /// decimal places in royalty rates
     pub decimal_places_in_rates: u8,
@@ -40,7 +40,7 @@ impl RoyaltyInfo {
     /// # Arguments
     ///
     /// * `api` - a reference to the Api used to convert human and canonical addresses
-    pub fn to_stored<A: Api>(&self, api: &A) -> StdResult<StoredRoyaltyInfo> {
+    pub fn to_stored(&self, api: &dyn Api) -> StdResult<StoredRoyaltyInfo> {
         Ok(StoredRoyaltyInfo {
             decimal_places_in_rates: self.decimal_places_in_rates,
             royalties: self
@@ -53,16 +53,16 @@ impl RoyaltyInfo {
 }
 
 /// display for a single royalty
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct DisplayRoyalty {
     /// address to send royalties to.  Can be None to keep addresses private
-    pub recipient: Option<HumanAddr>,
+    pub recipient: Option<Addr>,
     /// royalty rate
     pub rate: u16,
 }
 
 /// display all royalty information
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct DisplayRoyaltyInfo {
     /// decimal places in royalty rates
     pub decimal_places_in_rates: u8,
@@ -71,7 +71,7 @@ pub struct DisplayRoyaltyInfo {
 }
 
 /// data for storing a single royalty
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct StoredRoyalty {
     /// address to send royalties to
     pub recipient: CanonicalAddr,
@@ -86,11 +86,11 @@ impl StoredRoyalty {
     ///
     /// * `api` - a reference to the Api used to convert human and canonical addresses
     /// * `hide_addr` - true if the address should be kept hidden
-    pub fn to_human<A: Api>(&self, api: &A, hide_addr: bool) -> StdResult<DisplayRoyalty> {
+    pub fn to_human(&self, api: &dyn Api, hide_addr: bool) -> StdResult<DisplayRoyalty> {
         let recipient = if hide_addr {
             None
         } else {
-            Some(api.human_address(&self.recipient)?)
+            Some(api.addr_humanize(&self.recipient)?)
         };
         Ok(DisplayRoyalty {
             recipient,
@@ -100,7 +100,7 @@ impl StoredRoyalty {
 }
 
 /// all stored royalty information
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 pub struct StoredRoyaltyInfo {
     /// decimal places in royalty rates
     pub decimal_places_in_rates: u8,
@@ -115,7 +115,7 @@ impl StoredRoyaltyInfo {
     ///
     /// * `api` - a reference to the Api used to convert human and canonical addresses
     /// * `hide_addr` - true if the address should be kept hidden
-    pub fn to_human<A: Api>(&self, api: &A, hide_addr: bool) -> StdResult<DisplayRoyaltyInfo> {
+    pub fn to_human(&self, api: &dyn Api, hide_addr: bool) -> StdResult<DisplayRoyaltyInfo> {
         Ok(DisplayRoyaltyInfo {
             decimal_places_in_rates: self.decimal_places_in_rates,
             royalties: self

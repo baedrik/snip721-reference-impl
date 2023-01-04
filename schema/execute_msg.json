@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "HandleMsg",
-  "anyOf": [
+  "title": "ExecuteMsg",
+  "oneOf": [
     {
       "description": "mint new token",
       "type": "object",
@@ -21,13 +21,9 @@
             },
             "owner": {
               "description": "optional owner address. if omitted, owned by the message sender",
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             },
             "padding": {
@@ -97,7 +93,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Mint multiple tokens",
@@ -128,7 +125,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "create a mint run of clones that will have MintRunInfos showing they are serialized copies in the same mint run with the specified quantity.  Mint_run_id can be used to track mint run numbers in subsequent MintNftClones calls.  So, if provided, the first MintNftClones call will have mint run number 1, the next time MintNftClones is called with the same mint_run_id, those clones will have mint run number 2, etc...  If no mint_run_id is specified, the clones will not have any mint run number assigned to their MintRunInfos.  Because this mints to a single address, there is no option to specify that the clones are non-transferable as there is no foreseen reason for someone to have multiple copies of an nft that they can never send to others",
@@ -159,13 +157,9 @@
             },
             "owner": {
               "description": "optional owner address. if omitted, owned by the message sender",
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                },
-                {
-                  "type": "null"
-                }
+              "type": [
+                "string",
+                "null"
               ]
             },
             "padding": {
@@ -216,7 +210,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "set the public and/or private metadata.  This can be called by either the token owner or a valid minter if they have been given this power by the appropriate config values",
@@ -266,7 +261,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "set royalty information.  If no token ID is provided, this royalty info will become the default RoyaltyInfo for any new tokens minted on the contract.  If a token ID is provided, this can only be called by the token creator and only when the creator is the current owner.  Royalties can not be set on a token that is not transferable, because they can never be sold",
@@ -305,7 +301,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "Reveal the private metadata of a sealed token and mark the token as having been unwrapped",
@@ -333,7 +330,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "if a contract was instantiated to make ownership public by default, this will allow an address to make the ownership of their tokens private.  The address can still use SetGlobalApproval to make ownership public either inventory-wide or for a specific token",
@@ -354,7 +352,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "add/remove approval(s) that whitelist everyone (makes public)",
@@ -415,7 +414,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "add/remove approval(s) for a specific address on the token(s) you own.  Any permissions that are omitted will keep the current permission setting for that whitelist address",
@@ -432,11 +432,7 @@
           "properties": {
             "address": {
               "description": "address being granted/revoked permission",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "expires": {
               "description": "optional expiration",
@@ -498,7 +494,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "gives the spender permission to transfer the specified token.  If you are the owner of the token, you can use SetWhitelistedApproval to accomplish the same thing.  If you are an operator, you can only use Approve",
@@ -534,11 +531,7 @@
             },
             "spender": {
               "description": "address being granted the permission",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "token_id": {
               "description": "id of the token that the spender can transfer",
@@ -546,7 +539,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "revokes the spender's permission to transfer the specified token.  If you are the owner of the token, you can use SetWhitelistedApproval to accomplish the same thing.  If you are an operator, you can only use Revoke, but you can not revoke the transfer approval of another operator",
@@ -571,11 +565,7 @@
             },
             "spender": {
               "description": "address whose permission is revoked",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "token_id": {
               "description": "id of the token that the spender can no longer transfer",
@@ -583,7 +573,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "provided for cw721 compliance, but can be done with SetWhitelistedApproval... gives the operator permission to transfer all of the message sender's tokens",
@@ -611,11 +602,7 @@
             },
             "operator": {
               "description": "address being granted permission to transfer",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "padding": {
               "description": "optional message length padding",
@@ -626,7 +613,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "provided for cw721 compliance, but can be done with SetWhitelistedApproval... revokes the operator's permission to transfer any of the message sender's tokens",
@@ -643,11 +631,7 @@
           "properties": {
             "operator": {
               "description": "address whose permissions are revoked",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "padding": {
               "description": "optional message length padding",
@@ -658,7 +642,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "transfer a token if it is transferable",
@@ -690,11 +675,7 @@
             },
             "recipient": {
               "description": "recipient of the transfer",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "token_id": {
               "description": "id of the token to transfer",
@@ -702,7 +683,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "transfer many tokens and fails if any are non-transferable",
@@ -733,7 +715,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "send a token if it is transferable and call the receiving contract's (Batch)ReceiveNft",
@@ -751,11 +734,7 @@
           "properties": {
             "contract": {
               "description": "address to send the token to",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "memo": {
               "description": "optional memo for the tx",
@@ -799,7 +778,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "send many tokens and call the receiving contracts' (Batch)ReceiveNft.  Fails if any tokens are non-transferable",
@@ -830,7 +810,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "burn a token.  This can be always be done on a non-transferable token, regardless of whether burn has been enabled on the contract.  An owner should always have a way to get rid of a token they do not want, and burning is the only way to do that if the token is non-transferable",
@@ -865,7 +846,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "burn many tokens.  This can be always be done on a non-transferable token, regardless of whether burn has been enabled on the contract.  An owner should always have a way to get rid of a token they do not want, and burning is the only way to do that if the token is non-transferable",
@@ -896,7 +878,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "register that the message sending contract implements ReceiveNft and possibly BatchReceiveNft.  If a contract implements BatchReceiveNft, SendNft will always call BatchReceiveNft even if there is only one token transferred (the token_ids Vec will only contain one ID)",
@@ -931,7 +914,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "create a viewing key",
@@ -959,7 +943,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "set viewing key",
@@ -987,7 +972,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "add addresses with minting authority",
@@ -1006,7 +992,7 @@
               "description": "list of addresses that can now mint",
               "type": "array",
               "items": {
-                "$ref": "#/definitions/HumanAddr"
+                "type": "string"
               }
             },
             "padding": {
@@ -1018,7 +1004,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "revoke minting authority from addresses",
@@ -1037,7 +1024,7 @@
               "description": "list of addresses no longer allowed to mint",
               "type": "array",
               "items": {
-                "$ref": "#/definitions/HumanAddr"
+                "type": "string"
               }
             },
             "padding": {
@@ -1049,7 +1036,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "define list of addresses with minting authority",
@@ -1068,7 +1056,7 @@
               "description": "list of addresses with minting authority",
               "type": "array",
               "items": {
-                "$ref": "#/definitions/HumanAddr"
+                "type": "string"
               }
             },
             "padding": {
@@ -1080,7 +1068,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "change address with administrative power",
@@ -1097,11 +1086,7 @@
           "properties": {
             "address": {
               "description": "address with admin authority",
-              "allOf": [
-                {
-                  "$ref": "#/definitions/HumanAddr"
-                }
-              ]
+              "type": "string"
             },
             "padding": {
               "description": "optional message length padding",
@@ -1112,7 +1097,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "set contract status level to determine which functions are allowed.  StopTransactions status prevent mints, burns, sends, and transfers, but allows all other functions",
@@ -1144,7 +1130,8 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     {
       "description": "disallow the use of a permit",
@@ -1172,18 +1159,42 @@
             }
           }
         }
-      }
+      },
+      "additionalProperties": false
     }
   ],
   "definitions": {
     "AccessLevel": {
       "description": "permission access level",
-      "type": "string",
-      "enum": [
-        "approve_token",
-        "all",
-        "revoke_token",
-        "none"
+      "oneOf": [
+        {
+          "description": "approve permission only for the specified token",
+          "type": "string",
+          "enum": [
+            "approve_token"
+          ]
+        },
+        {
+          "description": "grant permission for all tokens",
+          "type": "string",
+          "enum": [
+            "all"
+          ]
+        },
+        {
+          "description": "revoke permission only for the specified token",
+          "type": "string",
+          "enum": [
+            "revoke_token"
+          ]
+        },
+        {
+          "description": "remove all permissions for this address",
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        }
       ]
     },
     "Authentication": {
@@ -1243,13 +1254,7 @@
     },
     "Expiration": {
       "description": "at the given point in time and after, Expiration will be considered expired",
-      "anyOf": [
-        {
-          "type": "string",
-          "enum": [
-            "never"
-          ]
-        },
+      "oneOf": [
         {
           "description": "expires at this block height",
           "type": "object",
@@ -1262,7 +1267,8 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "description": "expires at the time in seconds since 01/01/1970",
@@ -1276,7 +1282,15 @@
               "format": "uint64",
               "minimum": 0.0
             }
-          }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "never expires",
+          "type": "string",
+          "enum": [
+            "never"
+          ]
         }
       ]
     },
@@ -1379,9 +1393,6 @@
         }
       }
     },
-    "HumanAddr": {
-      "type": "string"
-    },
     "MediaFile": {
       "description": "media file",
       "type": "object",
@@ -1457,13 +1468,9 @@
         },
         "owner": {
           "description": "optional owner address, owned by the minter otherwise",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            },
-            {
-              "type": "null"
-            }
+          "type": [
+            "string",
+            "null"
           ]
         },
         "private_metadata": {
@@ -1562,11 +1569,7 @@
         },
         "recipient": {
           "description": "address to send royalties to",
-          "allOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          ]
+          "type": "string"
         }
       }
     },
@@ -1603,11 +1606,7 @@
       "properties": {
         "contract": {
           "description": "recipient of the sent tokens",
-          "allOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          ]
+          "type": "string"
         },
         "memo": {
           "description": "optional memo for the tx",
@@ -1731,11 +1730,7 @@
         },
         "recipient": {
           "description": "recipient of the transferred tokens",
-          "allOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          ]
+          "type": "string"
         },
         "token_ids": {
           "description": "tokens being transferred",

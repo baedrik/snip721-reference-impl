@@ -1,9 +1,7 @@
+use cosmwasm_std::{Addr, Binary, CosmosMsg, StdResult};
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
-use cosmwasm_std::{Binary, CosmosMsg, HumanAddr, StdResult};
-
 use secret_toolkit::utils::HandleCallback;
+use serde::{Deserialize, Serialize};
 
 use crate::contract::BLOCK_SIZE;
 
@@ -20,7 +18,7 @@ use crate::contract::BLOCK_SIZE;
 /// is actually processed like a BatchReceiveNft `from` field.  Again, apologies for any confusion
 /// caused by propagating inaccuracies, but because InterNFT is planning on using CW-721 standards,
 /// compliance with CW-721 might be necessary
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Snip721ReceiveMsg {
     /// ReceiveNft may be a HandleMsg variant of any contract that wants to implement a receiver
@@ -29,7 +27,7 @@ pub enum Snip721ReceiveMsg {
     /// inaccurately named `sender` field
     ReceiveNft {
         /// previous owner of sent token
-        sender: HumanAddr,
+        sender: Addr,
         /// token that was sent
         token_id: String,
         /// optional message to control receiving logic
@@ -40,9 +38,9 @@ pub enum Snip721ReceiveMsg {
     /// ReceiveNft.
     BatchReceiveNft {
         /// address that sent the tokens.  There is no ReceiveNft field equivalent to this
-        sender: HumanAddr,
+        sender: Addr,
         /// previous owner of sent tokens.  This is equivalent to the ReceiveNft `sender` field
-        from: HumanAddr,
+        from: Addr,
         /// tokens that were sent
         token_ids: Vec<String>,
         /// optional message to control receiving logic
@@ -65,11 +63,11 @@ impl HandleCallback for Snip721ReceiveMsg {
 ///                          sent the token
 /// * `contract_addr` - address of the contract that was sent the token
 pub fn receive_nft_msg(
-    sender: HumanAddr,
+    sender: Addr,
     token_id: String,
     msg: Option<Binary>,
     callback_code_hash: String,
-    contract_addr: HumanAddr,
+    contract_addr: String,
 ) -> StdResult<CosmosMsg> {
     let msg = Snip721ReceiveMsg::ReceiveNft {
         sender,
@@ -92,12 +90,12 @@ pub fn receive_nft_msg(
 ///                          sent the token
 /// * `contract_addr` - address of the contract that was sent the token
 pub fn batch_receive_nft_msg(
-    sender: HumanAddr,
-    from: HumanAddr,
+    sender: Addr,
+    from: Addr,
     token_ids: Vec<String>,
     msg: Option<Binary>,
     callback_code_hash: String,
-    contract_addr: HumanAddr,
+    contract_addr: String,
 ) -> StdResult<CosmosMsg> {
     let msg = Snip721ReceiveMsg::BatchReceiveNft {
         sender,

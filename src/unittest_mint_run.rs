@@ -1,32 +1,34 @@
 #[cfg(test)]
 mod tests {
-    use crate::contract::{handle, init, query};
-    use crate::mint_run::MintRunInfo;
-    use crate::msg::{HandleMsg, InitMsg, QueryAnswer, QueryMsg};
-    use cosmwasm_std::testing::*;
-    use cosmwasm_std::{from_binary, Extern, HumanAddr, InitResponse, StdError, StdResult};
     use std::any::Any;
+
+    use cosmwasm_std::testing::*;
+    use cosmwasm_std::{from_binary, Addr, OwnedDeps, Response, StdError, StdResult};
+
+    use crate::contract::{execute, instantiate, query};
+    use crate::mint_run::MintRunInfo;
+    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryAnswer, QueryMsg};
 
     // Helper functions
 
     fn init_helper() -> (
-        StdResult<InitResponse>,
-        Extern<MockStorage, MockApi, MockQuerier>,
+        StdResult<Response>,
+        OwnedDeps<MockStorage, MockApi, MockQuerier>,
     ) {
-        let mut deps = mock_dependencies(20, &[]);
-        let env = mock_env("instantiator", &[]);
-
-        let init_msg = InitMsg {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("instantiator", &[]);
+        let init_msg = InstantiateMsg {
             name: "sec721".to_string(),
             symbol: "S721".to_string(),
-            admin: Some(HumanAddr("admin".to_string())),
+            admin: Some("admin".to_string()),
             entropy: "We're going to need a bigger boat".to_string(),
             royalty_info: None,
             config: None,
             post_init_callback: None,
         };
 
-        (init(&mut deps, env, init_msg), deps)
+        (instantiate(deps.as_mut(), env, info, init_msg), deps)
     }
 
     fn extract_error_msg<T: Any>(error: StdResult<T>) -> String {
@@ -50,7 +52,7 @@ mod tests {
         );
 
         // test non-minter attempt
-        let handle_msg = HandleMsg::MintNftClones {
+        let execute_msg = ExecuteMsg::MintNftClones {
             mint_run_id: None,
             quantity: 1,
             owner: None,
@@ -60,12 +62,17 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("alice", &[]), handle_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("alice", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Only designated minters are allowed to mint"));
 
         // test 0 quantity
-        let handle_msg = HandleMsg::MintNftClones {
+        let execute_msg = ExecuteMsg::MintNftClones {
             mint_run_id: None,
             quantity: 0,
             owner: None,
@@ -75,12 +82,17 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         let error = extract_error_msg(handle_result);
         assert!(error.contains("Quantity can not be zero"));
 
         // test no mint_run_id
-        let handle_msg = HandleMsg::MintNftClones {
+        let execute_msg = ExecuteMsg::MintNftClones {
             mint_run_id: None,
             quantity: 3,
             owner: None,
@@ -90,29 +102,34 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
-        let instantiator = HumanAddr("instantiator".to_string());
-        let admin = HumanAddr("admin".to_string());
+        let instantiator = "instantiator".to_string();
+        let admin = "admin".to_string();
         let run_info_0 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
-            token_creator: Some(admin.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
+            token_creator: Some(Addr::unchecked(admin.clone())),
             time_of_minting: Some(1571797419),
             mint_run: None,
             serial_number: Some(1),
             quantity_minted_this_run: Some(3),
         };
         let run_info_1 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
-            token_creator: Some(admin.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
+            token_creator: Some(Addr::unchecked(admin.clone())),
             time_of_minting: Some(1571797419),
             mint_run: None,
             serial_number: Some(2),
             quantity_minted_this_run: Some(3),
         };
         let run_info_2 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
-            token_creator: Some(admin.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
+            token_creator: Some(Addr::unchecked(admin.clone())),
             time_of_minting: Some(1571797419),
             mint_run: None,
             serial_number: Some(3),
@@ -123,7 +140,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier { mint_run_info, .. } => {
@@ -136,7 +153,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier { mint_run_info, .. } => {
@@ -149,7 +166,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier { mint_run_info, .. } => {
@@ -159,7 +176,7 @@ mod tests {
         }
 
         // test mint_run_id
-        let handle_msg = HandleMsg::MintNftClones {
+        let execute_msg = ExecuteMsg::MintNftClones {
             mint_run_id: Some("Starry Night".to_string()),
             quantity: 1,
             owner: None,
@@ -169,12 +186,17 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         let run_info_3 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
-            token_creator: Some(admin.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
+            token_creator: Some(Addr::unchecked(admin.clone())),
             time_of_minting: Some(1571797419),
             mint_run: Some(1),
             serial_number: Some(1),
@@ -185,7 +207,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier { mint_run_info, .. } => {
@@ -195,7 +217,7 @@ mod tests {
         }
 
         // test subsequent use of mint_run_id
-        let handle_msg = HandleMsg::MintNftClones {
+        let execute_msg = ExecuteMsg::MintNftClones {
             mint_run_id: Some("Starry Night".to_string()),
             quantity: 2,
             owner: None,
@@ -205,12 +227,17 @@ mod tests {
             memo: None,
             padding: None,
         };
-        let handle_result = handle(&mut deps, mock_env("admin", &[]), handle_msg);
+        let handle_result = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &[]),
+            execute_msg,
+        );
         assert!(handle_result.is_ok());
 
         let run_info_4 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
-            token_creator: Some(admin.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
+            token_creator: Some(Addr::unchecked(admin.clone())),
             time_of_minting: Some(1571797419),
             mint_run: Some(2),
             serial_number: Some(1),
@@ -221,7 +248,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier { mint_run_info, .. } => {
@@ -230,8 +257,8 @@ mod tests {
             _ => panic!("unexpected"),
         }
         let run_info_5 = MintRunInfo {
-            collection_creator: Some(instantiator.clone()),
-            token_creator: Some(admin.clone()),
+            collection_creator: Some(Addr::unchecked(instantiator.clone())),
+            token_creator: Some(Addr::unchecked(admin.clone())),
             time_of_minting: Some(1571797419),
             mint_run: Some(2),
             serial_number: Some(2),
@@ -242,7 +269,7 @@ mod tests {
             viewer: None,
             include_expired: None,
         };
-        let query_result = query(&deps, query_msg);
+        let query_result = query(deps.as_ref(), mock_env(), query_msg);
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier { mint_run_info, .. } => {

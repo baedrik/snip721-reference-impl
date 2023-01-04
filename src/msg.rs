@@ -1,9 +1,9 @@
 #![allow(clippy::large_enum_variant)]
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Binary, Coin, HumanAddr};
+use cosmwasm_std::{Addr, Binary, Coin};
+use schemars::JsonSchema;
 use secret_toolkit::permit::Permit;
+use serde::{Deserialize, Serialize};
 
 use crate::expiration::Expiration;
 use crate::mint_run::{MintRunInfo, SerialNumber};
@@ -12,32 +12,32 @@ use crate::token::{Extension, Metadata};
 
 /// Instantiation message
 #[derive(Serialize, Deserialize, JsonSchema)]
-pub struct InitMsg {
+pub struct InstantiateMsg {
     /// name of token contract
     pub name: String,
     /// token contract symbol
     pub symbol: String,
     /// optional admin address, env.message.sender if missing
-    pub admin: Option<HumanAddr>,
+    pub admin: Option<String>,
     /// entropy used for prng seed
     pub entropy: String,
     /// optional royalty information to use as default when RoyaltyInfo is not provided to a
     /// minting function
     pub royalty_info: Option<RoyaltyInfo>,
     /// optional privacy configuration for the contract
-    pub config: Option<InitConfig>,
+    pub config: Option<InstantiateConfig>,
     /// optional callback message to execute after instantiation.  This will
     /// most often be used to have the token contract provide its address to a
     /// contract that instantiated it, but it could be used to execute any
     /// contract
-    pub post_init_callback: Option<PostInitCallback>,
+    pub post_init_callback: Option<PostInstantiateCallback>,
 }
 
 /// This type represents optional configuration values.
 /// All values are optional and have defaults which are more private by default,
 /// but can be overridden if necessary
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
-pub struct InitConfig {
+pub struct InstantiateConfig {
     /// indicates whether the token IDs and the number of tokens controlled by the contract are
     /// public.  If the token supply is private, only minters can view the token IDs and
     /// number of tokens controlled by the contract
@@ -72,9 +72,9 @@ pub struct InitConfig {
     pub enable_burn: Option<bool>,
 }
 
-impl Default for InitConfig {
+impl Default for InstantiateConfig {
     fn default() -> Self {
-        InitConfig {
+        InstantiateConfig {
             public_token_supply: Some(false),
             public_owner: Some(false),
             enable_sealed_metadata: Some(false),
@@ -88,11 +88,11 @@ impl Default for InitConfig {
 
 /// info needed to perform a callback message after instantiation
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
-pub struct PostInitCallback {
+pub struct PostInstantiateCallback {
     /// the callback message to execute
     pub msg: Binary,
     /// address of the contract to execute
-    pub contract_address: HumanAddr,
+    pub contract_address: String,
     /// code hash of the contract to execute
     pub code_hash: String,
     /// list of native Coin to send with the callback message
@@ -101,13 +101,13 @@ pub struct PostInitCallback {
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleMsg {
+pub enum ExecuteMsg {
     /// mint new token
     MintNft {
         /// optional token id. if omitted, use current token index
         token_id: Option<String>,
         /// optional owner address. if omitted, owned by the message sender
-        owner: Option<HumanAddr>,
+        owner: Option<String>,
         /// optional public metadata that can be seen by everyone
         public_metadata: Option<Metadata>,
         /// optional private metadata that can only be seen by the owner and whitelist
@@ -146,7 +146,7 @@ pub enum HandleMsg {
         /// number of clones to mint
         quantity: u32,
         /// optional owner address. if omitted, owned by the message sender
-        owner: Option<HumanAddr>,
+        owner: Option<String>,
         /// optional public metadata that can be seen by everyone
         public_metadata: Option<Metadata>,
         /// optional private metadata that can only be seen by the owner and whitelist
@@ -216,7 +216,7 @@ pub enum HandleMsg {
     /// that are omitted will keep the current permission setting for that whitelist address
     SetWhitelistedApproval {
         /// address being granted/revoked permission
-        address: HumanAddr,
+        address: String,
         /// optional token id to apply approval/revocation to
         token_id: Option<String>,
         /// optional permission level for viewing the owner
@@ -235,7 +235,7 @@ pub enum HandleMsg {
     /// you are an operator, you can only use Approve
     Approve {
         /// address being granted the permission
-        spender: HumanAddr,
+        spender: String,
         /// id of the token that the spender can transfer
         token_id: String,
         /// optional expiration for this approval
@@ -249,7 +249,7 @@ pub enum HandleMsg {
     /// of another operator
     Revoke {
         /// address whose permission is revoked
-        spender: HumanAddr,
+        spender: String,
         /// id of the token that the spender can no longer transfer
         token_id: String,
         /// optional message length padding
@@ -259,7 +259,7 @@ pub enum HandleMsg {
     /// gives the operator permission to transfer all of the message sender's tokens
     ApproveAll {
         /// address being granted permission to transfer
-        operator: HumanAddr,
+        operator: String,
         /// optional expiration for this approval
         expires: Option<Expiration>,
         /// optional message length padding
@@ -269,14 +269,14 @@ pub enum HandleMsg {
     /// revokes the operator's permission to transfer any of the message sender's tokens
     RevokeAll {
         /// address whose permissions are revoked
-        operator: HumanAddr,
+        operator: String,
         /// optional message length padding
         padding: Option<String>,
     },
     /// transfer a token if it is transferable
     TransferNft {
         /// recipient of the transfer
-        recipient: HumanAddr,
+        recipient: String,
         /// id of the token to transfer
         token_id: String,
         /// optional memo for the tx
@@ -294,7 +294,7 @@ pub enum HandleMsg {
     /// send a token if it is transferable and call the receiving contract's (Batch)ReceiveNft
     SendNft {
         /// address to send the token to
-        contract: HumanAddr,
+        contract: String,
         /// optional code hash and BatchReceiveNft implementation status of the recipient contract
         receiver_info: Option<ReceiverInfo>,
         /// id of the token to send
@@ -364,28 +364,28 @@ pub enum HandleMsg {
     /// add addresses with minting authority
     AddMinters {
         /// list of addresses that can now mint
-        minters: Vec<HumanAddr>,
+        minters: Vec<String>,
         /// optional message length padding
         padding: Option<String>,
     },
     /// revoke minting authority from addresses
     RemoveMinters {
         /// list of addresses no longer allowed to mint
-        minters: Vec<HumanAddr>,
+        minters: Vec<String>,
         /// optional message length padding
         padding: Option<String>,
     },
     /// define list of addresses with minting authority
     SetMinters {
         /// list of addresses with minting authority
-        minters: Vec<HumanAddr>,
+        minters: Vec<String>,
         /// optional message length padding
         padding: Option<String>,
     },
     /// change address with administrative power
     ChangeAdmin {
         /// address with admin authority
-        address: HumanAddr,
+        address: String,
         /// optional message length padding
         padding: Option<String>,
     },
@@ -426,7 +426,7 @@ pub struct Mint {
     /// optional token id, if omitted, use current token index
     pub token_id: Option<String>,
     /// optional owner address, owned by the minter otherwise
-    pub owner: Option<HumanAddr>,
+    pub owner: Option<String>,
     /// optional public metadata that can be seen by everyone
     pub public_metadata: Option<Metadata>,
     /// optional private metadata that can only be seen by owner and whitelist
@@ -455,7 +455,7 @@ pub struct Burn {
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Transfer {
     /// recipient of the transferred tokens
-    pub recipient: HumanAddr,
+    pub recipient: String,
     /// tokens being transferred
     pub token_ids: Vec<String>,
     /// optional memo for the tx
@@ -466,7 +466,7 @@ pub struct Transfer {
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug)]
 pub struct Send {
     /// recipient of the sent tokens
-    pub contract: HumanAddr,
+    pub contract: String,
     /// optional code hash and BatchReceiveNft implementation status of the recipient contract
     pub receiver_info: Option<ReceiverInfo>,
     /// tokens being sent
@@ -479,7 +479,7 @@ pub struct Send {
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
-pub enum HandleAnswer {
+pub enum ExecuteAnswer {
     /// MintNft will also display the minted token's ID in the log attributes under the
     /// key `minted` in case minting was done as a callback message
     MintNft {
@@ -576,16 +576,16 @@ pub enum HandleAnswer {
 }
 
 /// the address and viewing key making an authenticated query request
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct ViewerInfo {
     /// querying address
-    pub address: HumanAddr,
+    pub address: String,
     /// authentication key string
     pub viewing_key: String,
 }
 
 /// a recipient contract's code hash and whether it implements BatchReceiveNft
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct ReceiverInfo {
     /// recipient's code hash
     pub recipient_code_hash: String,
@@ -595,36 +595,36 @@ pub struct ReceiverInfo {
 }
 
 /// tx type and specifics
-#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum TxAction {
     /// transferred token ownership
     Transfer {
         /// previous owner
-        from: HumanAddr,
+        from: Addr,
         /// optional sender if not owner
-        sender: Option<HumanAddr>,
+        sender: Option<Addr>,
         /// new owner
-        recipient: HumanAddr,
+        recipient: Addr,
     },
     /// minted new token
     Mint {
         /// minter's address
-        minter: HumanAddr,
+        minter: Addr,
         /// token's first owner
-        recipient: HumanAddr,
+        recipient: Addr,
     },
     /// burned a token
     Burn {
         /// previous owner
-        owner: HumanAddr,
+        owner: Addr,
         /// burner's address if not owner
-        burner: Option<HumanAddr>,
+        burner: Option<Addr>,
     },
 }
 
 /// tx for display
-#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct Tx {
     /// tx id
@@ -641,7 +641,7 @@ pub struct Tx {
     pub memo: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     /// display the contract's name and symbol
@@ -733,7 +733,7 @@ pub enum QueryMsg {
     /// list all the inventory-wide approvals in place for the specified address if given the
     /// the correct viewing key for the address
     InventoryApprovals {
-        address: HumanAddr,
+        address: String,
         /// the viewing key
         viewing_key: String,
         /// optionally include expired Approvals in the response list.  If ommitted or
@@ -745,7 +745,7 @@ pub enum QueryMsg {
     /// CW721 compliance, however, approvals are private on secret network, so only the
     /// owner's viewing key will authorize the ability to see the list of operators
     ApprovedForAll {
-        owner: HumanAddr,
+        owner: String,
         /// optional viewing key to authenticate this query.  It is "optional" only in the
         /// sense that a CW721 query does not have this field.  However, not providing the
         /// key will always result in an empty list
@@ -757,9 +757,9 @@ pub enum QueryMsg {
     /// displays a list of all the tokens belonging to the input owner in which the viewer
     /// has view_owner permission
     Tokens {
-        owner: HumanAddr,
+        owner: String,
         /// optional address of the querier if different from the owner
-        viewer: Option<HumanAddr>,
+        viewer: Option<String>,
         /// optional viewing key
         viewing_key: Option<String>,
         /// paginate by providing the last token_id received in the previous query
@@ -770,9 +770,9 @@ pub enum QueryMsg {
     /// displays the number of tokens that the querier has permission to see the owner and that
     /// belong to the specified address
     NumTokensOfOwner {
-        owner: HumanAddr,
+        owner: String,
         /// optional address of the querier if different from the owner
-        viewer: Option<HumanAddr>,
+        viewer: Option<String>,
         /// optional viewing key
         viewing_key: Option<String>,
     },
@@ -784,20 +784,20 @@ pub enum QueryMsg {
     ImplementsNonTransferableTokens {},
     /// display that this contract implements the use of the `token_subtype` metadata extension field
     ImplementsTokenSubtype {},
-    /// verify that the specified address has approval to transfer every listed token.  
+    /// verify that the specified address has approval to transfer every listed token.
     /// A token will count as unapproved if it is non-transferable
     VerifyTransferApproval {
         /// list of tokens to verify approval for
         token_ids: Vec<String>,
         /// address that has approval
-        address: HumanAddr,
+        address: String,
         /// viewing key
         viewing_key: String,
     },
     /// display the transaction history for the specified address in reverse
     /// chronological order
     TransactionHistory {
-        address: HumanAddr,
+        address: String,
         /// viewing key
         viewing_key: String,
         /// optional page to display
@@ -809,7 +809,7 @@ pub enum QueryMsg {
     /// the contract implements BatchReceivenft
     RegisteredCodeHash {
         /// the contract whose receive registration info you want to view
-        contract: HumanAddr,
+        contract: String,
     },
     /// display the royalty information of a token if a token ID is specified, or display the
     /// contract's default royalty information in no token ID is provided
@@ -832,10 +832,10 @@ pub enum QueryMsg {
 }
 
 /// SNIP721 Approval
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Snip721Approval {
     /// whitelisted address
-    pub address: HumanAddr,
+    pub address: Addr,
     /// optional expiration if the address has view owner permission
     pub view_owner_expiration: Option<Expiration>,
     /// optional expiration if the address has view private metadata permission
@@ -845,28 +845,28 @@ pub struct Snip721Approval {
 }
 
 /// CW721 Approval
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Cw721Approval {
     /// address that can transfer the token
-    pub spender: HumanAddr,
+    pub spender: Addr,
     /// expiration of this approval
     pub expires: Expiration,
 }
 
 /// response of CW721 OwnerOf
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct Cw721OwnerOfResponse {
     /// Owner of the token if permitted to view it
-    pub owner: Option<HumanAddr>,
+    pub owner: Option<Addr>,
     /// list of addresses approved to transfer this token
     pub approvals: Vec<Cw721Approval>,
 }
 
 /// the token id and nft dossier info of a single token response in a batch query
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct BatchNftDossierElement {
     pub token_id: String,
-    pub owner: Option<HumanAddr>,
+    pub owner: Option<Addr>,
     pub public_metadata: Option<Metadata>,
     pub private_metadata: Option<Metadata>,
     pub display_private_metadata_error: Option<String>,
@@ -899,9 +899,11 @@ pub enum QueryAnswer {
         minter_may_update_metadata: bool,
         owner_may_update_metadata: bool,
         burn_is_enabled: bool,
+        implements_non_transferable_tokens: bool,
+        implements_token_subtype: bool,
     },
     Minters {
-        minters: Vec<HumanAddr>,
+        minters: Vec<Addr>,
     },
     NumTokens {
         count: u32,
@@ -910,7 +912,7 @@ pub enum QueryAnswer {
         tokens: Vec<String>,
     },
     OwnerOf {
-        owner: HumanAddr,
+        owner: Addr,
         approvals: Vec<Cw721Approval>,
     },
     TokenApprovals {
@@ -940,7 +942,7 @@ pub enum QueryAnswer {
         info: Option<Metadata>,
     },
     NftDossier {
-        owner: Option<HumanAddr>,
+        owner: Option<Addr>,
         public_metadata: Option<Metadata>,
         private_metadata: Option<Metadata>,
         display_private_metadata_error: Option<String>,
@@ -990,18 +992,18 @@ pub enum QueryAnswer {
         royalty_info: Option<DisplayRoyaltyInfo>,
     },
     ContractCreator {
-        creator: Option<HumanAddr>,
+        creator: Option<Addr>,
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseStatus {
     Success,
     Failure,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ContractStatus {
     Normal,
@@ -1021,7 +1023,7 @@ impl ContractStatus {
 }
 
 /// queries using permits instead of viewing keys
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryWithPermit {
     /// display the royalty information of a token if a token ID is specified, or display the
@@ -1076,7 +1078,7 @@ pub enum QueryWithPermit {
         /// false, expired Approvals will be filtered out of the response
         include_expired: Option<bool>,
     },
-    /// verify that the permit creator has approval to transfer every listed token.  
+    /// verify that the permit creator has approval to transfer every listed token.
     /// A token will count as unapproved if it is non-transferable
     VerifyTransferApproval {
         /// list of tokens to verify approval for
@@ -1120,7 +1122,7 @@ pub enum QueryWithPermit {
     /// displays a list of all the tokens belonging to the input owner in which the permit
     /// creator has view_owner permission
     Tokens {
-        owner: HumanAddr,
+        owner: String,
         /// paginate by providing the last token_id received in the previous query
         start_after: Option<String>,
         /// optional number of token ids to display
@@ -1128,5 +1130,5 @@ pub enum QueryWithPermit {
     },
     /// displays the number of tokens that the querier has permission to see the owner and that
     /// belong to the specified address
-    NumTokensOfOwner { owner: HumanAddr },
+    NumTokensOfOwner { owner: String },
 }

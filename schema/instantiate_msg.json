@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "InitMsg",
+  "title": "InstantiateMsg",
   "description": "Instantiation message",
   "type": "object",
   "required": [
@@ -11,20 +11,16 @@
   "properties": {
     "admin": {
       "description": "optional admin address, env.message.sender if missing",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/HumanAddr"
-        },
-        {
-          "type": "null"
-        }
+      "type": [
+        "string",
+        "null"
       ]
     },
     "config": {
       "description": "optional privacy configuration for the contract",
       "anyOf": [
         {
-          "$ref": "#/definitions/InitConfig"
+          "$ref": "#/definitions/InstantiateConfig"
         },
         {
           "type": "null"
@@ -43,7 +39,7 @@
       "description": "optional callback message to execute after instantiation.  This will most often be used to have the token contract provide its address to a contract that instantiated it, but it could be used to execute any contract",
       "anyOf": [
         {
-          "$ref": "#/definitions/PostInitCallback"
+          "$ref": "#/definitions/PostInstantiateCallback"
         },
         {
           "type": "null"
@@ -86,10 +82,7 @@
         }
       }
     },
-    "HumanAddr": {
-      "type": "string"
-    },
-    "InitConfig": {
+    "InstantiateConfig": {
       "description": "This type represents optional configuration values. All values are optional and have defaults which are more private by default, but can be overridden if necessary",
       "type": "object",
       "properties": {
@@ -144,7 +137,7 @@
         }
       }
     },
-    "PostInitCallback": {
+    "PostInstantiateCallback": {
       "description": "info needed to perform a callback message after instantiation",
       "type": "object",
       "required": [
@@ -160,11 +153,7 @@
         },
         "contract_address": {
           "description": "address of the contract to execute",
-          "allOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          ]
+          "type": "string"
         },
         "msg": {
           "description": "the callback message to execute",
@@ -199,11 +188,7 @@
         },
         "recipient": {
           "description": "address to send royalties to",
-          "allOf": [
-            {
-              "$ref": "#/definitions/HumanAddr"
-            }
-          ]
+          "type": "string"
         }
       }
     },
@@ -231,6 +216,7 @@
       }
     },
     "Uint128": {
+      "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
       "type": "string"
     }
   }
