@@ -1,8 +1,8 @@
 [package]
 name = "snip721-reference-impl"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["bill wincer"]
-edition = "2018"
+edition = "2021"
 
 exclude = [
   # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.
@@ -34,7 +34,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 [dependencies]
 cosmwasm-std = { package = "secret-cosmwasm-std", version = "1.0.0", default-features = false }
 cosmwasm-storage = { package = "secret-cosmwasm-storage", version = "1.0.0" }
-secret-toolkit = { version = "0.6.0", default-features = false, features = ["storage", "serialization", "utils", "permit", "viewing-key", "crypto"] }
+secret-toolkit = { version = "0.7.0", default-features = false, features = ["storage", "serialization", "utils", "permit", "viewing-key", "crypto"] }
 schemars = "0.8.11"
 serde = { version = "1.0.114", default-features = false, features = ["derive"] }
 bincode2 = "2.0.1"
