@@ -15,8 +15,6 @@ use crate::msg::{Tx, TxAction};
 pub const CONFIG_KEY: &[u8] = b"config";
 /// storage key for minters
 pub const MINTERS_KEY: &[u8] = b"minters";
-/// storage key for this contract's address
-pub const MY_ADDRESS_KEY: &[u8] = b"myaddr";
 /// storage key for the contract instantiator
 pub const CREATOR_KEY: &[u8] = b"creator";
 /// storage key for the default RoyaltyInfo to use if none is supplied when minting
