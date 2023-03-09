@@ -154,15 +154,15 @@ mod tests {
                 implements_non_transferable_tokens,
                 implements_token_subtype,
             } => {
-                assert_eq!(token_supply_is_public, false);
-                assert_eq!(owner_is_public, true);
-                assert_eq!(sealed_metadata_is_enabled, true);
-                assert_eq!(unwrapped_metadata_is_private, false);
-                assert_eq!(minter_may_update_metadata, true);
-                assert_eq!(owner_may_update_metadata, false);
-                assert_eq!(burn_is_enabled, true);
-                assert_eq!(implements_non_transferable_tokens, true);
-                assert_eq!(implements_token_subtype, true);
+                assert!(!token_supply_is_public);
+                assert!(owner_is_public);
+                assert!(sealed_metadata_is_enabled);
+                assert!(!unwrapped_metadata_is_private);
+                assert!(minter_may_update_metadata);
+                assert!(!owner_may_update_metadata);
+                assert!(burn_is_enabled);
+                assert!(implements_non_transferable_tokens);
+                assert!(implements_token_subtype);
             }
             _ => panic!("unexpected"),
         }
@@ -189,7 +189,7 @@ mod tests {
             alice.clone(),
         ];
         let execute_msg = ExecuteMsg::SetMinters {
-            minters: minters.clone(),
+            minters,
             padding: None,
         };
         let _handle_result = execute(
@@ -285,15 +285,9 @@ mod tests {
         let bob = "bob".to_string();
         let charlie = "charlie".to_string();
 
-        let minters = vec![
-            alice.clone(),
-            bob.clone(),
-            charlie.clone(),
-            bob.clone(),
-            alice.clone(),
-        ];
+        let minters = vec![alice.clone(), bob.clone(), charlie, bob, alice.clone()];
         let execute_msg = ExecuteMsg::SetMinters {
-            minters: minters.clone(),
+            minters,
             padding: None,
         };
         let _handle_result = execute(
@@ -332,7 +326,7 @@ mod tests {
             execute_msg,
         );
         let query_msg = QueryMsg::NumTokens {
-            viewer: Some(viewer.clone()),
+            viewer: Some(viewer),
         };
         let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
@@ -408,11 +402,11 @@ mod tests {
             execute_msg,
         ); // test burn when status prevents it
         let viewer = ViewerInfo {
-            address: alice.clone(),
+            address: alice,
             viewing_key: "key".to_string(),
         };
         let query_msg = QueryMsg::NumTokens {
-            viewer: Some(viewer.clone()),
+            viewer: Some(viewer),
         };
         let query_result = query(deps.as_ref(), mock_env(), query_msg);
         assert!(
@@ -521,15 +515,9 @@ mod tests {
         let bob = "bob".to_string();
         let charlie = "charlie".to_string();
 
-        let minters = vec![
-            alice.clone(),
-            bob.clone(),
-            charlie.clone(),
-            bob.clone(),
-            alice.clone(),
-        ];
+        let minters = vec![alice.clone(), bob.clone(), charlie, bob, alice.clone()];
         let execute_msg = ExecuteMsg::SetMinters {
-            minters: minters.clone(),
+            minters,
             padding: None,
         };
         let _handle_result = execute(
@@ -574,7 +562,7 @@ mod tests {
             execute_msg,
         );
         let query_msg = QueryMsg::AllTokens {
-            viewer: Some(viewer.clone()),
+            viewer: Some(viewer),
             start_after: None,
             limit: Some(2),
         };
@@ -728,7 +716,7 @@ mod tests {
             execute_msg,
         );
         let viewer = ViewerInfo {
-            address: alice.clone(),
+            address: alice,
             viewing_key: "key".to_string(),
         };
         let query_msg = QueryMsg::AllTokens {
@@ -775,7 +763,7 @@ mod tests {
         );
 
         let query_msg = QueryMsg::AllTokens {
-            viewer: Some(viewer.clone()),
+            viewer: Some(viewer),
             start_after: None,
             limit: Some(10),
         };
@@ -1316,7 +1304,7 @@ mod tests {
         // test owner is the viewer, filtering expired
         let query_msg = QueryMsg::NftDossier {
             token_id: "NFT1".to_string(),
-            viewer: Some(viewer.clone()),
+            viewer: Some(viewer),
             include_expired: None,
         };
         let query_result = query(deps.as_ref(), mock_env(), query_msg);
@@ -1367,7 +1355,7 @@ mod tests {
         };
         let query_msg = QueryMsg::NftDossier {
             token_id: "NFT1".to_string(),
-            viewer: Some(viewer.clone()),
+            viewer: Some(viewer),
             include_expired: None,
         };
         let query_result = query(deps.as_ref(), mock_env(), query_msg);
@@ -1385,7 +1373,7 @@ mod tests {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
-            private_metadata: Some(private_meta.clone()),
+            private_metadata: Some(private_meta),
             royalty_info: None,
             serial_number: None,
             transferable: None,
@@ -1434,7 +1422,7 @@ mod tests {
             execute_msg,
         );
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
-            address: bob.clone(),
+            address: bob,
             token_id: Some("NFT1".to_string()),
             view_owner: Some(AccessLevel::All),
             view_private_metadata: Some(AccessLevel::ApproveToken),
@@ -1492,7 +1480,7 @@ mod tests {
                 token_approvals,
                 inventory_approvals,
             } => {
-                assert_eq!(owner, Some(Addr::unchecked(alice.clone())));
+                assert_eq!(owner, Some(Addr::unchecked(alice)));
                 assert_eq!(public_metadata, Some(public_meta.clone()));
                 assert!(private_metadata.is_none());
                 assert!(transferable);
@@ -1528,7 +1516,7 @@ mod tests {
         let query_msg = QueryMsg::NftDossier {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: charlie.clone(),
+                address: charlie,
                 viewing_key: "ckey".to_string(),
             }),
             include_expired: None,
@@ -1553,7 +1541,7 @@ mod tests {
                 inventory_approvals,
             } => {
                 assert!(owner.is_none());
-                assert_eq!(public_metadata, Some(public_meta.clone()));
+                assert_eq!(public_metadata, Some(public_meta));
                 assert!(private_metadata.is_none());
                 assert!(transferable);
                 assert!(unwrapped);
@@ -2245,7 +2233,7 @@ mod tests {
         // test viewer has permission on start after token (but no other) does not error
         let query_msg = QueryMsg::Tokens {
             owner: charlie.clone(),
-            viewer: Some(bob.clone()),
+            viewer: Some(bob),
             viewing_key: Some("bkey".to_string()),
             start_after: Some("NFT8".to_string()),
             limit: Some(30),
@@ -2304,8 +2292,8 @@ mod tests {
 
         // test token not found with private supply and private ownership
         let query_msg = QueryMsg::Tokens {
-            owner: alice.clone(),
-            viewer: Some(charlie.clone()),
+            owner: alice,
+            viewer: Some(charlie),
             viewing_key: Some("ckey".to_string()),
             start_after: Some("NFT34".to_string()),
             limit: Some(30),
@@ -2506,7 +2494,7 @@ mod tests {
             execute_msg,
         );
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
-            address: bob.clone(),
+            address: bob,
             token_id: Some("NFT1".to_string()),
             view_owner: None,
             view_private_metadata: None,
@@ -2531,7 +2519,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::OwnerOf { owner, approvals } => {
-                assert_eq!(owner, Addr::unchecked(alice.clone()));
+                assert_eq!(owner, Addr::unchecked(alice));
                 assert!(approvals.is_empty());
             }
             _ => panic!("unexpected"),
@@ -2732,11 +2720,11 @@ mod tests {
             execute_msg,
         );
         let bob_approv = Cw721Approval {
-            spender: Addr::unchecked(bob.clone()),
+            spender: Addr::unchecked(bob),
             expires: Expiration::AtHeight(100),
         };
         let char_approv = Cw721Approval {
-            spender: Addr::unchecked(charlie.clone()),
+            spender: Addr::unchecked(charlie),
             expires: Expiration::AtHeight(1000),
         };
 
@@ -2769,7 +2757,7 @@ mod tests {
             QueryAnswer::OwnerOf { owner, approvals } => {
                 assert_eq!(owner, Addr::unchecked(alice.clone()));
                 assert_eq!(approvals.len(), 2);
-                assert_eq!(approvals, vec![bob_approv.clone(), char_approv.clone()])
+                assert_eq!(approvals, vec![bob_approv, char_approv.clone()])
             }
             _ => panic!("unexpected"),
         }
@@ -2802,8 +2790,8 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::OwnerOf { owner, approvals } => {
-                assert_eq!(owner, Addr::unchecked(alice.clone()));
-                assert_eq!(approvals, vec![char_approv.clone()])
+                assert_eq!(owner, Addr::unchecked(alice));
+                assert_eq!(approvals, vec![char_approv])
             }
             _ => panic!("unexpected"),
         }
@@ -2859,7 +2847,7 @@ mod tests {
         };
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(alice.clone()),
+            owner: Some(alice),
             public_metadata: Some(public_meta.clone()),
             private_metadata: None,
             royalty_info: None,
@@ -2940,7 +2928,7 @@ mod tests {
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFTfail".to_string()),
             owner: Some(alice.clone()),
-            public_metadata: Some(meta_for_fail.clone()),
+            public_metadata: Some(meta_for_fail),
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
@@ -3003,7 +2991,7 @@ mod tests {
             QueryAnswer::AllNftInfo { access, info } => {
                 assert!(access.owner.is_none());
                 assert!(access.approvals.is_empty());
-                assert_eq!(info, Some(public_meta.clone()));
+                assert_eq!(info, Some(public_meta));
             }
             _ => panic!("unexpected"),
         }
@@ -3026,7 +3014,7 @@ mod tests {
             execute_msg,
         );
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
-            address: bob.clone(),
+            address: bob,
             token_id: None,
             view_owner: None,
             view_private_metadata: None,
@@ -3054,7 +3042,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::AllNftInfo { access, info } => {
-                assert_eq!(access.owner, Some(Addr::unchecked(alice.clone())));
+                assert_eq!(access.owner, Some(Addr::unchecked(alice)));
                 assert_eq!(access.approvals.len(), 1);
                 assert!(info.is_none());
             }
@@ -3095,7 +3083,7 @@ mod tests {
         };
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(alice.clone()),
+            owner: Some(alice),
             public_metadata: None,
             private_metadata: Some(private_meta.clone()),
             royalty_info: None,
@@ -3218,7 +3206,7 @@ mod tests {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: None,
-            private_metadata: Some(private_meta.clone()),
+            private_metadata: Some(private_meta),
             royalty_info: None,
             serial_number: None,
             transferable: None,
@@ -3260,7 +3248,7 @@ mod tests {
         let query_msg = QueryMsg::PrivateMetadata {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: alice.clone(),
+                address: alice,
                 viewing_key: "akey".to_string(),
             }),
         };
@@ -3281,7 +3269,7 @@ mod tests {
         let query_msg = QueryMsg::PrivateMetadata {
             token_id: "NFT1".to_string(),
             viewer: Some(ViewerInfo {
-                address: bob.clone(),
+                address: bob,
                 viewing_key: "bkey".to_string(),
             }),
         };
@@ -3353,17 +3341,17 @@ mod tests {
         }
 
         let bob_approv = Cw721Approval {
-            spender: Addr::unchecked(bob.clone()),
+            spender: Addr::unchecked(bob),
             expires: Expiration::Never,
         };
         let char_approv = Cw721Approval {
-            spender: Addr::unchecked(charlie.clone()),
+            spender: Addr::unchecked(charlie),
             expires: Expiration::Never,
         };
 
         // sanity check
         let query_msg = QueryMsg::ApprovedForAll {
-            owner: alice.clone(),
+            owner: alice,
             viewing_key: Some("akey".to_string()),
             include_expired: None,
         };
@@ -3431,7 +3419,7 @@ mod tests {
 
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
-            owner: Some(alice.clone()),
+            owner: Some(alice),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -3479,7 +3467,7 @@ mod tests {
         );
 
         let bob_approv = Snip721Approval {
-            address: Addr::unchecked(bob.clone()),
+            address: Addr::unchecked(bob),
             view_owner_expiration: None,
             view_private_metadata_expiration: Some(Expiration::Never),
             transfer_expiration: None,
@@ -3662,7 +3650,7 @@ mod tests {
                 );
                 assert!(!private_metadata_is_public);
                 assert!(private_metadata_is_public_expiration.is_none());
-                assert_eq!(token_approvals, vec![bob_approv.clone()]);
+                assert_eq!(token_approvals, vec![bob_approv]);
             }
             _ => panic!("unexpected"),
         }
@@ -3801,7 +3789,7 @@ mod tests {
         );
 
         let bob_approv = Snip721Approval {
-            address: Addr::unchecked(bob.clone()),
+            address: Addr::unchecked(bob),
             view_owner_expiration: None,
             view_private_metadata_expiration: None,
             transfer_expiration: Some(Expiration::AtHeight(2000000)),
@@ -3823,7 +3811,7 @@ mod tests {
 
         // test owner makes ownership public for all tokens
         let query_msg = QueryMsg::InventoryApprovals {
-            address: alice.clone(),
+            address: alice,
             viewing_key: "akey".to_string(),
             include_expired: Some(true),
         };
@@ -3917,7 +3905,7 @@ mod tests {
         );
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some(nft2.clone()),
-            owner: Some(alice.clone()),
+            owner: Some(alice),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -3934,7 +3922,7 @@ mod tests {
         );
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some(nft3.clone()),
-            owner: Some(bob.clone()),
+            owner: Some(bob),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -3968,7 +3956,7 @@ mod tests {
         );
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some(nft5.clone()),
-            owner: Some(david.clone()),
+            owner: Some(david),
             public_metadata: None,
             private_metadata: None,
             royalty_info: None,
@@ -4062,14 +4050,8 @@ mod tests {
 
         // test not having approval on NFT5
         let query_msg = QueryMsg::VerifyTransferApproval {
-            token_ids: vec![
-                nft1.clone(),
-                nft2.clone(),
-                nft3.clone(),
-                nft4.clone(),
-                nft5.clone(),
-            ],
-            address: charlie.clone(),
+            token_ids: vec![nft1, nft2, nft3, nft4, nft5],
+            address: charlie,
             viewing_key: "ckey".to_string(),
         };
         let query_result = query(deps.as_ref(), mock_env(), query_msg);
@@ -4254,7 +4236,7 @@ mod tests {
             QueryAnswer::TransactionHistory { total, txs } => {
                 assert_eq!(
                     txs,
-                    vec![burn2.clone(), xfer1.clone(), mint2.clone(), mint1.clone()]
+                    vec![burn2.clone(), xfer1.clone(), mint2.clone(), mint1]
                 );
                 assert_eq!(total, 4);
             }
@@ -4272,7 +4254,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TransactionHistory { total, txs } => {
-                assert_eq!(txs, vec![burn2.clone(), xfer1.clone()]);
+                assert_eq!(txs, vec![burn2, xfer1.clone()]);
                 assert_eq!(total, 4);
             }
             _ => panic!("unexpected"),
@@ -4280,7 +4262,7 @@ mod tests {
 
         // test paginating so only see 3rd one
         let query_msg = QueryMsg::TransactionHistory {
-            address: admin.clone(),
+            address: admin,
             viewing_key: "key".to_string(),
             page: Some(2),
             page_size: Some(1),
@@ -4289,7 +4271,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TransactionHistory { total, txs } => {
-                assert_eq!(txs, vec![mint2.clone()]);
+                assert_eq!(txs, vec![mint2]);
                 assert_eq!(total, 4);
             }
             _ => panic!("unexpected"),
@@ -4297,7 +4279,7 @@ mod tests {
 
         // test tx was logged to all participants
         let query_msg = QueryMsg::TransactionHistory {
-            address: alice.clone(),
+            address: alice,
             viewing_key: "akey".to_string(),
             page: None,
             page_size: None,
@@ -4306,7 +4288,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::TransactionHistory { total, txs } => {
-                assert_eq!(txs, vec![xfer1.clone()]);
+                assert_eq!(txs, vec![xfer1]);
                 assert_eq!(total, 1);
             }
             _ => panic!("unexpected"),
@@ -4452,7 +4434,7 @@ mod tests {
         ];
 
         let execute_msg = ExecuteMsg::BatchMintNft {
-            mints: mints.clone(),
+            mints,
             padding: None,
         };
         let handle_result = execute(
@@ -4581,7 +4563,7 @@ mod tests {
         let query_msg = QueryMsg::NumTokensOfOwner {
             owner: alice.clone(),
             viewer: None,
-            viewing_key: Some(alice_key.clone()),
+            viewing_key: Some(alice_key),
         };
         let query_result = query(
             deps.as_ref(),
@@ -4825,8 +4807,8 @@ mod tests {
         // test that bob knows of NFT1 and NFT3 by using the two global approvals
         let query_msg = QueryMsg::NumTokensOfOwner {
             owner: alice.clone(),
-            viewer: Some(bob.clone()),
-            viewing_key: Some(bob_key.clone()),
+            viewer: Some(bob),
+            viewing_key: Some(bob_key),
         };
         let query_result = query(
             deps.as_ref(),
@@ -4864,9 +4846,9 @@ mod tests {
         */
         // test that charlie only knows of NFT3 now that the other two approvals expired
         let query_msg = QueryMsg::NumTokensOfOwner {
-            owner: alice.clone(),
-            viewer: Some(charlie.clone()),
-            viewing_key: Some(charlie_key.clone()),
+            owner: alice,
+            viewer: Some(charlie),
+            viewing_key: Some(charlie_key),
         };
         let query_result = query(
             deps.as_ref(),
@@ -4987,7 +4969,7 @@ mod tests {
                 token_id: Some("NFT3".to_string()),
                 owner: Some("bob".to_string()),
                 public_metadata: Some(public_meta3.clone()),
-                private_metadata: Some(private_meta3.clone()),
+                private_metadata: Some(private_meta3),
                 royalty_info: None,
                 serial_number: None,
                 transferable: None,
@@ -4996,7 +4978,7 @@ mod tests {
         ];
 
         let execute_msg = ExecuteMsg::BatchMintNft {
-            mints: mints.clone(),
+            mints,
             padding: None,
         };
         let handle_result = execute(
@@ -5025,7 +5007,7 @@ mod tests {
             token_ids: vec!["NFT1".to_string(), "NFT2".to_string(), "NFT3".to_string()],
             viewer: Some(ViewerInfo {
                 address: alice.clone(),
-                viewing_key: alice_key.clone(),
+                viewing_key: alice_key,
             }),
             include_expired: None,
         };
@@ -5057,7 +5039,7 @@ mod tests {
             },
             BatchNftDossierElement {
                 token_id: "NFT2".to_string(),
-                owner: Some(Addr::unchecked(alice.clone())),
+                owner: Some(Addr::unchecked(alice)),
                 public_metadata: Some(public_meta2),
                 private_metadata: Some(private_meta2),
                 display_private_metadata_error: None,
@@ -5082,7 +5064,7 @@ mod tests {
                     "You are not authorized to perform this action on token NFT3".to_string(),
                 ),
                 royalty_info: None,
-                mint_run_info: Some(mint_run_info.clone()),
+                mint_run_info: Some(mint_run_info),
                 transferable: true,
                 unwrapped: true,
                 owner_is_public: false,
