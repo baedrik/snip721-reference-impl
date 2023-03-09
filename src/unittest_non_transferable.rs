@@ -94,6 +94,7 @@ mod tests {
         (instantiate(deps.as_mut(), env, info, init_msg), deps)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn init_helper_royalties_with_config(
         royalty_info: Option<RoyaltyInfo>,
         public_token_supply: bool,
@@ -168,13 +169,13 @@ mod tests {
         assert_eq!(config.name, "sec721".to_string());
         assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
-        assert_eq!(config.token_supply_is_public, false);
-        assert_eq!(config.owner_is_public, false);
-        assert_eq!(config.sealed_metadata_is_enabled, false);
-        assert_eq!(config.unwrap_to_private, false);
-        assert_eq!(config.minter_may_update_metadata, true);
-        assert_eq!(config.owner_may_update_metadata, false);
-        assert_eq!(config.burn_is_enabled, false);
+        assert!(!config.token_supply_is_public);
+        assert!(!config.owner_is_public);
+        assert!(!config.sealed_metadata_is_enabled);
+        assert!(!config.unwrap_to_private);
+        assert!(config.minter_may_update_metadata);
+        assert!(!config.owner_may_update_metadata);
+        assert!(!config.burn_is_enabled);
 
         // test config specification
         let (init_result, deps) =
@@ -187,13 +188,13 @@ mod tests {
         assert_eq!(config.name, "sec721".to_string());
         assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
-        assert_eq!(config.token_supply_is_public, true);
-        assert_eq!(config.owner_is_public, true);
-        assert_eq!(config.sealed_metadata_is_enabled, true);
-        assert_eq!(config.unwrap_to_private, true);
-        assert_eq!(config.minter_may_update_metadata, false);
-        assert_eq!(config.owner_may_update_metadata, true);
-        assert_eq!(config.burn_is_enabled, false);
+        assert!(config.token_supply_is_public);
+        assert!(config.owner_is_public);
+        assert!(config.sealed_metadata_is_enabled);
+        assert!(config.unwrap_to_private);
+        assert!(!config.minter_may_update_metadata);
+        assert!(config.owner_may_update_metadata);
+        assert!(!config.burn_is_enabled);
 
         // test post init callback
         let mut deps = mock_dependencies();
@@ -279,13 +280,13 @@ mod tests {
         assert_eq!(config.name, "sec721".to_string());
         assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
-        assert_eq!(config.token_supply_is_public, true);
-        assert_eq!(config.owner_is_public, true);
-        assert_eq!(config.sealed_metadata_is_enabled, true);
-        assert_eq!(config.unwrap_to_private, true);
-        assert_eq!(config.minter_may_update_metadata, false);
-        assert_eq!(config.owner_may_update_metadata, true);
-        assert_eq!(config.burn_is_enabled, false);
+        assert!(config.token_supply_is_public);
+        assert!(config.owner_is_public);
+        assert!(config.sealed_metadata_is_enabled);
+        assert!(config.unwrap_to_private);
+        assert!(!config.minter_may_update_metadata);
+        assert!(config.owner_may_update_metadata);
+        assert!(!config.burn_is_enabled);
 
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: None,
@@ -361,7 +362,7 @@ mod tests {
         ];
 
         let execute_msg = ExecuteMsg::BatchMintNft {
-            mints: mints.clone(),
+            mints,
             padding: None,
         };
         let handle_result = execute(
@@ -413,7 +414,7 @@ mod tests {
         // test trying SetRoyaltyInfo on a non-transferable token
         let execute_msg = ExecuteMsg::SetRoyaltyInfo {
             token_id: Some("TryDefaultRoys".to_string()),
-            royalty_info: Some(royalties.clone()),
+            royalty_info: Some(royalties),
             padding: None,
         };
         let handle_result = execute(
@@ -455,7 +456,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT2".to_string()),
-                owner: Some(alice.clone()),
+                owner: Some(alice),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -466,7 +467,7 @@ mod tests {
         ];
 
         let execute_msg = ExecuteMsg::BatchMintNft {
-            mints: mints.clone(),
+            mints,
             padding: None,
         };
         let handle_result = execute(
@@ -547,7 +548,7 @@ mod tests {
                 memo: None,
             },
             Send {
-                contract: bob.clone(),
+                contract: bob,
                 receiver_info: None,
                 token_ids: vec!["NFT1".to_string()],
                 msg: None,
@@ -608,7 +609,7 @@ mod tests {
             },
             Mint {
                 token_id: Some("NFT3".to_string()),
-                owner: Some(alice.clone()),
+                owner: Some(alice),
                 public_metadata: None,
                 private_metadata: None,
                 royalty_info: None,
@@ -619,7 +620,7 @@ mod tests {
         ];
 
         let execute_msg = ExecuteMsg::BatchMintNft {
-            mints: mints.clone(),
+            mints,
             padding: None,
         };
         let handle_result = execute(
@@ -695,7 +696,7 @@ mod tests {
         let token: Option<Token> = json_may_load(&info_store, &tok3_key).unwrap();
         assert!(token.is_none());
         // confirm the tokens were removed from the owner's list
-        let inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        let inventory = Inventory::new(&deps.storage, alice_raw).unwrap();
         assert_eq!(inventory.cnt, 0);
         assert!(!inventory.contains(&deps.storage, 1).unwrap());
         assert!(!inventory.contains(&deps.storage, 2).unwrap());
@@ -738,7 +739,7 @@ mod tests {
             token_id: Some("NFT1".to_string()),
             owner: Some(alice.clone()),
             public_metadata: Some(public_meta.clone()),
-            private_metadata: Some(private_meta.clone()),
+            private_metadata: Some(private_meta),
             royalty_info: None,
             serial_number: None,
             transferable: Some(false),
@@ -778,8 +779,8 @@ mod tests {
                 token_approvals,
                 inventory_approvals,
             } => {
-                assert_eq!(owner, Some(Addr::unchecked(alice.clone())));
-                assert_eq!(public_metadata, Some(public_meta.clone()));
+                assert_eq!(owner, Some(Addr::unchecked(alice)));
+                assert_eq!(public_metadata, Some(public_meta));
                 assert!(private_metadata.is_none());
                 assert_eq!(
                     display_private_metadata_error,
@@ -872,7 +873,7 @@ mod tests {
         ];
 
         let execute_msg = ExecuteMsg::BatchMintNft {
-            mints: mints.clone(),
+            mints,
             padding: None,
         };
         let handle_result = execute(
@@ -974,7 +975,7 @@ mod tests {
         // verify that alice does not have transfer approval despite owning the non-transferable token
         let query_msg = QueryMsg::VerifyTransferApproval {
             token_ids: vec!["NFT1".to_string()],
-            address: alice.clone(),
+            address: alice,
             viewing_key: "akey".to_string(),
         };
         let query_result = query(deps.as_ref(), mock_env(), query_msg);
@@ -993,7 +994,7 @@ mod tests {
         // also verify that bob does not have transfer approval
         let query_msg = QueryMsg::VerifyTransferApproval {
             token_ids: vec!["NFT1".to_string()],
-            address: bob.clone(),
+            address: bob,
             viewing_key: "bkey".to_string(),
         };
         let query_result = query(deps.as_ref(), mock_env(), query_msg);
