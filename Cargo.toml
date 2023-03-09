@@ -29,7 +29,7 @@ overflow-checks = true
 [features]
 # for quicker tests, cargo test --lib
 # for more explicit tests, cargo test --features=backtraces
-backtraces = ["cosmwasm-std/backtraces"]
+#backtraces = ["cosmwasm-std/backtraces"]
 
 [dependencies]
 cosmwasm-std = { package = "secret-cosmwasm-std", version = "1.0.0", default-features = false }
