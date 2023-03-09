@@ -2,6 +2,7 @@
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
 use std::collections::HashSet;
 
+use base64::{engine, Engine};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Addr, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps,
     DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage, WasmMsg,
@@ -74,7 +75,11 @@ pub fn instantiate(
         })
         .transpose()?
         .unwrap_or(creator_raw);
-    let prng_seed = sha_256(base64::encode(msg.entropy).as_bytes());
+    let prng_seed = sha_256(
+        engine::general_purpose::STANDARD
+            .encode(msg.entropy)
+            .as_bytes(),
+    );
     ViewingKey::set_seed(deps.storage, &prng_seed);
 
     let init_config = msg.config.unwrap_or_default();
