@@ -2,6 +2,7 @@
 /// https://github.com/SecretFoundation/SNIPs/blob/master/SNIP-721.md
 use std::collections::HashSet;
 
+use base64::{engine::general_purpose, Engine as _};
 use cosmwasm_std::{
     attr, entry_point, to_binary, Addr, Api, Binary, BlockInfo, CanonicalAddr, CosmosMsg, Deps,
     DepsMut, Env, MessageInfo, Response, StdError, StdResult, Storage, WasmMsg,
@@ -28,10 +29,10 @@ use crate::royalties::{RoyaltyInfo, StoredRoyaltyInfo};
 use crate::state::{
     get_txs, json_may_load, json_save, load, may_load, remove, save, store_burn, store_mint,
     store_transfer, AuthList, Config, Permission, PermissionType, ReceiveRegistration, CONFIG_KEY,
-    CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, MY_ADDRESS_KEY, PREFIX_ALL_PERMISSIONS,
-    PREFIX_AUTHLIST, PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN,
-    PREFIX_MINT_RUN_NUM, PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS,
-    PREFIX_REVOKED_PERMITS, PREFIX_ROYALTY_INFO, VIEWING_KEY_ERR_MSG,
+    CREATOR_KEY, DEFAULT_ROYALTY_KEY, MINTERS_KEY, PREFIX_ALL_PERMISSIONS, PREFIX_AUTHLIST,
+    PREFIX_INFOS, PREFIX_MAP_TO_ID, PREFIX_MAP_TO_INDEX, PREFIX_MINT_RUN, PREFIX_MINT_RUN_NUM,
+    PREFIX_OWNER_PRIV, PREFIX_PRIV_META, PREFIX_PUB_META, PREFIX_RECEIVERS, PREFIX_REVOKED_PERMITS,
+    PREFIX_ROYALTY_INFO, VIEWING_KEY_ERR_MSG,
 };
 use crate::token::{Metadata, Token};
 
@@ -55,17 +56,12 @@ pub const ID_BLOCK_SIZE: u32 = 64;
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> StdResult<Response> {
     let creator_raw = deps.api.addr_canonicalize(info.sender.as_str())?;
     save(deps.storage, CREATOR_KEY, &creator_raw)?;
-    save(
-        deps.storage,
-        MY_ADDRESS_KEY,
-        &deps.api.addr_canonicalize(env.contract.address.as_str())?,
-    )?;
     let admin_raw = msg
         .admin
         .map(|a| {
@@ -74,7 +70,11 @@ pub fn instantiate(
         })
         .transpose()?
         .unwrap_or(creator_raw);
-    let prng_seed = sha_256(base64::encode(msg.entropy).as_bytes());
+    let prng_seed = sha_256(
+        general_purpose::STANDARD
+            .encode(msg.entropy.as_str())
+            .as_bytes(),
+    );
     ViewingKey::set_seed(deps.storage, &prng_seed);
 
     let init_config = msg.config.unwrap_or_default();
@@ -1834,7 +1834,7 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             query_transactions(deps, viewer, page, page_size, None)
         }
         QueryMsg::RegisteredCodeHash { contract } => query_code_hash(deps, &contract),
-        QueryMsg::WithPermit { permit, query } => permit_queries(deps, &env.block, permit, query),
+        QueryMsg::WithPermit { permit, query } => permit_queries(deps, &env, permit, query),
     };
     pad_query_result(response, BLOCK_SIZE)
 }
@@ -1845,26 +1845,22 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 /// # Arguments
 ///
 /// * `deps` - a reference to Extern containing all the contract's external dependencies
-/// * `block` - a reference to the BlockInfo
+/// * `env` - a reference to the Env of contract's environment
 /// * `permit` - the permit used to authentic the query
 /// * `query` - the query to perform
 pub fn permit_queries(
     deps: Deps,
-    block: &BlockInfo,
+    env: &Env,
     permit: Permit,
     query: QueryWithPermit,
 ) -> StdResult<Binary> {
-    // Validate permit content
-    let my_address = deps
-        .api
-        .addr_humanize(&load::<CanonicalAddr>(deps.storage, MY_ADDRESS_KEY)?)?;
     let querier = deps.api.addr_canonicalize(
         deps.api
             .addr_validate(&validate(
                 deps,
                 PREFIX_REVOKED_PERMITS,
                 &permit,
-                my_address.to_string(),
+                env.contract.address.to_string(),
                 Some("secret"),
             )?)?
             .as_str(),
@@ -1875,6 +1871,7 @@ pub fn permit_queries(
             permit.params.permissions
         )));
     }
+    let block = &env.block;
     // permit validated, process query
     match query {
         QueryWithPermit::RoyaltyInfo { token_id } => {
