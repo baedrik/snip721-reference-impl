@@ -257,8 +257,8 @@ mod tests {
             _ => panic!("unexpected"),
         }
         let run_info_5 = MintRunInfo {
-            collection_creator: Some(Addr::unchecked(instantiator.clone())),
-            token_creator: Some(Addr::unchecked(admin.clone())),
+            collection_creator: Some(Addr::unchecked(instantiator)),
+            token_creator: Some(Addr::unchecked(admin)),
             time_of_minting: Some(1571797419),
             mint_run: Some(2),
             serial_number: Some(2),

@@ -132,13 +132,13 @@ mod tests {
         assert_eq!(config.name, "sec721".to_string());
         assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
-        assert_eq!(config.token_supply_is_public, false);
-        assert_eq!(config.owner_is_public, false);
-        assert_eq!(config.sealed_metadata_is_enabled, false);
-        assert_eq!(config.unwrap_to_private, false);
-        assert_eq!(config.minter_may_update_metadata, true);
-        assert_eq!(config.owner_may_update_metadata, false);
-        assert_eq!(config.burn_is_enabled, false);
+        assert!(!config.token_supply_is_public);
+        assert!(!config.owner_is_public);
+        assert!(!config.sealed_metadata_is_enabled);
+        assert!(!config.unwrap_to_private);
+        assert!(config.minter_may_update_metadata);
+        assert!(!config.owner_may_update_metadata);
+        assert!(!config.burn_is_enabled);
 
         // test config specification
         let (init_result, deps) =
@@ -151,13 +151,13 @@ mod tests {
         assert_eq!(config.name, "sec721".to_string());
         assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
-        assert_eq!(config.token_supply_is_public, true);
-        assert_eq!(config.owner_is_public, true);
-        assert_eq!(config.sealed_metadata_is_enabled, true);
-        assert_eq!(config.unwrap_to_private, true);
-        assert_eq!(config.minter_may_update_metadata, false);
-        assert_eq!(config.owner_may_update_metadata, true);
-        assert_eq!(config.burn_is_enabled, false);
+        assert!(config.token_supply_is_public);
+        assert!(config.owner_is_public);
+        assert!(config.sealed_metadata_is_enabled);
+        assert!(config.unwrap_to_private);
+        assert!(!config.minter_may_update_metadata);
+        assert!(config.owner_may_update_metadata);
+        assert!(!config.burn_is_enabled);
 
         // test post init callback
         let mut deps = mock_dependencies();
@@ -408,7 +408,7 @@ mod tests {
         assert_eq!(txs[0].memo, Some("has id 3".to_string()));
 
         let execute_msg = ExecuteMsg::BatchMintNft {
-            mints: mints,
+            mints,
             padding: None,
         };
         let handle_result = execute(
@@ -1949,10 +1949,7 @@ mod tests {
             execute_msg,
         );
         let bob_raw = deps.api.addr_canonicalize("bob").unwrap();
-        let charlie_raw = deps
-            .api
-            .addr_canonicalize(&("charlie".to_string()))
-            .unwrap();
+        let charlie_raw = deps.api.addr_canonicalize("charlie").unwrap();
         let david_raw = deps.api.addr_canonicalize("david").unwrap();
         let edmund_raw = deps.api.addr_canonicalize("edmund").unwrap();
         let frank_raw = deps.api.addr_canonicalize("frank").unwrap();
@@ -2373,16 +2370,12 @@ mod tests {
         assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Metadata = load(&pub_store, &nft2_key).unwrap();
-        assert_eq!(pub_meta, pub2.clone().unwrap());
+        assert_eq!(pub_meta, pub2.unwrap());
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft2_key).unwrap();
         assert!(priv_meta.is_none());
         assert_eq!(token.permissions.len(), 1);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == bob_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == bob_raw));
         let charlie_tok_perm = token
             .permissions
             .iter()
@@ -2444,7 +2437,7 @@ mod tests {
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
         assert_eq!(all_perm.len(), 2);
-        assert!(all_perm.iter().find(|p| p.address == bob_raw).is_none());
+        assert!(!all_perm.iter().any(|p| p.address == bob_raw));
         let david_oper_perm = all_perm.iter().find(|p| p.address == david_raw).unwrap();
         assert_eq!(
             david_oper_perm.expirations[transfer_idx],
@@ -2592,7 +2585,7 @@ mod tests {
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
         assert_eq!(all_perm.len(), 2);
-        assert!(all_perm.iter().find(|p| p.address == bob_raw).is_none());
+        assert!(!all_perm.iter().any(|p| p.address == bob_raw));
         let david_oper_perm = all_perm.iter().find(|p| p.address == david_raw).unwrap();
         assert_eq!(
             david_oper_perm.expirations[transfer_idx],
@@ -2635,11 +2628,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft2_key).unwrap();
         assert_eq!(token.permissions.len(), 1);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == bob_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == bob_raw));
         let charlie_tok_perm = token
             .permissions
             .iter()
@@ -2749,7 +2738,7 @@ mod tests {
         let auth_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_AUTHLIST);
         let auth_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
         assert_eq!(auth_list.len(), 2);
-        assert!(auth_list.iter().find(|a| a.address == edmund_raw).is_none());
+        assert!(!auth_list.iter().any(|a| a.address == edmund_raw));
 
         // test approving a token for an address that already has ALL permission updates that
         // token's permission's expiration, removes ALL permission, and sets token permission
@@ -2784,7 +2773,7 @@ mod tests {
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
         assert_eq!(all_perm.len(), 1);
-        assert!(all_perm.iter().find(|p| p.address == edmund_raw).is_none());
+        assert!(!all_perm.iter().any(|p| p.address == edmund_raw));
         let david_oper_perm = all_perm.iter().find(|p| p.address == david_raw).unwrap();
         assert_eq!(
             david_oper_perm.expirations[transfer_idx],
@@ -2822,11 +2811,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft2_key).unwrap();
         assert_eq!(token.permissions.len(), 2);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == bob_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == bob_raw));
         let charlie_tok_perm = token
             .permissions
             .iter()
@@ -3081,16 +3066,12 @@ mod tests {
         assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Metadata = load(&pub_store, &nft4_key).unwrap();
-        assert_eq!(pub_meta, pub4.clone().unwrap());
+        assert_eq!(pub_meta, pub4.unwrap());
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
         assert!(priv_meta.is_none());
         assert_eq!(token.permissions.len(), 2);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == frank_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == frank_raw));
         let edmund_tok_perm = token
             .permissions
             .iter()
@@ -3117,7 +3098,7 @@ mod tests {
         let auth_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_AUTHLIST);
         let auth_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
         assert_eq!(auth_list.len(), 4);
-        assert!(auth_list.iter().find(|a| a.address == frank_raw).is_none());
+        assert!(!auth_list.iter().any(|a| a.address == frank_raw));
         let bob_auth = auth_list.iter().find(|a| a.address == bob_raw).unwrap();
         assert_eq!(bob_auth.tokens[transfer_idx].len(), 2);
         assert!(bob_auth.tokens[transfer_idx].contains(&0u32));
@@ -3220,7 +3201,7 @@ mod tests {
         assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
-        assert_eq!(pub_meta, pub1.clone().unwrap());
+        assert_eq!(pub_meta, pub1.unwrap());
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft1_key).unwrap();
         assert!(priv_meta.is_none());
@@ -3274,11 +3255,7 @@ mod tests {
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
         assert!(priv_meta.is_none());
         assert_eq!(token.permissions.len(), 2);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == frank_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == frank_raw));
         let bob_tok_perm = token
             .permissions
             .iter()
@@ -3406,11 +3383,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft1_key).unwrap();
         assert_eq!(token.permissions.len(), 2);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == frank_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == frank_raw));
         let bob_tok_perm = token
             .permissions
             .iter()
@@ -3459,20 +3432,12 @@ mod tests {
         );
         assert_eq!(charlie_tok_perm.expirations[view_meta_idx], None);
         assert_eq!(charlie_tok_perm.expirations[view_owner_idx], None);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == frank_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == frank_raw));
         // confirm NFT4 permission removed frank
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft4_key).unwrap();
         assert_eq!(token.permissions.len(), 2);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == frank_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == frank_raw));
         let edmund_tok_perm = token
             .permissions
             .iter()
@@ -3499,7 +3464,7 @@ mod tests {
         let auth_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_AUTHLIST);
         let auth_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
         assert_eq!(auth_list.len(), 4);
-        assert!(auth_list.iter().find(|a| a.address == frank_raw).is_none());
+        assert!(!auth_list.iter().any(|a| a.address == frank_raw));
         let bob_auth = auth_list.iter().find(|a| a.address == bob_raw).unwrap();
         assert_eq!(bob_auth.tokens[transfer_idx].len(), 2);
         assert!(bob_auth.tokens[transfer_idx].contains(&0u32));
@@ -3549,11 +3514,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft1_key).unwrap();
         assert_eq!(token.permissions.len(), 2);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == frank_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == frank_raw));
         let bob_tok_perm = token
             .permissions
             .iter()
@@ -3577,11 +3538,7 @@ mod tests {
             Some(Expiration::AtHeight(2000))
         );
         // confirm NFT2 permission removed frank
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == frank_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == frank_raw));
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft2_key).unwrap();
         assert_eq!(token.permissions.len(), 2);
@@ -3611,11 +3568,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft4_key).unwrap();
         assert_eq!(token.permissions.len(), 2);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == frank_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == frank_raw));
         let edmund_tok_perm = token
             .permissions
             .iter()
@@ -3642,7 +3595,7 @@ mod tests {
         let auth_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_AUTHLIST);
         let auth_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
         assert_eq!(auth_list.len(), 4);
-        assert!(auth_list.iter().find(|a| a.address == frank_raw).is_none());
+        assert!(!auth_list.iter().any(|a| a.address == frank_raw));
         let bob_auth = auth_list.iter().find(|a| a.address == bob_raw).unwrap();
         assert_eq!(bob_auth.tokens[transfer_idx].len(), 2);
         assert!(bob_auth.tokens[transfer_idx].contains(&0u32));
@@ -3688,11 +3641,7 @@ mod tests {
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &nft2_key).unwrap();
         assert_eq!(token.permissions.len(), 1);
-        assert!(token
-            .permissions
-            .iter()
-            .find(|p| p.address == charlie_raw)
-            .is_none());
+        assert!(!token.permissions.iter().any(|p| p.address == charlie_raw));
         let edmund_tok_perm = token
             .permissions
             .iter()
@@ -3707,10 +3656,7 @@ mod tests {
         // confirm AuthLists removed charlie
         let auth_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_AUTHLIST);
         let auth_list: Vec<AuthList> = load(&auth_store, alice_key).unwrap();
-        assert!(auth_list
-            .iter()
-            .find(|a| a.address == charlie_raw)
-            .is_none());
+        assert!(!auth_list.iter().any(|a| a.address == charlie_raw));
 
         // verify that storage entry for AuthLists gets removed when all are gone
         let execute_msg = ExecuteMsg::SetWhitelistedApproval {
@@ -3826,7 +3772,7 @@ mod tests {
         assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Metadata = load(&pub_store, &nft3_key).unwrap();
-        assert_eq!(pub_meta, pub3.clone().unwrap());
+        assert_eq!(pub_meta, pub3.unwrap());
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft3_key).unwrap();
         assert!(priv_meta.is_none());
@@ -4118,7 +4064,7 @@ mod tests {
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
         assert_eq!(all_perm.len(), 1);
-        assert!(all_perm.iter().find(|p| p.address == charlie_raw).is_none());
+        assert!(!all_perm.iter().any(|p| p.address == charlie_raw));
         // confirm token permission added charlie with default expiration
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
@@ -4187,7 +4133,7 @@ mod tests {
         assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
-        assert_eq!(priv_meta, priv_expect.clone().unwrap());
+        assert_eq!(priv_meta, priv_expect.unwrap());
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Option<Metadata> = may_load(&pub_store, &tok_key).unwrap();
         assert!(pub_meta.is_none());
@@ -4353,7 +4299,7 @@ mod tests {
         assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Metadata = load(&priv_store, &tok2_key).unwrap();
-        assert_eq!(priv_meta, priv2.clone().unwrap());
+        assert_eq!(priv_meta, priv2.unwrap());
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Option<Metadata> = may_load(&pub_store, &tok2_key).unwrap();
         assert!(pub_meta.is_none());
@@ -4637,7 +4583,7 @@ mod tests {
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
         assert_eq!(all_perm.len(), 1);
-        assert!(all_perm.iter().find(|p| p.address == charlie_raw).is_none());
+        assert!(!all_perm.iter().any(|p| p.address == charlie_raw));
         // confirm token permission is still empty
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
@@ -4681,7 +4627,7 @@ mod tests {
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
         assert_eq!(all_perm.len(), 1);
-        assert!(all_perm.iter().find(|p| p.address == charlie_raw).is_none());
+        assert!(!all_perm.iter().any(|p| p.address == charlie_raw));
         // confirm token permission added charlie
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
@@ -4723,7 +4669,7 @@ mod tests {
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
         assert_eq!(all_perm.len(), 1);
-        assert!(all_perm.iter().find(|p| p.address == charlie_raw).is_none());
+        assert!(!all_perm.iter().any(|p| p.address == charlie_raw));
         // confirm token permission removed charlie
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
@@ -4757,7 +4703,7 @@ mod tests {
         let all_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_ALL_PERMISSIONS);
         let all_perm: Vec<Permission> = json_load(&all_store, alice_key).unwrap();
         assert_eq!(all_perm.len(), 1);
-        assert!(all_perm.iter().find(|p| p.address == charlie_raw).is_none());
+        assert!(!all_perm.iter().any(|p| p.address == charlie_raw));
         // confirm token does not list charlie
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
         let token: Token = json_load(&info_store, &tok_key).unwrap();
@@ -4809,7 +4755,7 @@ mod tests {
         assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
-        assert_eq!(priv_meta, priv_expect.clone().unwrap());
+        assert_eq!(priv_meta, priv_expect.unwrap());
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Option<Metadata> = may_load(&pub_store, &tok_key).unwrap();
         assert!(pub_meta.is_none());
@@ -4957,7 +4903,7 @@ mod tests {
         assert!(token.unwrapped);
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Metadata = load(&priv_store, &tok2_key).unwrap();
-        assert_eq!(priv_meta, priv2.clone().unwrap());
+        assert_eq!(priv_meta, priv2.unwrap());
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Option<Metadata> = may_load(&pub_store, &tok2_key).unwrap();
         assert!(pub_meta.is_none());
@@ -5346,8 +5292,8 @@ mod tests {
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("MyNFT2".to_string()),
             owner: Some("alice".to_string()),
-            private_metadata: priv2.clone(),
-            public_metadata: pub2.clone(),
+            private_metadata: priv2,
+            public_metadata: pub2,
             royalty_info: None,
             serial_number: None,
             transferable: None,
@@ -5446,7 +5392,7 @@ mod tests {
         let index: Option<u32> = may_load(&map2idx, "MyNFT2".as_bytes()).unwrap();
         assert!(index.is_none());
         let map2id = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_MAP_TO_ID);
-        let id: Option<String> = may_load(&map2id, &01u32.to_le_bytes()).unwrap();
+        let id: Option<String> = may_load(&map2id, &1u32.to_le_bytes()).unwrap();
         assert!(id.is_none());
         // confirm token info was deleted from storage
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
@@ -5516,7 +5462,7 @@ mod tests {
         let index: Option<u32> = may_load(&map2idx, "MyNFT3".as_bytes()).unwrap();
         assert!(index.is_none());
         let map2id = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_MAP_TO_ID);
-        let id: Option<String> = may_load(&map2id, &02u32.to_le_bytes()).unwrap();
+        let id: Option<String> = may_load(&map2id, &2u32.to_le_bytes()).unwrap();
         assert!(id.is_none());
         // confirm token info was deleted from storage
         let info_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_INFOS);
@@ -6351,8 +6297,8 @@ mod tests {
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT3".to_string()),
             owner: Some("alice".to_string()),
-            private_metadata: priv3.clone(),
-            public_metadata: pub3.clone(),
+            private_metadata: priv3,
+            public_metadata: pub3,
             royalty_info: None,
             serial_number: None,
             transferable: None,
@@ -7283,10 +7229,10 @@ mod tests {
         // confirm the metadata is intact
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
-        assert_eq!(priv_meta, priv1.clone().unwrap());
+        assert_eq!(priv_meta, priv1.unwrap());
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Metadata = load(&pub_store, &tok_key).unwrap();
-        assert_eq!(pub_meta, pub1.clone().unwrap());
+        assert_eq!(pub_meta, pub1.unwrap());
         // confirm the tx was logged to all involved parties
         let (txs, total) = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 10).unwrap();
         assert_eq!(total, 1);
@@ -9000,10 +8946,10 @@ mod tests {
         // confirm the metadata is intact
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Metadata = load(&priv_store, &tok_key).unwrap();
-        assert_eq!(priv_meta, priv1.clone().unwrap());
+        assert_eq!(priv_meta, priv1.unwrap());
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Metadata = load(&pub_store, &tok_key).unwrap();
-        assert_eq!(pub_meta, pub1.clone().unwrap());
+        assert_eq!(pub_meta, pub1.unwrap());
         // confirm the tx was logged to all involved parties
         let (txs, total) = get_txs(&deps.api, &deps.storage, &charlie_raw, 0, 10).unwrap();
         assert_eq!(total, 1);
@@ -9060,7 +9006,7 @@ mod tests {
         let mut msg_fr_ch = to_binary(&Snip721ReceiveMsg::ReceiveNft {
             sender: Addr::unchecked("charlie".to_string()),
             token_id: "MyNFT".to_string(),
-            msg: send_msg.clone(),
+            msg: send_msg,
         })
         .unwrap();
         let msg_fr_ch = space_pad(&mut msg_fr_ch.0, 256usize);
@@ -9754,7 +9700,7 @@ mod tests {
             sender: Addr::unchecked("bob".to_string()),
             from: Addr::unchecked("alice".to_string()),
             token_ids: vec!["NFT3".to_string()],
-            msg: send_msg.clone(),
+            msg: send_msg,
         })
         .unwrap();
         let msg_fr_al = space_pad(&mut msg_fr_al.0, 256usize);
@@ -9998,7 +9944,7 @@ mod tests {
             sender: Addr::unchecked("bob".to_string()),
             from: Addr::unchecked("bob".to_string()),
             token_ids: vec!["NFT4".to_string()],
-            msg: send_msg.clone(),
+            msg: send_msg,
         })
         .unwrap();
         let msg_fr_b = space_pad(&mut msf_fr_b.0, 256usize);
@@ -10533,7 +10479,7 @@ mod tests {
         let charlie_raw = deps.api.addr_canonicalize("charlie").unwrap();
         let admin_raw = deps.api.addr_canonicalize("admin").unwrap();
         let execute_msg = ExecuteMsg::AddMinters {
-            minters: minters.clone(),
+            minters,
             padding: None,
         };
         let _handle_result = execute(
@@ -10685,7 +10631,7 @@ mod tests {
         let bob_raw = deps.api.addr_canonicalize("bob").unwrap();
         let charlie_raw = deps.api.addr_canonicalize("charlie").unwrap();
         let execute_msg = ExecuteMsg::SetMinters {
-            minters: minters.clone(),
+            minters,
             padding: None,
         };
         let _handle_result = execute(
@@ -11704,7 +11650,7 @@ mod tests {
         assert!(token.unwrapped);
         let pub_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PUB_META);
         let pub_meta: Metadata = load(&pub_store, &nft1_key).unwrap();
-        assert_eq!(pub_meta, pub1.clone().unwrap());
+        assert_eq!(pub_meta, pub1.unwrap());
         let priv_store = ReadonlyPrefixedStorage::new(&deps.storage, PREFIX_PRIV_META);
         let priv_meta: Option<Metadata> = may_load(&priv_store, &nft1_key).unwrap();
         assert!(priv_meta.is_none());
@@ -12611,7 +12557,7 @@ mod tests {
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT1".to_string()),
             owner: Some("alice".to_string()),
-            public_metadata: pub1.clone(),
+            public_metadata: pub1,
             private_metadata: None,
             royalty_info: None,
             serial_number: None,
@@ -12628,7 +12574,7 @@ mod tests {
         let execute_msg = ExecuteMsg::MintNft {
             token_id: Some("NFT2".to_string()),
             owner: Some("alice".to_string()),
-            public_metadata: pub2.clone(),
+            public_metadata: pub2,
             private_metadata: None,
             royalty_info: None,
             serial_number: None,

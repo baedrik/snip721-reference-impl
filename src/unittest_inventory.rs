@@ -40,7 +40,7 @@ mod tests {
 
         let expected = [100u32, 200, 300, 400];
         let mut expected_set: HashSet<u32> = HashSet::new();
-        expected_set.extend(&expected);
+        expected_set.extend(expected);
         // verify to_set
         let set = inventory.to_set(&deps.storage).unwrap();
         assert_eq!(set, expected_set);
@@ -73,7 +73,7 @@ mod tests {
 
         let expected = [400u32, 200];
         let mut expected_set: HashSet<u32> = HashSet::new();
-        expected_set.extend(&expected);
+        expected_set.extend(expected);
         // verify to_set
         let set = inventory.to_set(&deps.storage).unwrap();
         assert_eq!(set, expected_set);
@@ -91,7 +91,7 @@ mod tests {
 
         let expected = [400u32, 200, 500];
         let mut expected_set: HashSet<u32> = HashSet::new();
-        expected_set.extend(&expected);
+        expected_set.extend(expected);
         // verify to_set
         let set = inventory.to_set(&deps.storage).unwrap();
         assert_eq!(set, expected_set);
@@ -109,7 +109,7 @@ mod tests {
 
         let expected = [400u32, 200, 500, 600];
         let mut expected_set: HashSet<u32> = HashSet::new();
-        expected_set.extend(&expected);
+        expected_set.extend(expected);
         // verify to_set
         let set = inventory.to_set(&deps.storage).unwrap();
         assert_eq!(set, expected_set);
@@ -129,7 +129,7 @@ mod tests {
 
         let expected = [400u32, 200, 500, 600, 700];
         let mut expected_set: HashSet<u32> = HashSet::new();
-        expected_set.extend(&expected);
+        expected_set.extend(expected);
         // verify to_set
         let set = inventory.to_set(&deps.storage).unwrap();
         assert_eq!(set, expected_set);
@@ -150,7 +150,7 @@ mod tests {
 
         let expected = [400u32, 200, 500, 700];
         let mut expected_set: HashSet<u32> = HashSet::new();
-        expected_set.extend(&expected);
+        expected_set.extend(expected);
         // verify to_set
         let set = inventory.to_set(&deps.storage).unwrap();
         assert_eq!(set, expected_set);
@@ -175,7 +175,7 @@ mod tests {
         inventory.remove(&mut deps.storage, 200, true).unwrap();
         inventory.remove(&mut deps.storage, 400, true).unwrap();
 
-        let mut inventory = Inventory::new(&deps.storage, alice_raw.clone()).unwrap();
+        let mut inventory = Inventory::new(&deps.storage, alice_raw).unwrap();
 
         assert_eq!(inventory.cnt, 0);
         // test to_set with empty inventory
@@ -196,7 +196,7 @@ mod tests {
 
         let expected = [800u32, 900, 1000, 1100, 1200, 1300];
         let mut expected_set: HashSet<u32> = HashSet::new();
-        expected_set.extend(&expected);
+        expected_set.extend(expected);
         // verify to_set
         let set = inventory.to_set(&deps.storage).unwrap();
         assert_eq!(set, expected_set);

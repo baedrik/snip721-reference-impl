@@ -40,6 +40,7 @@ mod tests {
         (instantiate(deps.as_mut(), env, info, init_msg), deps)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn init_helper_royalties_with_config(
         royalty_info: Option<RoyaltyInfo>,
         public_token_supply: bool,
@@ -128,13 +129,13 @@ mod tests {
         assert_eq!(config.name, "sec721".to_string());
         assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
-        assert_eq!(config.token_supply_is_public, false);
-        assert_eq!(config.owner_is_public, false);
-        assert_eq!(config.sealed_metadata_is_enabled, false);
-        assert_eq!(config.unwrap_to_private, false);
-        assert_eq!(config.minter_may_update_metadata, true);
-        assert_eq!(config.owner_may_update_metadata, false);
-        assert_eq!(config.burn_is_enabled, false);
+        assert!(!config.token_supply_is_public);
+        assert!(!config.owner_is_public);
+        assert!(!config.sealed_metadata_is_enabled);
+        assert!(!config.unwrap_to_private);
+        assert!(config.minter_may_update_metadata);
+        assert!(!config.owner_may_update_metadata);
+        assert!(!config.burn_is_enabled);
 
         let expected_see = DisplayRoyaltyInfo {
             decimal_places_in_rates: 2,
@@ -211,7 +212,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::RoyaltyInfo { royalty_info } => {
-                assert_eq!(royalty_info, Some(expected_see.clone()));
+                assert_eq!(royalty_info, Some(expected_see));
             }
             _ => panic!("unexpected"),
         }
@@ -235,13 +236,13 @@ mod tests {
         assert_eq!(config.name, "sec721".to_string());
         assert_eq!(config.admin, deps.api.addr_canonicalize("admin").unwrap());
         assert_eq!(config.symbol, "S721".to_string());
-        assert_eq!(config.token_supply_is_public, true);
-        assert_eq!(config.owner_is_public, true);
-        assert_eq!(config.sealed_metadata_is_enabled, true);
-        assert_eq!(config.unwrap_to_private, true);
-        assert_eq!(config.minter_may_update_metadata, false);
-        assert_eq!(config.owner_may_update_metadata, true);
-        assert_eq!(config.burn_is_enabled, false);
+        assert!(config.token_supply_is_public);
+        assert!(config.owner_is_public);
+        assert!(config.sealed_metadata_is_enabled);
+        assert!(config.unwrap_to_private);
+        assert!(!config.minter_may_update_metadata);
+        assert!(config.owner_may_update_metadata);
+        assert!(!config.burn_is_enabled);
 
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: None,
@@ -360,7 +361,7 @@ mod tests {
         };
         let execute_msg = ExecuteMsg::SetRoyaltyInfo {
             token_id: None,
-            royalty_info: Some(royalty_info_for_failure.clone()),
+            royalty_info: Some(royalty_info_for_failure),
             padding: None,
         };
         let handle_result = execute(
@@ -506,7 +507,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::RoyaltyInfo { royalty_info } => {
-                assert_eq!(royalty_info, Some(expected_see.clone()));
+                assert_eq!(royalty_info, Some(expected_see));
             }
             _ => panic!("unexpected"),
         }
@@ -525,7 +526,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::RoyaltyInfo { royalty_info } => {
-                assert_eq!(royalty_info, Some(expected_hidden.clone()));
+                assert_eq!(royalty_info, Some(expected_hidden));
             }
             _ => panic!("unexpected"),
         }
@@ -631,7 +632,7 @@ mod tests {
         };
         let execute_msg = ExecuteMsg::SetRoyaltyInfo {
             token_id: None,
-            royalty_info: Some(default.clone()),
+            royalty_info: Some(default),
             padding: None,
         };
         let handle_result = execute(
@@ -673,7 +674,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::RoyaltyInfo { royalty_info } => {
-                assert_eq!(royalty_info, Some(default_hide.clone()));
+                assert_eq!(royalty_info, Some(default_hide));
             }
             _ => panic!("unexpected"),
         }
@@ -682,8 +683,8 @@ mod tests {
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: Some("default".to_string()),
             viewer: Some(ViewerInfo {
-                address: alice.clone(),
-                viewing_key: alice_key.clone(),
+                address: alice,
+                viewing_key: alice_key,
             }),
         };
         let query_result = query(deps.as_ref(), mock_env(), query_msg);
@@ -762,7 +763,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier { royalty_info, .. } => {
-                assert_eq!(royalty_info, Some(individual_hide.clone()));
+                assert_eq!(royalty_info, Some(individual_hide));
             }
             _ => panic!("unexpected"),
         }
@@ -797,7 +798,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier { royalty_info, .. } => {
-                assert_eq!(royalty_info, Some(individual_see.clone()));
+                assert_eq!(royalty_info, Some(individual_see));
             }
             _ => panic!("unexpected"),
         }
@@ -806,8 +807,8 @@ mod tests {
         let query_msg = QueryMsg::RoyaltyInfo {
             token_id: None,
             viewer: Some(ViewerInfo {
-                address: admin.clone(),
-                viewing_key: admin_key.clone(),
+                address: admin,
+                viewing_key: admin_key,
             }),
         };
         let query_result = query(deps.as_ref(), mock_env(), query_msg);
@@ -837,7 +838,7 @@ mod tests {
         // test trying to set royalties for a token if not the creator
         let execute_msg = ExecuteMsg::SetRoyaltyInfo {
             token_id: Some("default".to_string()),
-            royalty_info: Some(individual.clone()),
+            royalty_info: Some(individual),
             padding: None,
         };
         let handle_result = execute(
@@ -865,8 +866,8 @@ mod tests {
         let query_msg = QueryMsg::NftDossier {
             token_id: "specified".to_string(),
             viewer: Some(ViewerInfo {
-                address: bob.clone(),
-                viewing_key: bob_key.clone(),
+                address: bob,
+                viewing_key: bob_key,
             }),
             include_expired: None,
         };
@@ -874,7 +875,7 @@ mod tests {
         let query_answer: QueryAnswer = from_binary(&query_result.unwrap()).unwrap();
         match query_answer {
             QueryAnswer::NftDossier { royalty_info, .. } => {
-                assert_eq!(royalty_info, Some(default_see.clone()));
+                assert_eq!(royalty_info, Some(default_see));
             }
             _ => panic!("unexpected"),
         }
@@ -934,7 +935,7 @@ mod tests {
         // test unknown token id error when supply is private
         let execute_msg = ExecuteMsg::SetRoyaltyInfo {
             token_id: Some("NFT".to_string()),
-            royalty_info: Some(royalties.clone()),
+            royalty_info: Some(royalties),
             padding: None,
         };
         let handle_result = execute(
