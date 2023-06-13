@@ -911,6 +911,7 @@ mod tests {
                     height: 10,
                     time: Timestamp::from_seconds(100),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -1026,6 +1027,7 @@ mod tests {
                     height: 1,
                     time: Timestamp::from_seconds(100),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -1143,6 +1145,7 @@ mod tests {
                     height: 1,
                     time: Timestamp::from_seconds(100),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -1253,6 +1256,7 @@ mod tests {
                     height: 10000,
                     time: Timestamp::from_seconds(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -1453,6 +1457,7 @@ mod tests {
                     height: 10,
                     time: Timestamp::from_seconds(100),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -2743,6 +2748,7 @@ mod tests {
                     height: 500,
                     time: Timestamp::from_seconds(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -2778,6 +2784,7 @@ mod tests {
                     height: 500,
                     time: Timestamp::from_seconds(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -3501,6 +3508,7 @@ mod tests {
                     height: 500,
                     time: Timestamp::from_seconds(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -3566,6 +3574,7 @@ mod tests {
                     height: 500,
                     time: Timestamp::from_seconds(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -3625,6 +3634,7 @@ mod tests {
                     height: 500,
                     time: Timestamp::from_seconds(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -3709,6 +3719,7 @@ mod tests {
                     height: 500,
                     time: Timestamp::from_seconds(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -3822,6 +3833,7 @@ mod tests {
                     height: 500,
                     time: Timestamp::from_seconds(1000000),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -4476,6 +4488,7 @@ mod tests {
                     height: 2,
                     time: Timestamp::from_seconds(2),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -4529,6 +4542,7 @@ mod tests {
                     height: 3,
                     time: Timestamp::from_seconds(3),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -4572,6 +4586,7 @@ mod tests {
                     height: 4,
                     time: Timestamp::from_seconds(4),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -4631,6 +4646,7 @@ mod tests {
                     height: 10,
                     time: Timestamp::from_seconds(10),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -4679,6 +4695,7 @@ mod tests {
                     height: 20,
                     time: Timestamp::from_seconds(20),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -4709,6 +4726,7 @@ mod tests {
                     height: 20,
                     time: Timestamp::from_seconds(20),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -4787,6 +4805,7 @@ mod tests {
                     height: 30,
                     time: Timestamp::from_seconds(30),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -4817,6 +4836,7 @@ mod tests {
                     height: 30,
                     time: Timestamp::from_seconds(30),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
@@ -4857,6 +4877,7 @@ mod tests {
                     height: 57,
                     time: Timestamp::from_seconds(57),
                     chain_id: "cosmos-testnet-14002".to_string(),
+                    random: None,
                 },
                 transaction: None,
                 contract: cosmwasm_std::ContractInfo {
